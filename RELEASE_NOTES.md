@@ -1,17 +1,16 @@
 # Repository and deployment notes
 
-## What is included
+## AWS-only behavior
 
-- A bilingual, responsive frontend with a build step that injects public runtime configuration into `dist/index.html`.
-- An AWS SAM stack for Cognito, API Gateway HTTP API, Python 3.12 Lambda, four DynamoDB tables and their indexes, and CloudWatch logs/dashboard/alarms.
-- A fail-closed hosted build: the deployment mode and local-auth setting must be explicit; API mode requires valid Cognito IDs and an HTTPS API base URL.
-- Cognito subject-to-profile seeding tools, including dry-run modes, and an idempotent application-activity-index migration utility.
-- Least-privilege Lambda data access: read-only policy templates for each table, explicitly scoped transactional write permission, and a limited activity-summary recovery write.
-- Transaction-bounded archive/restore logic and unit tests for data-index helpers, profile mappings, deployment configuration, frontend behavior, and infrastructure contracts.
-- A short project README plus dedicated architecture and deployment guides.
+- Frontend sign-in is handled exclusively by Amazon Cognito. There is no local-auth fallback, seeded sample workspace, demo reset action, browser-side identity map, or local work-data database.
+- Every application data read/write uses the Cognito-authenticated API backed by API Gateway, Python Lambda, and DynamoDB. The browser holds a transient view snapshot for rendering only; it does not persist a work-data cache or continue from offline demo data.
+- The frontend build requires a real Cognito User Pool ID, public app-client ID, and HTTPS API base URL. The build emits only public browser configuration; secrets must never be supplied to frontend code.
+- The AWS SAM stack provisions Cognito, API Gateway, Python 3.12 Lambda, four DynamoDB tables and required indexes, and CloudWatch logs/dashboard/alarms.
+- Lambda IAM is constrained to read-only table policies, transactional write operations on WorkItems/ActivityEvents/Archive, and the narrow ActivityEvents batch-write recovery path.
+- Archive/restore handling is transaction-bounded. Trusted administration scripts validate Cognito-to-profile mappings and support dry runs for profile seeding and activity-index migration.
 
-## Validation and deployment status
+## Validation and release boundary
 
-The GitHub Actions workflow in `.github/workflows/validate.yml` is the source of truth for automated validation. It runs frontend tests, builds the Amplify artifact, tests Python helpers, checks the SAM template and DynamoDB-index contract, compiles Python sources, runs `sam validate --lint`, and builds the Lambda deployment artifact.
+The GitHub Actions workflow in `.github/workflows/validate.yml` runs frontend regression tests, AWS-only build-configuration tests, backend/admin-script tests, infrastructure contract checks, Python compilation, `sam validate --lint`, and `sam build`. It uses non-production test configuration only to verify the frontend build path.
 
-These checks validate and package the project; they do **not** deploy the SAM stack into an AWS account. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for account setup, manual backend deployment, Cognito provisioning, Amplify configuration, acceptance tests, and recovery procedures. Do not treat a green CI run as proof that a live AWS environment has been configured or smoke-tested.
+CI validation does **not** deploy the SAM stack or prove that any AWS account is configured. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for first deployment, Cognito provisioning, Amplify environment variables, acceptance testing, migrations, and recovery. Do not treat a green CI run as a live deployment or smoke test.

@@ -34,7 +34,12 @@ jobs:
       - name: Test frontend and built-in data API
         run: npm test
 
-      - name: Build the Amplify artifact
+      - name: Build the AWS-only Amplify artifact with CI test configuration
+        env:
+          TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID: us-east-1_CiValidation123
+          TEAM_FOLLOW_UP_COGNITO_CLIENT_ID: ciValidationPublicClient123456789
+          TEAM_FOLLOW_UP_API_BASE_URL: https://ci-api.execute-api.us-east-1.amazonaws.com
+          TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE: custom:teamUserId
         run: npm run build
 
       - name: Test backend helpers

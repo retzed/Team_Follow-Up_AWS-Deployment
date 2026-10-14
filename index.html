@@ -3906,5 +3906,137 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
 }
 .history-search-hint { display: none !important; }
 </style>
+
+<style id="mobile-date-input-overflow-fix-v3">
+/* Final mobile date-control sizing. This block is intentionally last in the document,
+   after the legacy responsive rules which previously forced date fields wider than
+   their grid tracks on phones. */
+@media (max-width: 700px) {
+  /* Let every containing layout shrink below the native date input's intrinsic width. */
+  .sidebar,
+  .sidebar-content,
+  #mainContent,
+  #mainContent .child-search-section,
+  #mainContent .child-toolbar,
+  .modal,
+  .modal-content,
+  .modal .form-grid {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Workspace From/To filters: one full-width field per row. */
+  .sidebar-content > .date-filter,
+  .date-filter {
+    display: flex !important;
+    flex: 0 1 auto !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    overflow: hidden;
+  }
+
+  .sidebar-content > .date-filter > .field,
+  .date-filter > .field {
+    display: flex !important;
+    flex: 0 1 auto !important;
+    flex-direction: column !important;
+    align-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    grid-column: auto !important;
+    overflow: hidden;
+  }
+
+  /* Use the same hard width constraints for every native date input, including
+     child filters and date controls inside create/edit popups. */
+  input[type="date"],
+  .date-input,
+  .modal input[type="date"],
+  .modal .date-input {
+    display: block !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-inline-size: 0 !important;
+    max-inline-size: 100% !important;
+    inline-size: 100% !important;
+    margin: 0 !important;
+    padding-inline: 8px !important;
+    flex: 0 1 auto !important;
+  }
+
+  /* Child-item filters had a later rule giving From/To narrow grid tracks plus
+     a max-content Clear column. Override that layout instead of just the inputs. */
+  #mainContent .child-toolbar.expanded {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #mainContent .child-toolbar .child-date-row {
+    display: flex !important;
+    flex: 0 1 auto !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 4 !important;
+    gap: 9px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden;
+  }
+
+  #mainContent .child-toolbar .child-date-row > .child-filter-field {
+    display: flex !important;
+    flex: 0 1 auto !important;
+    flex-direction: column !important;
+    align-self: stretch !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden;
+  }
+
+  #mainContent .child-toolbar .child-date-row .child-mobile-clear-button {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    align-self: flex-start !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  /* Dialog field/grid wrappers must also shrink; otherwise their child date
+     controls can enlarge the entire edit/create popup. */
+  .modal .form-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100% !important;
+  }
+
+  .modal .form-grid > .field,
+  .modal .field {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    grid-column: 1 / -1 !important;
+  }
+}
+</style>
+
 </body>
 </html>

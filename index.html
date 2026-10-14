@@ -1229,7 +1229,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   const mergeUnique=(target,rows,key='id')=>{const map=new Map(target.map(row=>[String(row[key]),row]));for(const row of rows||[]){const id=String(row[key]||'');if(id)map.set(id,row);}return [...map.values()];};
   const mergeActivityUnique=(target,rows)=>{
    const map=new Map();
-   const signature=e=>JSON.stringify([String(e.itemId||''),String(e.rootParentId||''),String(e.parentId||''),String(e.at||''),String(e.action||e.summary||''),String(e.kind||''),String(e.userId||e.actorUserId||'')]);
+   const signature=e=>JSON.stringify([String(e.itemId||''),String(e.rootParentId||''),String(e.parentId||''),String(e.action||e.summary||''),String(e.kind||''),String(e.userId||e.actorUserId||'')]);
    const hash=value=>{let n=2166136261;for(let i=0;i<value.length;i++){n^=value.charCodeAt(i);n=Math.imul(n,16777619);}return (n>>>0).toString(36);};
    for(const row of [...(target||[]),...(rows||[])]){
     const id=String(row.id||row.eventId||'');if(!id)continue;
@@ -1692,7 +1692,7 @@ function normalizeActivityEventForUi(raw){
  if(!event.rootParentType)event.rootParentType=String(root?.type||snapshot?.type||(rootId&&rootId===event.itemId?event.itemType:'')||event.rootTypeSnapshot||'');
  return event;
 }
-function activityIdentity(event){return JSON.stringify([String(event.itemId||''),String(event.rootParentId||''),String(event.parentId||''),String(event.at||''),String(event.action||event.summary||''),String(event.kind||''),String(event.userId||event.actorUserId||'')]);}
+function activityIdentity(event){return JSON.stringify([String(event.itemId||''),String(event.rootParentId||''),String(event.parentId||''),String(event.action||event.summary||''),String(event.kind||''),String(event.userId||event.actorUserId||'')]);}
 function activityLogicalIdentity(event){return JSON.stringify([String(event.itemId||''),String(event.rootParentId||''),String(event.parentId||''),String(event.action||event.summary||''),String(event.kind||''),String(event.userId||event.actorUserId||'')]);}
 function shortActivityHash(value){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(36);}
 function mergeActivityRows(existingRows,incomingRows){

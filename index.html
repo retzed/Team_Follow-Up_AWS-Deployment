@@ -1431,7 +1431,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   ev.preventDefault();if(state.submitting)return;setError('');
   const username=$('signInUsername').value.trim();const password=$('signInPassword').value;const code=$('signInChallengeInput').value.trim();
   if(!username){setError(ar?'أدخل اسم المستخدم.':'Enter your username.');$('signInUsername').focus();return;}
-  if(!state.modules){if(!state.modules){setError(isConfigured()?copy.sdkError:copy.configure);return;}
+  if(!state.modules){setError(isConfigured()?copy.sdkError:copy.configure);return;}
   try{
    if(state.mode==='signIn'){
     if(!password){setError(copy.needPassword);$('signInPassword').focus();return;}

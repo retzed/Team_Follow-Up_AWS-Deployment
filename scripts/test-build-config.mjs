@@ -28,6 +28,10 @@ function getRuntimeConfig(html) {
 
 const hostedBuildWithoutExplicitMode = build({ AWS_APP_ID: 'amplify-test-app' });
 assert.notEqual(hostedBuildWithoutExplicitMode.status, 0, 'Amplify builds must set data mode explicitly');
+const hostedBuildWithEmptyMode = build({ AWS_APP_ID: 'amplify-test-app', TEAM_FOLLOW_UP_DATA_MODE: '', TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED: 'false' });
+assert.notEqual(hostedBuildWithEmptyMode.status, 0, 'Amplify must reject an empty data-mode value instead of defaulting to demo mode');
+const hostedBuildWithWhitespaceMode = build({ AWS_APP_ID: 'amplify-test-app', TEAM_FOLLOW_UP_DATA_MODE: '   ', TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED: 'false' });
+assert.notEqual(hostedBuildWithWhitespaceMode.status, 0, 'Amplify must reject whitespace-only data-mode values');
 const hostedBuildWithoutExplicitLocalAuth = build({ AWS_APP_ID: 'amplify-test-app', TEAM_FOLLOW_UP_DATA_MODE: 'builtin' });
 assert.notEqual(hostedBuildWithoutExplicitLocalAuth.status, 0, 'Amplify builds must set the local-auth flag explicitly');
 

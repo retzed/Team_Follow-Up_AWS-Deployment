@@ -7,10 +7,13 @@ const readString = (key, fallback) => {
 };
 const isAmplifyBuild = Boolean(process.env.AWS_APP_ID);
 const configuredDataMode = process.env.TEAM_FOLLOW_UP_DATA_MODE;
-if (isAmplifyBuild && configuredDataMode === undefined) {
-  throw new Error('Set TEAM_FOLLOW_UP_DATA_MODE explicitly in Amplify Hosting; refusing to publish with an implicit local/demo mode.');
+if (isAmplifyBuild && (configuredDataMode === undefined || !configuredDataMode.trim())) {
+  throw new Error('Set TEAM_FOLLOW_UP_DATA_MODE to a non-empty value in Amplify Hosting; refusing to publish with an implicit local/demo mode.');
 }
-const dataMode = (configuredDataMode || readString('dataMode', 'builtin')).toLowerCase();
+if (configuredDataMode !== undefined && !configuredDataMode.trim()) {
+  throw new Error('TEAM_FOLLOW_UP_DATA_MODE must not be empty.');
+}
+const dataMode = (configuredDataMode !== undefined ? configuredDataMode : readString('dataMode', 'builtin')).trim().toLowerCase();
 if (!['builtin', 'api'].includes(dataMode)) throw new Error('TEAM_FOLLOW_UP_DATA_MODE must be builtin or api.');
 const userPoolId = process.env.TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID || readString('userPoolId', 'REPLACE_WITH_COGNITO_USER_POOL_ID');
 const clientId = process.env.TEAM_FOLLOW_UP_COGNITO_CLIENT_ID || readString('userPoolClientId', 'REPLACE_WITH_PUBLIC_APP_CLIENT_ID');
@@ -24,16 +27,17 @@ if (process.env.TEAM_FOLLOW_UP_COGNITO_IDENTITY_MAP) {
 }
 const configuredCognito = !/REPLACE_WITH|^\s*$/.test(userPoolId) && !/REPLACE_WITH|^\s*$/.test(clientId);
 const localEnv = process.env.TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED;
+const normalizedLocalEnv = localEnv === undefined ? undefined : localEnv.trim().toLowerCase();
 if (isAmplifyBuild && localEnv === undefined) {
   throw new Error('Set TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED explicitly in Amplify Hosting; use false for hosted builds.');
 }
 const truthy = ['1', 'true', 'yes', 'on'];
 const falsy = ['0', 'false', 'no', 'off'];
-if (localEnv !== undefined && ![...truthy, ...falsy].includes(localEnv.toLowerCase())) {
+if (normalizedLocalEnv !== undefined && ![...truthy, ...falsy].includes(normalizedLocalEnv)) {
   throw new Error('TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED must be true or false.');
 }
 const localAuthEnabled = localEnv !== undefined
-  ? truthy.includes(localEnv.toLowerCase())
+  ? truthy.includes(normalizedLocalEnv)
   : (dataMode === 'builtin' && !configuredCognito);
 if (dataMode === 'api' && !configuredCognito) throw new Error('API mode requires TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID and TEAM_FOLLOW_UP_COGNITO_CLIENT_ID.');
 if (dataMode === 'api' && /REPLACE_WITH|^\s*$/.test(apiBaseUrl)) throw new Error('API mode requires TEAM_FOLLOW_UP_API_BASE_URL.');

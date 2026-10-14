@@ -833,8 +833,6 @@ body.signin-open{overflow:hidden} .signin-screen{position:fixed;inset:0;z-index:
 .signin-submit{width:100%;height:44px;margin-top:2px;font-size:13px}
 .signin-error{font-size:12px;color:var(--red);background:var(--red-bg);border:1px solid color-mix(in srgb,var(--red) 26%,var(--border));border-radius:10px;padding:10px 12px;line-height:1.5}
 .signin-error[hidden]{display:none!important}
-.signin-local-note{font-size:11px;line-height:1.5;color:var(--amber);background:var(--amber-bg);border:1px solid color-mix(in srgb,var(--amber) 30%,var(--border));border-radius:10px;padding:10px 12px}
-.signin-local-note[hidden]{display:none!important}
 .signin-link{align-self:flex-start;border:0;background:transparent;color:var(--accent);font-size:12px;font-weight:700;padding:1px 0;text-decoration:none}
 .signin-link:hover{text-decoration:underline}
 .signin-challenge-help{font-size:12px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
@@ -1144,7 +1142,6 @@ html[dir="rtl"] #signOutButton svg {
   <form class="signin-card" id="signInForm" novalidate>
     <div class="signin-brand"><span class="signin-mark" id="signInLogoMark" aria-hidden="true"></span><span class="signin-brand-copy"><strong>Team Follow-Up</strong><small id="signInBrandSubtitle">Work, connected.</small></span></div>
     <div class="signin-heading"><h1 id="signInTitle">Sign in</h1><p id="signInSubtitle">Enter your team username to continue.</p></div>
-    <div class="signin-local-note" id="signInModeNote" role="note" hidden></div>
     <label class="signin-field" for="signInUsername"><span id="signInUsernameLabel">Username</span><input id="signInUsername" name="username" type="text" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required placeholder="Enter username"></label>
     <label class="signin-field" for="signInPassword"><span id="signInPasswordLabel">Password</span><input id="signInPassword" name="password" type="password" autocomplete="current-password" required placeholder="Enter password"><select id="signInChallengeSelect" hidden></select></label>
     <label class="signin-field" id="signInChallengeField" for="signInChallengeInput" hidden><span id="signInChallengeLabel">Verification code</span><input id="signInChallengeInput" name="challenge" type="text" autocomplete="one-time-code" placeholder="Enter code"></label>
@@ -1155,376 +1152,188 @@ html[dir="rtl"] #signOutButton svg {
   </form>
 </section>
 <script id="team-follow-up-runtime-config">
-/* Generated at build time from public Amplify environment variables. Never put secrets here. */
+/* Generated at build time. All values below are public AWS browser configuration. */
 window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
-  "cognito": {
-    "userPoolId": "REPLACE_WITH_COGNITO_USER_POOL_ID",
-    "userPoolClientId": "REPLACE_WITH_PUBLIC_APP_CLIENT_ID",
-    "teamUserAttribute": "custom:teamUserId",
-    "identityMap": {}
+  cognito: {
+    userPoolId: "",
+    userPoolClientId: "",
+    teamUserAttribute: "custom:teamUserId"
   },
-  "localAuth": {
-    "enabled": true
-  },
-  "dataMode": "builtin",
-  "apiBaseUrl": "REPLACE_WITH_API_GATEWAY_BASE_URL"
+  apiBaseUrl: ""
 });
-</script>
+</script></script></script>
 <script id="team-follow-up-data-api">
-/*
- * Team Follow-Up data access layer.
- * The built-in adapter models DynamoDB tables + GSIs in browser storage and exposes
- * asynchronous REST-shaped calls. Switch dataMode to "api" only after deploying the
- * API Gateway/Lambda/DynamoDB backend described in backend/template.yaml.
- */
+/* AWS-only data access. There is no browser database, mock route, or local adapter. */
 (function(){
  'use strict';
- const cfg=window.TEAM_FOLLOW_UP_CONFIG||{};
- const mode=String(cfg.dataMode||'builtin').toLowerCase();
- const TABLES_KEY='team-follow-up-builtin-dynamodb-tables-v1';
- const names=Object.freeze({workItems:'TeamFollowUp-WorkItems',activity:'TeamFollowUp-ActivityEvents',users:'TeamFollowUp-UserProfiles',archive:'TeamFollowUp-Archive'});
- let memoryTables=null;let tableStorageSaveTimer=0;
  const clone=value=>JSON.parse(JSON.stringify(value??null));
- const now=()=>new Date().toISOString();
- const sortStamp=(v,id)=>`${String(v||'1970-01-01T00:00:00.000Z')}#${id}`;
- function buildArchiveRecord(item,tables,archivedAt,archivedByUserId,lookupIndex){
-  const x=clone(item)||{};const itemId=String(x.itemId||x.id||'');
-  const workById=lookupIndex?.workById||new Map((tables.workItems||[]).map(v=>[String(v.itemId||v.id),v]));
-  const archiveById=lookupIndex?.archiveById||new Map((tables.archiveItems||[]).map(v=>[String(v.archiveId||v.itemId||v.id),v]));
-  const rootId=['project','job'].includes(x.type)?itemId:String(x.rootParentId||x.parentId||'');
-  const rootRow=workById.get(rootId)||archiveById.get(rootId);
-  const parentId=String(x.parentId||'');
-  const parentRow=parentId?(workById.get(parentId)||archiveById.get(parentId)):null;
-  delete x.deletedAt;
-  x.itemId=itemId;x.archiveId=itemId;x.archiveRootId=rootId;x.archiveRootName=rootId===itemId?String(x.name||''):String(rootRow?.name||rootRow?.archiveRootName||'');x.archiveRootType=rootId===itemId?String(x.type||''):String(rootRow?.type||rootRow?.archiveRootType||'');
-  x.archiveParentId=x.parentId||null;x.archiveParentName=String(parentRow?.name||parentRow?.archiveParentName||x.archiveParentName||'');x.archivedAt=archivedAt||x.archivedAt||now();x.archivedByUserId=archivedByUserId||x.updatedByUserId||x.updatedBy||'';
-  x.archivePK='ARCHIVE';x.archiveSort=sortStamp(x.archivedAt,itemId);x.archiveRootPK=`ROOT#${rootId}`;x.archiveRootSort=sortStamp(x.archivedAt,itemId);
-  return x;
- }
- function normalizeTables(tables){
-  if(!Array.isArray(tables.archiveItems))tables.archiveItems=[];
-  const archivedIds=new Set(tables.archiveItems.map(x=>String(x.archiveId||x.itemId||x.id||'')));
-  const remaining=[];let migrated=false;
-  for(const row of tables.workItems||[]){
-   if(row.deletedAt){const id=String(row.itemId||row.id||'');if(id&&!archivedIds.has(id)){tables.archiveItems.push(buildArchiveRecord(row,tables,row.deletedAt,row.updatedByUserId||row.updatedBy));archivedIds.add(id);}migrated=true;}
-   else remaining.push(row);
-  }
-  if(migrated)tables.workItems=remaining;
-  return {tables,migrated};
- }
- function flushTableStorage(){if(tableStorageSaveTimer){clearTimeout(tableStorageSaveTimer);tableStorageSaveTimer=0;}try{if(memoryTables)localStorage.setItem(TABLES_KEY,JSON.stringify(memoryTables));}catch(e){console.warn('Built-in tables cannot persist in browser storage; this session will use memory storage.',e);}}
- function scheduleTableStorageSave(){if(typeof setTimeout!=='function'){flushTableStorage();return;}if(tableStorageSaveTimer)clearTimeout(tableStorageSaveTimer);tableStorageSaveTimer=setTimeout(()=>{tableStorageSaveTimer=0;flushTableStorage();},0);}
- if(typeof window.addEventListener==='function')window.addEventListener('pagehide',flushTableStorage,{capture:true});
- function readTables(){
-  if(memoryTables){
-   if(!Array.isArray(memoryTables.archiveItems)){memoryTables.archiveItems=[];scheduleTableStorageSave();}
-   return clone(memoryTables);
-  }
-  try{const raw=localStorage.getItem(TABLES_KEY);if(raw){const t=JSON.parse(raw);if(t&&Array.isArray(t.workItems)&&Array.isArray(t.activityEvents)&&Array.isArray(t.userProfiles)){const normalized=normalizeTables(t);memoryTables=normalized.tables;if(normalized.migrated||!Array.isArray(t.archiveItems))scheduleTableStorageSave();return clone(memoryTables);}}
-  }catch(e){console.warn('Built-in DynamoDB tables are not readable; using memory storage.',e);}
-  return null;
- }
- function writeTables(t){memoryTables=t;scheduleTableStorageSave();}
- function ensureIndexFields(item){
-  const x=clone(item)||{};const itemId=String(x.itemId||x.id||'');delete x.id;x.itemId=itemId;
-  const top=['project','job'].includes(x.type);const rootId=top?itemId:String(x.rootParentId||x.parentId||'');
-  x.listPK=top?'TOP_LEVEL':`PARENT#${String(x.parentId||'')}`;
-  x.updatedSort=sortStamp(x.updatedAt,itemId);x.createdSort=sortStamp(x.createdAt,itemId);
-  x.rootPK=`ROOT#${rootId}`;x.rootUpdatedSort=sortStamp(x.updatedAt,itemId);
-  if(x.ownerId){x.assigneePK=`USER#${x.ownerId}`;x.assigneeUpdatedSort=sortStamp(x.updatedAt,itemId);x.assigneeCreatedSort=sortStamp(x.createdAt,itemId);}
-  else {delete x.assigneePK;delete x.assigneeUpdatedSort;delete x.assigneeCreatedSort;}
-  return x;
- }
- function ensureActivityIndexes(event){
-  const e=clone(event)||{};const id=String(e.eventId||e.id||'');delete e.id;e.eventId=id;
-  e.itemNameSnapshot=e.itemNameSnapshot||e.itemName||'';e.itemTypeSnapshot=e.itemTypeSnapshot||e.itemType||'';e.actorUserId=e.actorUserId||e.userId||'';
-  delete e.itemName;delete e.itemType;delete e.userId;
-  e.itemPK=`ITEM#${String(e.itemId||'')}`;e.itemSort=sortStamp(e.at,id);
-  e.applicationPK='APPLICATION';e.applicationSort=sortStamp(e.at,id);
-  e.rootPK=`ROOT#${String(e.rootParentId||'')}`;e.rootSort=sortStamp(e.at,id);
-  if(e.parentId){e.parentPK=`PARENT#${e.parentId}`;e.parentSort=sortStamp(e.at,id);}else{delete e.parentPK;delete e.parentSort;}
-  return e;
- }
- function activityIdentity(event){return JSON.stringify([String(event.itemId||''),String(event.rootParentId||''),String(event.parentId||''),String(event.action||event.summary||''),String(event.kind||''),String(event.userId||event.actorUserId||'')]);}
- function storeActivityEvent(tables,raw){
-  let event=ensureActivityIndexes(raw);if(!event.eventId)throw new Error('eventId is required.');
-  const existingIndex=tables.activityEvents.findIndex(row=>String(row.eventId||row.id||'')===event.eventId);
-  if(existingIndex<0){tables.activityEvents.push(event);return event;}
-  const existing=tables.activityEvents[existingIndex];
-  if(activityIdentity(existing)===activityIdentity(event)){
-   event=ensureActivityIndexes({...existing,...event,eventId:event.eventId});tables.activityEvents[existingIndex]=event;return event;
-  }
-  // A duplicate identifier must never replace a distinct immutable audit row.
-  const base=event.eventId;let candidate;
-  do{candidate=`${base}_collision_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`;}
-  while(tables.activityEvents.some(row=>String(row.eventId||row.id||'')===candidate));
-  const rawCopy={...(raw||{}),id:candidate,eventId:candidate};event=ensureActivityIndexes(rawCopy);tables.activityEvents.push(event);return event;
- }
  function toAppItem(record){
-  const x=clone(record)||{};x.id=String(x.id||x.itemId||'');delete x.itemId;
-  for(const k of ['listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK','assigneeUpdatedSort','assigneeCreatedSort','deletedAt'])delete x[k];
-  return x;
+  const item=clone(record)||{};item.id=String(item.id||item.itemId||'');delete item.itemId;
+  for(const key of ['listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK','assigneeUpdatedSort','assigneeCreatedSort','deletedAt'])delete item[key];
+  return item;
  }
  function toAppEvent(record){
-  const x=clone(record)||{};x.id=String(x.id||x.eventId||'');delete x.eventId;
-  if(!x.itemName&&x.itemNameSnapshot)x.itemName=x.itemNameSnapshot;
-  if(!x.itemType&&x.itemTypeSnapshot)x.itemType=x.itemTypeSnapshot;
-  if(!x.userId&&x.actorUserId)x.userId=x.actorUserId;
-  for(const k of ['itemNameSnapshot','itemTypeSnapshot','actorUserId','itemPK','itemSort','applicationPK','applicationSort','rootPK','rootSort','parentPK','parentSort'])delete x[k];
-  return x;
+  const event=clone(record)||{};event.id=String(event.id||event.eventId||'');delete event.eventId;
+  if(!event.itemName&&event.itemNameSnapshot)event.itemName=event.itemNameSnapshot;
+  if(!event.itemType&&event.itemTypeSnapshot)event.itemType=event.itemTypeSnapshot;
+  if(!event.userId&&event.actorUserId)event.userId=event.actorUserId;
+  for(const key of ['itemNameSnapshot','itemTypeSnapshot','actorUserId','itemPK','itemSort','applicationPK','applicationSort','rootPK','rootSort','parentPK','parentSort'])delete event[key];
+  return event;
  }
- function toAppArchiveRecord(record){const x=toAppItem(record);x.id=String(record.archiveId||record.itemId||record.id||'');x.archiveRootId=String(record.archiveRootId||record.rootParentId||x.id);x.archiveRootName=String(record.archiveRootName||record.name||'');x.archivedAt=String(record.archivedAt||record.deletedAt||'');x.archivedBy=String(record.archivedByUserId||record.updatedByUserId||record.updatedBy||'');for(const k of ['archiveId','archivePK','archiveSort','archiveRootPK','archiveRootSort','archiveParentId','archivedByUserId','deletedAt'])delete x[k];return x;}
- function toTableUser(user){const u=clone(user)||{};const row={userId:String(u.userId||u.id||''),displayName:String(u.displayName||u.name||''),role:String(u.role||'AWS Engineer'),enabled:u.enabled!==false};const sub=u.cognitoSub||u.sub;if(sub)row.cognitoSub=String(sub);return row;}
- function toAppUser(user){return {id:String(user.userId||user.id||''),name:String(user.displayName||user.name||''),role:String(user.role||'AWS Engineer'),...(user.cognitoSub?{cognitoSub:user.cognitoSub}:{})};}
- function snapshotFromTables(tables){
-  const active=(tables.workItems||[]).filter(x=>!x.deletedAt).map(toAppItem);
-  const parents=active.filter(x=>x.type==='project'||x.type==='job');
-  const children=active.filter(x=>x.type!=='project'&&x.type!=='job');
-  const activity=(tables.activityEvents||[]).map(toAppEvent);
-  const users=(tables.userProfiles||[]).filter(u=>u.enabled!==false).map(toAppUser);
-  return {schema:4,users,parents,children,activity};
+ function toAppArchiveRecord(record){
+  const item=toAppItem(record);item.id=String(record.archiveId||record.itemId||record.id||'');
+  item.archiveRootId=String(record.archiveRootId||record.rootParentId||item.id);
+  item.archiveRootName=String(record.archiveRootName||record.name||'');
+  item.archivedAt=String(record.archivedAt||record.deletedAt||'');
+  item.archivedBy=String(record.archivedByUserId||record.updatedByUserId||record.updatedBy||'');
+  for(const key of ['archiveId','archivePK','archiveSort','archiveRootPK','archiveRootSort','archiveParentId','archivedByUserId','deletedAt'])delete item[key];
+  return item;
  }
- function tableFromSnapshot(snapshot){
-  return {
-   schema:1,
-   workItems:[...(snapshot.parents||[]),...(snapshot.children||[])].map(ensureIndexFields),
-   activityEvents:(snapshot.activity||[]).map(ensureActivityIndexes),
-   userProfiles:(snapshot.users||[]).map(toTableUser),
-   archiveItems:[]
-  };
- }
- function logCall(method,path,source){try{const rows=window.__TEAM_FOLLOW_UP_API_LOG||(window.__TEAM_FOLLOW_UP_API_LOG=[]);rows.push({at:now(),method,path,adapter:source||mode});if(rows.length>300)rows.splice(0,rows.length-300);}catch(e){}}
- function itemSort(a,b,mode,direction){const key=mode==='updated'?'updatedSort':'createdSort';const ka=a[key]||'';const kb=b[key]||'';return (ka<kb?-1:ka>kb?1:0)*(direction==='asc'?1:-1);}
- function matchItem(x,p){
-  if(x.deletedAt)return false;
-  if(p.type&&p.type!=='all'&&x.type!==p.type)return false;
-  if(p.status&&p.status!=='all'&&p.status!=='not-completed'&&x.status!==p.status)return false;
-  if(p.status==='not-completed'&&x.status==='completed')return false;
-  if(p.priority&&p.priority!=='all'&&x.priority!==p.priority)return false;
-  if(p.query){const q=String(p.query).toLocaleLowerCase();if(!String(x.name||'').toLocaleLowerCase().includes(q)&&!String(x.description||'').toLocaleLowerCase().includes(q))return false;}
-  const dateMode=p.dateMode||'updated';const key=dateMode==='updated'?x.updatedAt:x.createdAt;
-  if(p.from&&String(key||'').slice(0,10)<p.from)return false;
-  if(p.to&&String(key||'').slice(0,10)>p.to)return false;
-  return true;
- }
- function sortItems(rows,p){const dir=p.direction||(p.dateMode==='created-asc'?'asc':'desc');const mode=String(p.dateMode||'updated')==='updated'?'updated':'created';return rows.sort((a,b)=>itemSort(a,b,mode,dir));}
- function mockRoute(method,path,body){
-  const url=new URL(path,'https://builtin.local/');const clean=url.pathname.replace(/\/+$/,'')||'/';const q=url.searchParams;
-  let tables=readTables();if(!tables)throw new Error('Built-in table store has not been initialized.');
-  const respond=value=>Promise.resolve(clone(value));
-  const persist=()=>writeTables(tables);
-  const allActive=()=>tables.workItems.filter(x=>!x.deletedAt);
-  if(method==='GET'&&clean==='/bootstrap')return respond({items:allActive().map(toAppItem),activity:tables.activityEvents.map(toAppEvent),users:tables.userProfiles.filter(u=>u.enabled!==false).map(toAppUser),tableNames:names,mode:'builtin'});
-  if(method==='GET'&&clean==='/users')return respond(tables.userProfiles.filter(u=>u.enabled!==false).map(toAppUser));
-  if(clean==='/items'&&method==='GET'){
-   let rows=allActive();const scope=q.get('scope');const parentId=q.get('parentId');const rootId=q.get('rootParentId');const assignee=q.get('assigneeUserId');
-   if(scope==='top-level'||q.get('listPK')==='TOP_LEVEL')rows=rows.filter(x=>x.listPK==='TOP_LEVEL');
-   if(parentId)rows=rows.filter(x=>x.listPK===`PARENT#${parentId}`);
-   if(rootId)rows=rows.filter(x=>x.rootPK===`ROOT#${rootId}`);
-   if(assignee)rows=rows.filter(x=>x.assigneePK===`USER#${assignee}`);
-   const p={type:q.get('type')||'all',status:q.get('status')||'all',priority:q.get('priority')||'all',query:q.get('q')||'',dateMode:q.get('dateMode')||'updated',from:q.get('from')||'',to:q.get('to')||'',direction:q.get('direction')||'desc'};
-   rows=rows.filter(x=>matchItem(x,p));rows.sort((a,b)=>itemSort(a,b,String(p.dateMode)==='updated'?'updated':'created',p.direction));
-   const limit=Math.max(1,Math.min(250,Number(q.get('limit')||100)));const offset=Math.max(0,Number(q.get('offset')||0));return respond({items:rows.slice(offset,offset+limit).map(toAppItem),count:rows.length,nextOffset:offset+limit<rows.length?offset+limit:null});
-  }
-  if(method==='GET'&&clean==='/items/assigned-to-me'){
-   const uid=q.get('userId');let rows=allActive().filter(x=>x.assigneePK===`USER#${uid}`);const p={type:q.get('type')||'all',status:q.get('status')||'all',priority:q.get('priority')||'all',query:q.get('q')||'',dateMode:q.get('dateMode')||'updated',from:q.get('from')||'',to:q.get('to')||'',direction:q.get('direction')||'desc'};rows=rows.filter(x=>matchItem(x,p));rows.sort((a,b)=>itemSort(a,b,String(p.dateMode)==='updated'?'updated':'created',p.direction));return respond({items:rows.map(toAppItem),count:rows.length});
-  }
-  let m=clean.match(/^\/items\/([^/]+)\/children$/);
-  if(method==='GET'&&m){const parentId=decodeURIComponent(m[1]);const p={type:q.get('type')||'all',status:q.get('status')||'all',priority:q.get('priority')||'all',query:q.get('q')||'',dateMode:q.get('dateMode')||'updated',from:q.get('from')||'',to:q.get('to')||'',direction:q.get('direction')||'desc'};let rows=allActive().filter(x=>x.listPK===`PARENT#${parentId}`).filter(x=>matchItem(x,p));rows.sort((a,b)=>itemSort(a,b,String(p.dateMode)==='updated'?'updated':'created',p.direction));const limit=Math.max(1,Math.min(250,Number(q.get('limit')||100)));const offset=Math.max(0,Number(q.get('offset')||0));return respond({items:rows.slice(offset,offset+limit).map(toAppItem),count:rows.length,nextOffset:offset+limit<rows.length?offset+limit:null});}
-  m=clean.match(/^\/items\/([^/]+)\/activity$/);
-  if(method==='GET'&&m){const itemId=decodeURIComponent(m[1]);const item=tables.workItems.find(x=>x.itemId===itemId);const scope=q.get('scope')||'item';let events;if(scope==='all'&&item&&['project','job'].includes(item.type))events=tables.activityEvents.filter(e=>e.rootPK===`ROOT#${itemId}`);else if(scope==='all'&&item&&item.type==='task')events=tables.activityEvents.filter(e=>e.itemPK===`ITEM#${itemId}`||e.parentPK===`PARENT#${itemId}`);else events=tables.activityEvents.filter(e=>e.itemPK===`ITEM#${itemId}`);const search=(q.get('q')||'').toLocaleLowerCase();if(search)events=events.filter(e=>[e.summary,e.action,e.itemNameSnapshot,e.actorUserId].some(v=>String(v||'').toLocaleLowerCase().includes(search)));events.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))||String(b.eventId||b.id||'').localeCompare(String(a.eventId||a.id||'')));return respond({events:events.map(toAppEvent),count:events.length});}
-  if(method==='POST'&&clean==='/items'){
-   const payload=clone(body)||{};const relatedEvents=Array.isArray(payload.activityEvents)?payload.activityEvents:[];delete payload.activityEvents;
-   const x=ensureIndexFields(payload);if(!x.itemId)throw new Error('itemId is required.');const existing=tables.workItems.findIndex(i=>i.itemId===x.itemId);if(existing>=0)tables.workItems[existing]=x;else tables.workItems.push(x);
-   for(const raw of relatedEvents)storeActivityEvent(tables,raw);
-   persist();return respond(toAppItem(x));
-  }
-  m=clean.match(/^\/items\/([^/]+)$/);
-  if(m&&method==='PATCH') {const id=decodeURIComponent(m[1]);const i=tables.workItems.findIndex(x=>x.itemId===id);if(i<0)throw new Error('Item not found.');const payload=clone(body)||{};const relatedEvents=Array.isArray(payload.activityEvents)?payload.activityEvents:[];delete payload.activityEvents;tables.workItems[i]=ensureIndexFields({...tables.workItems[i],...payload,itemId:id});for(const raw of relatedEvents)storeActivityEvent(tables,raw);persist();return respond(toAppItem(tables.workItems[i]));}
-  if(method==='GET'&&clean==='/archive'){
-   let rows=(tables.archiveItems||[]).slice();const queryText=(q.get('q')||'').toLocaleLowerCase();const type=q.get('type')||'all';const root=q.get('rootParentId');
-   if(type!=='all')rows=rows.filter(x=>x.type===type);if(root)rows=rows.filter(x=>String(x.archiveRootId||x.rootParentId||x.itemId)===root);
-   if(queryText)rows=rows.filter(x=>[x.name,x.description,x.archiveRootName,x.type,x.status,x.parentId].some(v=>String(v||'').toLocaleLowerCase().includes(queryText)));
-   rows.sort((a,b)=>String(b.archivedAt||'').localeCompare(String(a.archivedAt||'')));
-   const limit=Math.max(1,Math.min(500,Number(q.get('limit')||250)));const offset=Math.max(0,Number(q.get('offset')||0));return respond({items:rows.slice(offset,offset+limit).map(toAppArchiveRecord),count:rows.length,nextOffset:offset+limit<rows.length?offset+limit:null});
-  }
-  if(method==='POST'&&clean==='/archive/restore'){
-   const payload=clone(body)||{};const ids=Array.isArray(payload.itemIds)?[...new Set(payload.itemIds.map(String))]:[];if(!ids.length)throw new Error('Select at least one archived item to restore.');
-   const archiveRows=tables.archiveItems||[];const archiveById=new Map(archiveRows.map(x=>[String(x.archiveId||x.itemId),x]));const selectedRows=ids.map(id=>archiveById.get(id));if(selectedRows.some(x=>!x))throw new Error('One or more selected archive items are no longer available. Refresh the archive and try again.');
-   const selectedMap=new Map(selectedRows.map(x=>[String(x.archiveId||x.itemId),x]));const activeMap=new Map(tables.workItems.map(x=>[String(x.itemId),x]));
-   for(const row of selectedRows){if(activeMap.has(String(row.itemId)))throw new Error(`Item ${row.name} already exists in active work items.`);const parentId=String(row.parentId||'');if(parentId&&!activeMap.has(parentId)&&!selectedMap.has(parentId))throw new Error(`Restore the parent item together with "${row.name}", or restore the parent first.`);if(parentId&&selectedMap.has(parentId)){const p=selectedMap.get(parentId);if(p.type==='job'&&row.type!=='followup')throw new Error('Jobs can contain follow-ups only.');if(p.type==='task'&&row.type!=='followup')throw new Error('Tasks can contain follow-ups only.');if(p.type==='project'&&!['task','followup'].includes(row.type))throw new Error('Projects can contain tasks and follow-ups only.');}}
-   const depth=row=>{let d=0,cursor=row,seen=new Set();while(cursor?.parentId&&selectedMap.has(String(cursor.parentId))&&!seen.has(String(cursor.parentId))){seen.add(String(cursor.parentId));d++;cursor=selectedMap.get(String(cursor.parentId));}return d;};
-   const ordered=selectedRows.slice().sort((a,b)=>depth(a)-depth(b)||String(a.name).localeCompare(String(b.name)));const restored=[],savedEvents=[];const actor=String(payload.actorUserId||'');const restoredAt=now();const restoredArchiveIds=new Set(ordered.map(x=>String(x.archiveId||x.itemId)));const activeById=new Map(tables.workItems.map(x=>[String(x.itemId),x]));
-   const selectionRoots=ordered.filter(row=>!selectedMap.has(String(row.parentId||'')));
-   const isInSelectedSubtree=(row,rootId)=>{let cursor=row,seen=new Set();while(cursor&&!seen.has(String(cursor.itemId||cursor.archiveId))){const id=String(cursor.itemId||cursor.archiveId);if(id===String(rootId))return true;seen.add(id);cursor=selectedMap.get(String(cursor.parentId||''));}return false;};
-   const summaryForRoot=rootRaw=>{const rootId=String(rootRaw.itemId||rootRaw.archiveId);const group=ordered.filter(row=>isInSelectedSubtree(row,rootId));const item=group.find(row=>String(row.itemId||row.archiveId)===rootId)||rootRaw;const id=String(item.itemId||item.archiveId);const rootParentId=String(item.rootParentId||(['project','job'].includes(item.type)?id:''));const rootRecord=selectedMap.get(rootParentId)||activeById.get(rootParentId)||archiveById.get(rootParentId)||item;const rootName=String(rootId===id?item.name:(rootRecord?.name||item.archiveRootName||''));const rootType=String(rootRecord?.type||item.archiveRootType||(['project','job'].includes(item.type)?item.type:''));const descCount=Math.max(0,group.length-1);const action=`Restored ${item.type}: ${item.name}`;return storeActivityEvent(tables,{id:`evt_restore_${id}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`,itemId:id,itemName:item.name,itemType:item.type,rootParentId:rootParentId||id,rootParentName:rootName,rootParentType:rootType,rootTypeSnapshot:rootType,parentId:item.parentId||null,userId:actor||item.updatedByUserId||item.updatedBy||item.createdByUserId||item.createdBy||'',action,summary:action,kind:'restore',at:restoredAt,ancestorIds:item.parentId?[String(item.parentId),...(rootParentId&&rootParentId!==item.parentId?[rootParentId]:[])]:[],bulkOperation:descCount?'restore-subtree':'restore-item',affectedCount:group.length,affectedDescendantCount:descCount});};
-   for(const raw of ordered){const id=String(raw.itemId||raw.archiveId);const item=clone(raw);for(const k of ['archiveId','archivePK','archiveSort','archiveRootPK','archiveRootSort','archiveRootId','archiveRootName','archiveRootType','archiveParentId','archiveParentName','archivedAt','archivedByUserId','deletedAt'])delete item[k];item.updatedAt=restoredAt;if(actor){if('createdByUserId' in item||'updatedByUserId' in item)item.updatedByUserId=actor;else item.updatedBy=actor;}else if(item.updatedBy)item.updatedByUserId=item.updatedBy;item.version=(Number(item.version)||0)+1;const indexed=ensureIndexFields(item);tables.workItems.push(indexed);restored.push(toAppItem(indexed));activeMap.set(id,indexed);activeById.set(id,indexed);}
-   tables.archiveItems=tables.archiveItems.filter(x=>!restoredArchiveIds.has(String(x.archiveId||x.itemId)));
-   for(const rootRaw of selectionRoots)savedEvents.push(toAppEvent(summaryForRoot(rootRaw)));
-   persist();return respond({ok:true,restoredIds:restored.map(x=>x.id),restoredItems:restored,activityEvents:savedEvents});
-  }
-  if(m&&method==='DELETE'){const id=decodeURIComponent(m[1]);const i=tables.workItems.findIndex(x=>x.itemId===id&&!x.deletedAt);if(i<0)throw new Error('Item not found.');const payload=clone(body)||{};const relatedEvents=Array.isArray(payload.activityEvents)?payload.activityEvents:[];const deletedAt=now();const current=tables.workItems[i];const actor=String(relatedEvents[0]?.userId||current.updatedByUserId||current.updatedBy||'');const currentRoot=['project','job'].includes(current.type)?id:String(current.rootParentId||current.parentId||id);const isLeafFollowup=current.type==='followup';const scoped=isLeafFollowup?[current]:allActive().filter(row=>String(row.rootPK||'')===`ROOT#${currentRoot}`||String(row.itemId)===id);const byParent=new Map();for(const row of scoped){const pid=String(row.parentId||'');if(pid){if(!byParent.has(pid))byParent.set(pid,[]);byParent.get(pid).push(row);}}const collected=[],seen=new Set(),queue=[{row:current,depth:0}];let queuePos=0;while(queuePos<queue.length){const next=queue[queuePos++];const childId=String(next.row.itemId);if(seen.has(childId))continue;seen.add(childId);collected.push(next);for(const child of byParent.get(childId)||[])queue.push({row:child,depth:next.depth+1});}collected.sort((a,b)=>b.depth-a.depth||String(a.row.itemId).localeCompare(String(b.row.itemId)));const needed=new Set();for(const entry of collected){const row=entry.row;needed.add(String(row.itemId));const rootKey=['project','job'].includes(row.type)?String(row.itemId):String(row.rootParentId||row.parentId||'');const parentKey=String(row.parentId||'');if(rootKey)needed.add(rootKey);if(parentKey)needed.add(parentKey);}const archiveLookupIndex={workById:new Map(),archiveById:new Map()};for(const row of tables.workItems||[]){const key=String(row.itemId||row.id);if(needed.has(key))archiveLookupIndex.workById.set(key,row);}for(const row of tables.archiveItems||[]){const key=String(row.archiveId||row.itemId||row.id);if(needed.has(key))archiveLookupIndex.archiveById.set(key,row);}for(const entry of collected){const row=entry.row;const archiveRecord=buildArchiveRecord(row,tables,deletedAt,actor,archiveLookupIndex);const existingArchive=tables.archiveItems.findIndex(x=>String(x.archiveId||x.itemId)===String(row.itemId));if(existingArchive>=0)tables.archiveItems[existingArchive]=archiveRecord;else tables.archiveItems.push(archiveRecord);const wi=tables.workItems.findIndex(x=>String(x.itemId)===String(row.itemId));if(wi>=0)tables.workItems.splice(wi,1);}const savedEvents=[];const raw=relatedEvents.find(e=>String(e.itemId||'')===id)||relatedEvents[0];if(raw){const event=ensureActivityIndexes({...raw,itemId:id,itemName:current.name,itemType:current.type,rootParentId:current.rootParentId||id,parentId:current.parentId||null,userId:actor,at:deletedAt,kind:'delete',affectedCount:collected.length,affectedDescendantCount:Math.max(0,collected.length-1)});event.action=`Deleted ${current.type}: ${current.name}`;event.summary=event.action;savedEvents.push(toAppEvent(storeActivityEvent(tables,event)));}else{const action=`Deleted ${current.type}: ${current.name}`;const fallback=storeActivityEvent(tables,{id:`evt_delete_${id}_${Date.now()}`,itemId:id,itemName:current.name,itemType:current.type,rootParentId:current.rootParentId||id,parentId:current.parentId||null,userId:actor,action,summary:action,kind:'delete',at:deletedAt,affectedCount:collected.length,affectedDescendantCount:Math.max(0,collected.length-1)});savedEvents.push(toAppEvent(fallback));}persist();return respond({ok:true,itemId:id,archived:true,archivedItemIds:collected.map(x=>String(x.row.itemId)),activityEvents:savedEvents});}
-  if(method==='GET'&&clean==='/activity'){let rows=tables.activityEvents.slice();const root=q.get('rootParentId');const item=q.get('itemId');const parent=q.get('parentId');if(root)rows=rows.filter(e=>e.rootPK===`ROOT#${root}`);if(item)rows=rows.filter(e=>e.itemPK===`ITEM#${item}`);if(parent)rows=rows.filter(e=>e.parentPK===`PARENT#${parent}`);rows.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))||String(b.eventId||b.id||'').localeCompare(String(a.eventId||a.id||'')));return respond({events:rows.map(toAppEvent),count:rows.length});}
-  if(method==='POST'&&clean==='/activity'){const e=storeActivityEvent(tables,body);persist();return respond(toAppEvent(e));}
-  m=clean.match(/^\/activity\/([^/]+)$/);
-  if(m&&method==='PATCH'){const id=decodeURIComponent(m[1]);const i=tables.activityEvents.findIndex(x=>x.eventId===id);if(i<0)throw new Error('Activity event not found.');tables.activityEvents[i]=ensureActivityIndexes({...tables.activityEvents[i],...(body||{}),eventId:id});persist();return respond(toAppEvent(tables.activityEvents[i]));}
-  if(m&&method==='DELETE'){const id=decodeURIComponent(m[1]);tables.activityEvents=tables.activityEvents.filter(x=>x.eventId!==id);persist();return respond({ok:true,eventId:id});}
-  if(method==='POST'&&clean==='/users'){const u=toTableUser(body);const i=tables.userProfiles.findIndex(x=>x.userId===u.userId);if(i>=0)tables.userProfiles[i]=u;else tables.userProfiles.push(u);persist();return respond(toAppUser(u));}
-  m=clean.match(/^\/users\/([^/]+)$/);
-  if(m&&method==='PATCH'){const id=decodeURIComponent(m[1]);const i=tables.userProfiles.findIndex(x=>x.userId===id);if(i<0)throw new Error('User profile not found.');tables.userProfiles[i]={...tables.userProfiles[i],...toTableUser({...tables.userProfiles[i],...(body||{}),userId:id})};persist();return respond(toAppUser(tables.userProfiles[i]));}
-  throw new Error(`Built-in API route not found: ${method} ${clean}`);
- }
+ function toAppUser(user){return {id:String(user.userId||user.id||''),name:String(user.displayName||user.name||''),role:String(user.role||'AWS Engineer')};}
  async function request(method,path,body){
-  method=String(method||'GET').toUpperCase();logCall(method,path,mode);
-  if(mode!=='api')return mockRoute(method,path,body);
-  const auth=window.TeamFollowUpAuth;if(!auth||typeof auth.authenticatedFetch!=='function')throw new Error('Authenticated API client is unavailable. Sign in with Cognito before using the API.');
-  const init={method,headers:{Accept:'application/json'}};if(body!==undefined){init.body=JSON.stringify(body);init.headers['Content-Type']='application/json';}
+  const auth=window.TeamFollowUpAuth;
+  if(!auth||typeof auth.authenticatedFetch!=='function')throw new Error('The Cognito-authenticated API client is unavailable. Sign in again.');
+  const init={method:method,headers:{Accept:'application/json'}};
+  if(body!==undefined){init.body=JSON.stringify(body);init.headers['Content-Type']='application/json';}
   const response=await auth.authenticatedFetch(String(path||'').replace(/^\/+/,''),init);
-  let payload={};try{payload=await response.json();}catch(e){}
-  if(!response.ok)throw new Error(payload.message||payload.error||`API request failed (${response.status}).`);
+  let payload={};try{payload=await response.json();}catch(error){}
+  if(!response.ok)throw new Error(payload.message||payload.error||('API request failed ('+response.status+').'));
   return payload;
  }
  function absorbCommittedResult(next,result){
   if(!result||typeof result!=='object')return;
-  const saved=result.item;
-  if(saved&&saved.id){const row=[...(next.parents||[]),...(next.children||[])].find(x=>x.id===saved.id);if(row)Object.assign(row,toAppItem(saved));}
-  for(const raw of Array.isArray(result.activityEvents)?result.activityEvents:[]){const event=toAppEvent(raw);const existing=(next.activity||[]).find(x=>x.id===event.id);if(existing)Object.assign(existing,event);else (next.activity||(next.activity=[])).push(event);}
+  if(result.item&&result.item.id){
+   const row=[...(next.parents||[]),...(next.children||[])].find(item=>item.id===result.item.id);
+   if(row)Object.assign(row,toAppItem(result.item));
+  }
+  for(const raw of Array.isArray(result.activityEvents)?result.activityEvents:[]){
+   const event=toAppEvent(raw),existing=(next.activity||[]).find(item=>String(item.id)===String(event.id));
+   if(existing)Object.assign(existing,event);else (next.activity||(next.activity=[])).push(event);
+  }
  }
  async function fetchPagedItems(path,onPage,limit=100){
-  const parsed=new URL(path,'https://builtin.local/');
-  const rows=[];let offset=0;let pageGuard=0;
+  const parsed=new URL(path,window.location.origin),rows=[];let offset=0,pageGuard=0;
   while(true){
    const url=new URL(parsed.toString());url.searchParams.set('limit',String(limit));url.searchParams.set('offset',String(offset));
-   const result=await request('GET',`${url.pathname}${url.search}`);
-   const page=(result.items||[]).map(x=>x&&x.id?x:toAppItem(x));
-   rows.push(...page);
-   if(typeof onPage==='function')onPage(page,result,rows.length);
-   const next=result.nextOffset;
-   if(next===undefined||next===null)break;
+   const result=await request('GET',url.pathname+url.search),page=(result.items||[]).map(item=>item&&item.id?item:toAppItem(item));
+   rows.push(...page);if(typeof onPage==='function')onPage(page,result,rows.length);
+   const next=result.nextOffset;if(next===undefined||next===null)break;
    const numeric=Number(next);if(!Number.isFinite(numeric)||numeric<=offset||++pageGuard>10000)throw new Error('Data query pagination did not advance. Please retry.');
    offset=numeric;
   }
   return rows;
  }
- async function bootstrap(fallback,onProgress){
-  const notify=(snapshot,stage,extra={})=>{if(typeof onProgress==='function'){try{onProgress(clone(snapshot),{stage,...extra});}catch(err){console.warn('Data loading progress callback failed.',err);}}};
-  if(mode!=='api'){
-   if(!readTables()){
-    const seed=tableFromSnapshot(fallback||{users:[],parents:[],children:[],activity:[]});
-    // Initialize the local DynamoDB-shaped tables only once.
-    writeTables(seed);
-   }
-   const result=await request('GET','/bootstrap');
-   const items=result.items||result.workItems||[];const users=result.users||result.userProfiles||[];const activity=result.activity||result.activityEvents||[];
-   const active=items.filter(x=>!x.deletedAt).map(toAppItem);
-   const snapshot={schema:4,users:users.map(u=>u.id?u:toAppUser(u)),parents:active.filter(x=>x.type==='project'||x.type==='job'),children:active.filter(x=>x.type!=='project'&&x.type!=='job'),activity:activity.map(e=>e.id?e:toAppEvent(e))};
-   notify(snapshot,'complete',{done:true});return snapshot;
-  }
-
-  /* API mode deliberately hydrates by domain: profiles first, then parent rows, then each
-     root's descendants and timeline. The UI can render any completed portion immediately. */
+ async function bootstrap(onProgress){
+  const notify=(snapshot,stage,extra={})=>{if(typeof onProgress==='function'){try{onProgress(clone(snapshot),{stage:stage,...extra});}catch(error){console.warn('AWS data loading progress callback failed.',error);}}};
   const snapshot={schema:4,users:[],parents:[],children:[],activity:[]};
-  const mergeUnique=(target,rows,key='id')=>{const map=new Map(target.map(x=>[String(x[key]),x]));for(const row of rows||[]){const id=String(row[key]||'');if(id)map.set(id,row);}return [...map.values()];};
-  const mergeActivityUnique=(target,rows)=>{const map=new Map();const sig=e=>JSON.stringify([String(e.itemId||''),String(e.rootParentId||''),String(e.parentId||''),String(e.at||''),String(e.action||e.summary||''),String(e.kind||''),String(e.userId||e.actorUserId||'')]);const hash=v=>{let h=2166136261;for(let i=0;i<v.length;i++){h^=v.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(36);};for(const row of [...(target||[]),...(rows||[])]){const id=String(row.id||row.eventId||'');if(!id)continue;let key=id;const prior=map.get(key);if(prior&&sig(prior)!==sig(row)){const base=`${id}~${hash(sig(row))}`;key=base;let n=1;while(map.has(key)&&sig(map.get(key))!==sig(row))key=`${base}_${n++}`;}const old=map.get(key);map.set(key,old?{...old,...row,id:key}:({...row,id:key}));}return [...map.values()];};
+  const mergeUnique=(target,rows,key='id')=>{const map=new Map(target.map(row=>[String(row[key]),row]));for(const row of rows||[]){const id=String(row[key]||'');if(id)map.set(id,row);}return [...map.values()];};
+  const mergeActivityUnique=(target,rows)=>{
+   const map=new Map();
+   const signature=e=>JSON.stringify([String(e.itemId||''),String(e.rootParentId||''),String(e.parentId||''),String(e.at||''),String(e.action||e.summary||''),String(e.kind||''),String(e.userId||e.actorUserId||'')]);
+   const hash=value=>{let n=2166136261;for(let i=0;i<value.length;i++){n^=value.charCodeAt(i);n=Math.imul(n,16777619);}return (n>>>0).toString(36);};
+   for(const row of [...(target||[]),...(rows||[])]){
+    const id=String(row.id||row.eventId||'');if(!id)continue;
+    let key=id;const prior=map.get(key);
+    if(prior&&signature(prior)!==signature(row)){const base=id+'~'+hash(signature(row));key=base;let suffix=1;while(map.has(key)&&signature(map.get(key))!==signature(row))key=base+'_'+suffix++;}
+    const old=map.get(key);map.set(key,old?{...old,...row,id:key}:{...row,id:key});
+   }
+   return [...map.values()];
+  };
   const profiles=await request('GET','/users');
-  snapshot.users=(profiles.users||profiles.items||[]).map(u=>u.id?u:toAppUser(u));
-  notify(snapshot,'users',{done:true});
-
+  snapshot.users=(profiles.users||profiles.items||[]).map(user=>user.id?user:toAppUser(user));notify(snapshot,'users',{done:true});
   await fetchPagedItems('/items?scope=top-level&dateMode=updated&direction=desc',(page,result,total)=>{
    snapshot.parents=mergeUnique(snapshot.parents,page);
    notify(snapshot,'parents-page',{done:result.nextOffset===undefined||result.nextOffset===null,count:total,nextOffset:result.nextOffset??null});
   },100);
-  snapshot.parents=mergeUnique(snapshot.parents,[]);
   notify(snapshot,'parents-complete',{done:true,count:snapshot.parents.length});
-
   let nextRoot=0;const roots=[...snapshot.parents];
   const loadRoot=async parent=>{
    const rootId=String(parent.id);
-   const childTask=(async()=>{
-    await fetchPagedItems(`/items?rootParentId=${encodeURIComponent(rootId)}&dateMode=updated&direction=desc`,(page,result,total)=>{
-     const descendants=page.filter(x=>String(x.id)!==rootId&&x.type!=='project'&&x.type!=='job');
-     snapshot.children=mergeUnique(snapshot.children,descendants);
-     const done=result.nextOffset===undefined||result.nextOffset===null;
-     notify(snapshot,done?'root-children-complete':'root-children-page',{rootId,done,count:total});
-    },100);
-   })().catch(error=>{notify(snapshot,'root-children-error',{rootId,message:String(error?.message||error)});});
-   const activityTask=(async()=>{
-    const result=await request('GET',`/items/${encodeURIComponent(rootId)}/activity?scope=all`);
-    snapshot.activity=mergeActivityUnique(snapshot.activity,(result.events||result.activity||[]).map(e=>e.id?e:toAppEvent(e)));
-    notify(snapshot,'root-activity-complete',{rootId,done:true,count:(result.events||result.activity||[]).length});
-   })().catch(error=>{notify(snapshot,'root-activity-error',{rootId,message:String(error?.message||error)});});
+   const childTask=(async()=>{await fetchPagedItems('/items?rootParentId='+encodeURIComponent(rootId)+'&dateMode=updated&direction=desc',(page,result,total)=>{
+    const descendants=page.filter(item=>String(item.id)!==rootId&&item.type!=='project'&&item.type!=='job');
+    snapshot.children=mergeUnique(snapshot.children,descendants);const done=result.nextOffset===undefined||result.nextOffset===null;
+    notify(snapshot,done?'root-children-complete':'root-children-page',{rootId:rootId,done:done,count:total});
+   },100);})().catch(error=>notify(snapshot,'root-children-error',{rootId:rootId,message:String(error?.message||error)}));
+   const activityTask=(async()=>{const result=await request('GET','/items/'+encodeURIComponent(rootId)+'/activity?scope=all');
+    const rows=(result.events||result.activity||[]).map(event=>event.id?event:toAppEvent(event));
+    snapshot.activity=mergeActivityUnique(snapshot.activity,rows);notify(snapshot,'root-activity-complete',{rootId:rootId,done:true,count:rows.length});
+   })().catch(error=>notify(snapshot,'root-activity-error',{rootId:rootId,message:String(error?.message||error)}));
    await Promise.all([childTask,activityTask]);
   };
   const workers=Array.from({length:Math.min(3,Math.max(1,roots.length))},async()=>{while(nextRoot<roots.length){const parent=roots[nextRoot++];await loadRoot(parent);}});
-  await Promise.all(workers);
-  notify(snapshot,'complete',{done:true,count:snapshot.parents.length});
-  return snapshot;
+  await Promise.all(workers);notify(snapshot,'complete',{done:true,count:snapshot.parents.length});return snapshot;
  }
  function sameRecordFields(a,b){
   if(a===b)return true;if(!a||!b)return false;
   const keys=new Set([...Object.keys(a),...Object.keys(b)]);
-  for(const key of keys){const av=a[key],bv=b[key];if(av===bv||(av==null&&bv==null))continue;if(av&&bv&&typeof av==='object'&&typeof bv==='object'){if(JSON.stringify(av)!==JSON.stringify(bv))return false;continue;}return false;}
-  return true;
+  for(const key of keys){const av=a[key],bv=b[key];if(av===bv||(av==null&&bv==null))continue;if(av&&bv&&typeof av==='object'&&typeof bv==='object'){if(JSON.stringify(av)!==JSON.stringify(bv))return false;continue;}return false;}return true;
  }
  async function commitSnapshot(previous,next){
-  if(!previous){previous={users:[],parents:[],children:[],activity:[]};}
+  previous=previous||{users:[],parents:[],children:[],activity:[]};
   const oldItems=[...(previous.parents||[]),...(previous.children||[])],newItems=[...(next.parents||[]),...(next.children||[])];
-  const oldMap=new Map(oldItems.map(x=>[x.id,x])),newMap=new Map(newItems.map(x=>[x.id,x]));
-  const oldEvents=new Map((previous.activity||[]).map(e=>[String(e.id||e.eventId||''),e])),newEvents=new Map((next.activity||[]).map(e=>[String(e.id||e.eventId||''),e]));
-  const freshEventsByItem=new Map();for(const event of next.activity||[]){const eid=String(event.id||event.eventId||'');if(!eid||oldEvents.has(eid))continue;const owner=String(event.itemId||'');if(!freshEventsByItem.has(owner))freshEventsByItem.set(owner,[]);freshEventsByItem.get(owner).push(event);}
-  const apiMode=mode==='api';const deliveredEvents=new Set();
+  const oldMap=new Map(oldItems.map(item=>[item.id,item])),newMap=new Map(newItems.map(item=>[item.id,item]));
+  const oldEvents=new Map((previous.activity||[]).map(event=>[String(event.id||event.eventId||''),event]));
+  const newEvents=new Map((next.activity||[]).map(event=>[String(event.id||event.eventId||''),event]));
+  const freshEventsByItem=new Map();
+  for(const event of next.activity||[]){const eventId=String(event.id||event.eventId||'');if(!eventId||oldEvents.has(eventId))continue;const itemId=String(event.itemId||'');if(!freshEventsByItem.has(itemId))freshEventsByItem.set(itemId,[]);freshEventsByItem.get(itemId).push(event);}
+  const deliveredEvents=new Set();
   for(const [id,item] of newMap){
-   const old=oldMap.get(id);const changed=!old||!sameRecordFields(old,item);if(!changed)continue;
-   const freshEvents=freshEventsByItem.get(String(id))||[];
-   const body={...item,activityEvents:freshEvents};
-   const saved= !old?await request('POST','/items',body):await request('PATCH',`/items/${encodeURIComponent(id)}`,body);
-   if(apiMode)absorbCommittedResult(next,saved);
-   freshEvents.forEach(e=>deliveredEvents.add(e.id));
+   const old=oldMap.get(id);if(old&&sameRecordFields(old,item))continue;
+   const freshEvents=freshEventsByItem.get(String(id))||[],payload={...item,activityEvents:freshEvents};
+   const saved=old?await request('PATCH','/items/'+encodeURIComponent(id),payload):await request('POST','/items',payload);
+   absorbCommittedResult(next,saved);freshEvents.forEach(event=>deliveredEvents.add(String(event.id||event.eventId||'')));
   }
-  const removed=[...oldMap.values()].filter(item=>!newMap.has(item.id));
-  const removedIds=new Set(removed.map(item=>String(item.id)));
-  // One DELETE call per explicitly removed subtree root; Lambda archives descendants in one indexed operation.
-  // This keeps a parent/task cascade from producing one network round-trip per child.
+  const removed=[...oldMap.values()].filter(item=>!newMap.has(item.id)),removedIds=new Set(removed.map(item=>String(item.id)));
   const removalRoots=removed.filter(item=>!removedIds.has(String(item.parentId||''))).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
   for(const item of removalRoots){
-   const id=item.id;const deletionEvents=freshEventsByItem.get(String(id))||[];
-   const saved=await request('DELETE',`/items/${encodeURIComponent(id)}`,{activityEvents:deletionEvents,cascade:true});
-   if(apiMode)absorbCommittedResult(next,saved);
-   deletionEvents.forEach(e=>deliveredEvents.add(e.id));
+   const id=String(item.id),deletionEvents=freshEventsByItem.get(id)||[];
+   const saved=await request('DELETE','/items/'+encodeURIComponent(id),{activityEvents:deletionEvents,cascade:true});
+   absorbCommittedResult(next,saved);deletionEvents.forEach(event=>deliveredEvents.add(String(event.id||event.eventId||'')));
   }
-  for(const [id,event] of newEvents){
-   if(deliveredEvents.has(id))continue;
-   const old=oldEvents.get(String(id));
-   if(!old)await request('POST','/activity',event);else if(!apiMode&&!sameRecordFields(old,event))await request('PATCH',`/activity/${encodeURIComponent(id)}`,event);
+  for(const [eventId,event] of newEvents){
+   if(oldEvents.has(eventId)){if(!sameRecordFields(oldEvents.get(eventId),event))throw new Error('Activity history is append-only. Refresh the workspace before retrying.');continue;}
+   if(!deliveredEvents.has(eventId))throw new Error('Activity history must be committed with its item change. Refresh the workspace before retrying.');
   }
-  if(!apiMode)for(const id of oldEvents.keys())if(!newEvents.has(id))await request('DELETE',`/activity/${encodeURIComponent(id)}`);
-  const oldUsers=new Map((previous.users||[]).map(u=>[u.id,u]));for(const user of next.users||[]){const old=oldUsers.get(user.id);if(!old||JSON.stringify(old)!==JSON.stringify(user))await request('POST','/users',user);}
+  for(const eventId of oldEvents.keys())if(!newEvents.has(eventId))throw new Error('Activity history is append-only. Refresh the workspace before retrying.');
+  if(!sameRecordFields(previous.users||[],next.users||[]))throw new Error('Team profiles are managed in AWS and cannot be edited from the workspace.');
  }
- async function queryTopLevel(options={}){const dateMode=options.dateMode||'updated';const p=new URLSearchParams({scope:'top-level',dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});for(const [key,q] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(q!==undefined&&q!==null&&q!=='')p.set(key,String(q));return request('GET',`/items?${p}`);}
- async function queryChildren(parentId,options={}){const dateMode=options.dateMode||'updated';const p=new URLSearchParams({dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});for(const [key,q] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(q!==undefined&&q!==null&&q!=='')p.set(key,String(q));return request('GET',`/items/${encodeURIComponent(parentId)}/children?${p}`);}
- async function queryAssigned(userId,options={}){const dateMode=options.dateMode||'updated';const p=new URLSearchParams({userId,dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});for(const [key,q] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(q!==undefined&&q!==null&&q!=='')p.set(key,String(q));return request('GET',`/items/assigned-to-me?${p}`);}
- async function queryActivity(itemId,scope='item',query=''){const p=new URLSearchParams({scope});if(query)p.set('q',query);return request('GET',`/items/${encodeURIComponent(itemId)}/activity?${p}`);}
+ async function queryTopLevel(options={}){
+  const dateMode=options.dateMode||'updated',params=new URLSearchParams({scope:'top-level',dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
+  for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
+  return request('GET','/items?'+params.toString());
+ }
+ async function queryChildren(parentId,options={}){
+  const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
+  for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
+  return request('GET','/items/'+encodeURIComponent(parentId)+'/children?'+params.toString());
+ }
+ async function queryAssigned(userId,options={}){
+  const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
+  for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
+  return request('GET','/items/assigned-to-me?'+params.toString());
+ }
+ async function queryActivity(itemId,scope='item',queryText=''){
+  const params=new URLSearchParams({scope:scope});if(queryText)params.set('q',queryText);
+  return request('GET','/items/'+encodeURIComponent(itemId)+'/activity?'+params.toString());
+ }
  async function queryGlobalActivity(){return request('GET','/activity?scope=application');}
  async function listArchive(options={},onPage){
-  const pageSize=Math.max(1,Math.min(500,Number(options.limit||250)));
-  let offset=Math.max(0,Number(options.offset||0));const all=[];let result=null;let pages=0;
+  const pageSize=Math.max(1,Math.min(500,Number(options.limit||250)));let offset=Math.max(0,Number(options.offset||0)),all=[],result=null,pages=0;
   while(true){
-   const p=new URLSearchParams();
-   for(const [key,value] of Object.entries({q:options.query,type:options.type,rootParentId:options.rootParentId}))if(value!==undefined&&value!==null&&value!=='')p.set(key,String(value));
-   p.set('limit',String(pageSize));p.set('offset',String(offset));
-   result=await request('GET',`/archive?${p.toString()}`);const page=Array.isArray(result.items)?result.items:[];all.push(...page);
-   if(typeof onPage==='function'){try{onPage(page,{loaded:all.length,count:result.count??null,nextOffset:result.nextOffset??null,page:pages});}catch(error){console.warn('Archive page-render callback failed.',error);}}
-   const next=result.nextOffset;
-   if(next===undefined||next===null)break;
-   const parsed=Number(next);if(!Number.isFinite(parsed)||parsed<=offset||++pages>10000)throw new Error('Archive pagination did not advance. Refresh the Archive and try again.');
-   offset=parsed;
+   const params=new URLSearchParams();for(const [key,value] of Object.entries({q:options.query,type:options.type,rootParentId:options.rootParentId}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
+   params.set('limit',String(pageSize));params.set('offset',String(offset));result=await request('GET','/archive?'+params.toString());
+   const page=Array.isArray(result.items)?result.items.map(row=>row.id?row:toAppArchiveRecord(row)):[];
+   all.push(...page);if(typeof onPage==='function'){try{onPage(page,{loaded:all.length,count:result.count??null,nextOffset:result.nextOffset??null,page:pages});}catch(error){console.warn('Archive page callback failed.',error);}}
+   const next=result.nextOffset;if(next===undefined||next===null)break;const numeric=Number(next);
+   if(!Number.isFinite(numeric)||numeric<=offset||++pages>10000)throw new Error('Archive pagination did not advance. Refresh Archive and try again.');
+   offset=numeric;
   }
   return {...(result||{}),items:all,count:result?.count??all.length,nextOffset:null};
  }
- async function restoreArchive(itemIds,actorUserId){const payload={itemIds:[...new Set((itemIds||[]).map(String))]};if(mode!=='api'&&actorUserId)payload.actorUserId=String(actorUserId);return request('POST','/archive/restore',payload);}
- window.TeamFollowUpDataApi=Object.freeze({mode,tableNames:names,request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive});
+ async function restoreArchive(itemIds){return request('POST','/archive/restore',{itemIds:[...new Set((itemIds||[]).map(String))]});}
+ window.TeamFollowUpDataApi=Object.freeze({request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive});
 })();
-</script>
+</script></script>
 
 <script id="pre-auth-gate">
 (function(){
@@ -1540,9 +1349,9 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  screen.hidden=false;screen.lang=root.lang;screen.dir=root.dir;
  const ar=root.lang==='ar';
  const copy=ar?{
-  brand:'العمل، بتناغم.',title:'تسجيل الدخول',subtitle:'أدخل بيانات حساب الفريق للمتابعة.',localWarning:'تسجيل دخول محلي مؤقت مفعّل لأن Cognito غير مُعدّ. يقبل أي كلمة مرور غير فارغة؛ هذه الطريقة ليست آمنة ويجب تعطيلها عند إعداد Cognito.',localUnknownUser:'اسم المستخدم غير معروف. أدخل اسم أحد أعضاء الفريق المعرّفين في التطبيق.',username:'اسم المستخدم',password:'كلمة المرور',usernamePlaceholder:'أدخل اسم المستخدم',passwordPlaceholder:'أدخل كلمة المرور',submit:'تسجيل الدخول',forgot:'نسيت كلمة المرور؟',unknown:'تعذّر تسجيل الدخول. تحقّق من بياناتك وحاول مرة أخرى.',needPassword:'أدخل كلمة المرور للمتابعة.',configure:'لم يتم إعداد Amazon Cognito بعد. أضف معرّف مجموعة المستخدمين ومعرّف تطبيق العميل العام في إعدادات الملف قبل النشر.',configureIncomplete:'إعداد Cognito غير مكتمل أو غير صحيح. صحّح معرّف مجموعة المستخدمين ومعرّف تطبيق العميل. تم تعطيل تسجيل الدخول المحلي لأن إعداد Cognito قد بدأ.',loading:'جارٍ تهيئة المصادقة…',sdkError:'تعذّر تحميل مكوّن المصادقة. تحقّق من الاتصال وأعد تحميل الصفحة.',notLinked:'تم التحقق من الحساب، لكنه غير مرتبط بملف عضو في الفريق. اطلب من مسؤول النظام إعداد ربط Cognito لهذا الحساب.',code:'رمز التحقق',newPassword:'كلمة المرور الجديدة',newPasswordPlaceholder:'أنشئ كلمة مرور جديدة',enterCode:'أدخل رمز التحقق',resetSent:'تم إرسال تعليمات إعادة تعيين كلمة المرور إذا كان الحساب مؤهلاً. أدخل رمز التأكيد وكلمة المرور الجديدة.',reset:'إعادة تعيين كلمة المرور',resetDone:'تم تحديث كلمة المرور. سجّل الدخول بكلمة المرور الجديدة.',needCode:'أدخل رمز التحقق.',chooseFactor:'اختر طريقة التحقق',factorPassword:'كلمة المرور',factorEmail:'رمز البريد الإلكتروني',factorSms:'رمز الرسائل النصية',factorTotp:'تطبيق المصادقة',setupTotp:'أضف الحساب إلى تطبيق المصادقة باستخدام بيانات الإعداد أدناه، ثم أدخل الرمز الناتج.',setupEmail:'أدخل عنوان البريد الإلكتروني لإكمال إعداد التحقق.',confirmUser:'هذا الحساب بحاجة إلى تأكيد من المسؤول. تواصل مع مسؤول النظام.',unknownChallenge:'تتطلب إعدادات الحساب خطوة تحقق غير مدعومة هنا. تواصل مع مسؤول النظام.',signOut:'تسجيل الخروج',apiNotReady:'تم تسجيل الدخول، لكن عنوان API لم يُضبط بعد؛ عمليات البيانات لا تزال محلية حتى توصيل الواجهة الخلفية.'
+  brand:'العمل، بتناغم.',title:'تسجيل الدخول',subtitle:'أدخل بيانات حساب الفريق للمتابعة.',username:'اسم المستخدم',password:'كلمة المرور',usernamePlaceholder:'أدخل اسم المستخدم',passwordPlaceholder:'أدخل كلمة المرور',submit:'تسجيل الدخول',forgot:'نسيت كلمة المرور؟',unknown:'تعذّر تسجيل الدخول. تحقّق من بياناتك وحاول مرة أخرى.',needPassword:'أدخل كلمة المرور للمتابعة.',configure:'لم يتم إعداد Amazon Cognito بعد. أضف معرّف مجموعة المستخدمين ومعرّف تطبيق العميل العام في إعدادات الملف قبل النشر.',loading:'جارٍ تهيئة المصادقة…',sdkError:'تعذّر تحميل مكوّن المصادقة. تحقّق من الاتصال وأعد تحميل الصفحة.',notLinked:'تم التحقق من الحساب، لكنه غير مرتبط بملف عضو في الفريق. اطلب من مسؤول النظام إعداد ربط Cognito لهذا الحساب.',code:'رمز التحقق',newPassword:'كلمة المرور الجديدة',newPasswordPlaceholder:'أنشئ كلمة مرور جديدة',enterCode:'أدخل رمز التحقق',resetSent:'تم إرسال تعليمات إعادة تعيين كلمة المرور إذا كان الحساب مؤهلاً. أدخل رمز التأكيد وكلمة المرور الجديدة.',reset:'إعادة تعيين كلمة المرور',resetDone:'تم تحديث كلمة المرور. سجّل الدخول بكلمة المرور الجديدة.',needCode:'أدخل رمز التحقق.',chooseFactor:'اختر طريقة التحقق',factorPassword:'كلمة المرور',factorEmail:'رمز البريد الإلكتروني',factorSms:'رمز الرسائل النصية',factorTotp:'تطبيق المصادقة',setupTotp:'أضف الحساب إلى تطبيق المصادقة باستخدام بيانات الإعداد أدناه، ثم أدخل الرمز الناتج.',setupEmail:'أدخل عنوان البريد الإلكتروني لإكمال إعداد التحقق.',confirmUser:'هذا الحساب بحاجة إلى تأكيد من المسؤول. تواصل مع مسؤول النظام.',unknownChallenge:'تتطلب إعدادات الحساب خطوة تحقق غير مدعومة هنا. تواصل مع مسؤول النظام.',signOut:'تسجيل الخروج',apiNotReady:'تم تسجيل الدخول، لكن عنوان API لم يُضبط بعد؛ عمليات البيانات لا تزال محلية حتى توصيل الواجهة الخلفية.'
  }:{
-  brand:'Work, connected.',title:'Sign in',subtitle:'Enter your team account credentials to continue.',localWarning:'Temporary local sign-in is enabled because Cognito is not configured. Any non-empty password is accepted; this is not secure and must be disabled when Cognito is configured.',localUnknownUser:'Unknown team username. Enter the name of one of the six configured team members.',username:'Username',password:'Password',usernamePlaceholder:'Enter username',passwordPlaceholder:'Enter password',submit:'Sign in',forgot:'Forgot password?',unknown:'Sign-in failed. Check your credentials and try again.',needPassword:'Enter your password to continue.',configure:'Amazon Cognito is not configured yet. Add the User Pool ID and public app client ID in the file configuration before deployment.',configureIncomplete:'Cognito configuration is incomplete or invalid. Correct the User Pool ID and App Client ID. Local sign-in is disabled because Cognito setup appears to have started.',loading:'Preparing authentication…',sdkError:'The authentication library could not be loaded. Check your connection and reload the page.',notLinked:'Your account authenticated successfully but is not linked to a team profile. Ask an administrator to map this Cognito account.',code:'Verification code',newPassword:'New password',newPasswordPlaceholder:'Create a new password',enterCode:'Enter verification code',resetSent:'If the account can be recovered, Cognito sent password-reset instructions. Enter the confirmation code and a new password.',reset:'Reset password',resetDone:'Your password was updated. Sign in with the new password.',needCode:'Enter the verification code.',chooseFactor:'Choose a verification method',factorPassword:'Password',factorEmail:'Email code',factorSms:'SMS code',factorTotp:'Authenticator app',setupTotp:'Add this account to your authenticator app using the setup details below, then enter the generated code.',setupEmail:'Enter your email address to finish setting up verification.',confirmUser:'This account requires administrator confirmation. Contact your administrator.',unknownChallenge:'Your account requires a sign-in step that this page cannot complete. Contact your administrator.',signOut:'Sign out',apiNotReady:'Signed in, but the API URL is not configured yet; data operations remain local until the backend is connected.'
+  brand:'Work, connected.',title:'Sign in',subtitle:'Enter your team account credentials to continue.',username:'Username',password:'Password',usernamePlaceholder:'Enter username',passwordPlaceholder:'Enter password',submit:'Sign in',forgot:'Forgot password?',unknown:'Sign-in failed. Check your credentials and try again.',needPassword:'Enter your password to continue.',configure:'Amazon Cognito is not configured yet. Add the User Pool ID and public app client ID in the file configuration before deployment.',loading:'Preparing authentication…',sdkError:'The authentication library could not be loaded. Check your connection and reload the page.',notLinked:'Your account authenticated successfully but is not linked to a team profile. Ask an administrator to map this Cognito account.',code:'Verification code',newPassword:'New password',newPasswordPlaceholder:'Create a new password',enterCode:'Enter verification code',resetSent:'If the account can be recovered, Cognito sent password-reset instructions. Enter the confirmation code and a new password.',reset:'Reset password',resetDone:'Your password was updated. Sign in with the new password.',needCode:'Enter the verification code.',chooseFactor:'Choose a verification method',factorPassword:'Password',factorEmail:'Email code',factorSms:'SMS code',factorTotp:'Authenticator app',setupTotp:'Add this account to your authenticator app using the setup details below, then enter the generated code.',setupEmail:'Enter your email address to finish setting up verification.',confirmUser:'This account requires administrator confirmation. Contact your administrator.',unknownChallenge:'Your account requires a sign-in step that this page cannot complete. Contact your administrator.',signOut:'Sign out',apiNotReady:'Signed in, but the API URL is not configured yet; data operations remain local until the backend is connected.'
  };
  const norm=v=>String(v??'').trim().normalize('NFKC').toLocaleLowerCase();
  function setError(message){const el=$('signInError');el.textContent=message||'';el.hidden=!message;}
@@ -1590,39 +1399,15 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   catch(e){setError(copy.unknown);}
   finally{setBusy(false);}
  }
- function isConfigured(){return !!(typeof cognito.userPoolId==='string'&&/^[-\w]+_[A-Za-z0-9]+$/.test(cognito.userPoolId)&&typeof cognito.userPoolClientId==='string'&&cognito.userPoolClientId.length>8&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolClientId)&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolId));}
- function hasCognitoConfigurationAttempt(){const pool=String(cognito.userPoolId||'').trim();const client=String(cognito.userPoolClientId||'').trim();const meaningful=v=>!!v&&!/REPLACE|YOUR_|<|>/i.test(v);return meaningful(pool)||meaningful(client); }
- const localTeamUsers=[
-  {id:'u1',aliases:['Marwa','مروة']},
-  {id:'u2',aliases:['Zyad','زياد']},
-  {id:'u3',aliases:['Nadine','نادين']},
-  {id:'u4',aliases:['Omar','عمر']},
-  {id:'u5',aliases:['Haneen','حنين']},
-  {id:'u6',aliases:['Dina','دينا']}
- ];
- function resolveLocalTeamUserId(username){const value=norm(username);for(const user of localTeamUsers){if(user.aliases.some(alias=>norm(alias)===value))return user.id;}return null;}
- function makeLocalContext(teamUserId,username){return {teamUserId,authMode:'local',localAuth:true,localUsername:String(username||''),getAccessToken:async()=>{throw new Error('Local authentication does not provide a Cognito access token. Configure Cognito before using authenticated APIs.');}};}
- function initializeLocalAuth(){
-  state.authMode='local';state.modules=null;state.mode='signIn';state.submitting=false;
-  $('signInModeNote').textContent=copy.localWarning;$('signInModeNote').hidden=false;
-  $('signInForgotPassword').hidden=true;$('signInSubmit').disabled=false;setError('');enterDefaultMode();
-  try{const saved=sessionStorage.getItem(LOCAL_SESSION_KEY);if(validIds.includes(saved)){finishVisualAuth(makeLocalContext(saved,localTeamUsers.find(u=>u.id===saved)?.aliases[0]||''));return;}}catch(e){}
-  $('signInUsername').value='';$('signInPassword').value='';$('signInSubmit').disabled=false;$('signInForgotPassword').hidden=true;$('signInUsername').focus({preventScroll:true});
- }
- function resolveTeamUserId(user,attributes){
-  const customName=String(cognito.teamUserAttribute||'custom:teamUserId');const custom=String(attributes?.[customName]||'').trim();if(validIds.includes(custom))return custom;
-  const map=cognito.identityMap&&typeof cognito.identityMap==='object'?cognito.identityMap:{};
-  const candidates=[`sub:${user.userId||''}`,`username:${user.username||''}`,`email:${attributes?.email||''}`,String(user.username||''),String(attributes?.email||'')].map(norm).filter(Boolean);
-  for(const [key,value] of Object.entries(map)){if(candidates.includes(norm(key))&&validIds.includes(String(value)))return String(value);}
-  return null;
- }
- async function ensureAuthenticatedContext(){
+ function isConfigured(){if(!(typeof cognito.userPoolId==='string'&&/^[-\w]+_[A-Za-z0-9]+$/.test(cognito.userPoolId)&&typeof cognito.userPoolClientId==='string'&&cognito.userPoolClientId.length>8&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolClientId)&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolId)))return false;try{const api=new URL(String(cfg.apiBaseUrl||''));return api.protocol==='https:'&&!api.username&&!api.password&&!api.search&&!api.hash&&['','/'].includes(api.pathname);}catch(error){return false;}}
+ function resolveTeamUserId(attributes){const customName=String(cognito.teamUserAttribute||'custom:teamUserId');const custom=String(attributes?.[customName]||'').trim();return validIds.includes(custom)?custom:null;}
+ async function ensureAuthenticatedContext(){async function ensureAuthenticatedContext(){
   const current=await state.modules.getCurrentUser();const session=await state.modules.fetchAuthSession();
   if(!session?.tokens?.accessToken)throw new Error('NO_VALID_SESSION');
   let attributes={};try{attributes=await state.modules.fetchUserAttributes();}catch(e){}
-  const teamUserId=resolveTeamUserId(current,attributes);
+  const teamUserId=resolveTeamUserId(attributes);
   if(!teamUserId){try{await state.modules.signOut();}catch(e){}throw new Error('TEAM_PROFILE_NOT_MAPPED');}
-  return {teamUserId,cognitoUsername:current.username,cognitoUserId:current.userId,email:attributes.email||'',getAccessToken:async()=>{const fresh=await state.modules.fetchAuthSession();const tok=fresh?.tokens?.accessToken?.toString();if(!tok)throw new Error('Not authenticated');return tok;}};
+  return {teamUserId,authMode:'cognito',cognitoUsername:current.username,cognitoUserId:current.userId,email:attributes.email||'',getAccessToken:async()=>{const fresh=await state.modules.fetchAuthSession();const tok=fresh?.tokens?.accessToken?.toString();if(!tok)throw new Error('Not authenticated');return tok;}};
  }
  function finishVisualAuth(context){
   window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=context;
@@ -1646,16 +1431,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   ev.preventDefault();if(state.submitting)return;setError('');
   const username=$('signInUsername').value.trim();const password=$('signInPassword').value;const code=$('signInChallengeInput').value.trim();
   if(!username){setError(ar?'أدخل اسم المستخدم.':'Enter your username.');$('signInUsername').focus();return;}
-  if(state.authMode==='local'){
-   if(state.mode!=='signIn'){setError(copy.unknown);return;}
-   if(!password){setError(copy.needPassword);$('signInPassword').focus();return;}
-   const teamUserId=resolveLocalTeamUserId(username);
-   if(!teamUserId){setError(copy.localUnknownUser);$('signInUsername').focus();return;}
-   setBusy(true,ar?'جارٍ تسجيل الدخول…':'Signing in…');
-   try{sessionStorage.setItem(LOCAL_SESSION_KEY,teamUserId);}catch(e){}
-   setBusy(false);finishVisualAuth(makeLocalContext(teamUserId,username));return;
-  }
-  if(!state.modules){setError(isConfigured()?copy.sdkError:copy.configure);return;}
+  if(!state.modules){if(!state.modules){setError(isConfigured()?copy.sdkError:copy.configure);return;}
   try{
    if(state.mode==='signIn'){
     if(!password){setError(copy.needPassword);$('signInPassword').focus();return;}
@@ -1705,35 +1481,24 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   $('signInBrandSubtitle').textContent=copy.brand;$('signInTitle').textContent=copy.title;$('signInSubtitle').textContent=copy.subtitle;$('signInUsernameLabel').textContent=copy.username;$('signInPasswordLabel').textContent=copy.password;$('signInUsername').placeholder=copy.usernamePlaceholder;$('signInPassword').placeholder=copy.passwordPlaceholder;$('signInSubmit').textContent=copy.submit;$('signInForgotPassword').textContent=copy.forgot;
  }
  async function initialize(){
-  initializeSignInCopy();$('signInSubmit').disabled=true;screen.hidden=false;document.body.classList.add('signin-open');
-  $('signInModeNote').hidden=true;
-  if(!isConfigured()){
-   /* The local option is permitted only while Cognito remains entirely unconfigured.
-      Once either real Cognito setting is supplied, malformed/incomplete config fails closed. */
-   if(cfg.localAuth?.enabled===true&&!hasCognitoConfigurationAttempt()){initializeLocalAuth();return;}
-   state.authMode='cognito';setError(hasCognitoConfigurationAttempt()?copy.configureIncomplete:copy.configure);$('signInSubmit').disabled=true;$('signInForgotPassword').hidden=true;return;
+   initializeSignInCopy();$('signInSubmit').disabled=true;screen.hidden=false;document.body.classList.add('signin-open');
+   if(!isConfigured()){setError(copy.configure);$('signInSubmit').disabled=true;$('signInForgotPassword').hidden=true;return;}
+   setError(copy.loading);
+   try{
+    const version='6.20.0';
+    const [core,auth,cognitoAuth,utils]=await Promise.all([
+     import('https://esm.sh/aws-amplify@'+version),
+     import('https://esm.sh/aws-amplify@'+version+'/auth'),
+     import('https://esm.sh/aws-amplify@'+version+'/auth/cognito'),
+     import('https://esm.sh/aws-amplify@'+version+'/utils')
+    ]);
+    state.modules={...auth};core.Amplify.configure({Auth:{Cognito:{userPoolId:cognito.userPoolId,userPoolClientId:cognito.userPoolClientId,loginWith:{username:true},allowGuestAccess:false}}});
+    cognitoAuth.cognitoUserPoolsTokenProvider.setKeyValueStorage(utils.sessionStorage);$('signInSubmit').disabled=false;setError('');
+    try{const context=await ensureAuthenticatedContext();finishVisualAuth(context);}
+    catch(error){if(error?.message==='TEAM_PROFILE_NOT_MAPPED'){try{await state.modules.signOut();}catch(_){}setError(copy.notLinked);}else{enterDefaultMode();}}
+   }catch(error){setError(copy.sdkError);$('signInSubmit').disabled=true;$('signInForgotPassword').hidden=true;}
   }
-  /* A configured Cognito pool always takes precedence. The local fallback is never attempted
-     when Cognito is configured, even if Cognito authentication or the SDK fails. */
-  state.authMode='cognito';try{sessionStorage.removeItem(LOCAL_SESSION_KEY);}catch(e){}
-  setError(copy.loading);
-  try{
-   const version='6.20.0';
-   const [core,auth,cognitoAuth,utils]=await Promise.all([
-    import(`https://esm.sh/aws-amplify@${version}`),
-    import(`https://esm.sh/aws-amplify@${version}/auth`),
-    import(`https://esm.sh/aws-amplify@${version}/auth/cognito`),
-    import(`https://esm.sh/aws-amplify@${version}/utils`)
-   ]);
-   state.modules={...auth};
-   core.Amplify.configure({Auth:{Cognito:{userPoolId:cognito.userPoolId,userPoolClientId:cognito.userPoolClientId,loginWith:{username:true},allowGuestAccess:false}}});
-   cognitoAuth.cognitoUserPoolsTokenProvider.setKeyValueStorage(utils.sessionStorage);
-   $('signInSubmit').disabled=false;setError('');
-   try{const context=await ensureAuthenticatedContext();finishVisualAuth(context);}
-   catch(e){if(e?.message==='TEAM_PROFILE_NOT_MAPPED'){try{await state.modules.signOut();}catch(_){}setError(copy.notLinked);}else{enterDefaultMode();} }
-  }catch(e){setError(copy.sdkError);$('signInSubmit').disabled=true;$('signInForgotPassword').hidden=true;}
- }
- $('signInForm').addEventListener('submit',handleSubmit);
+$('signInForm').addEventListener('submit',handleSubmit);
  $('signInForgotPassword').addEventListener('click',beginPasswordReset);
  $('signInUsername').addEventListener('input',()=>{if(state.mode==='signIn')setError('');});
  $('signInPassword').addEventListener('input',()=>{if(state.mode==='signIn')setError('');});
@@ -2055,7 +1820,7 @@ async function refreshApplicationHistory(silent=false){
   console.warn('Could not load application-wide activity history.',error);
   applicationHistoryError=String(error?.message||tr('loadFailed'));
   // Existing project-scoped records remain usable, but show the global-source error explicitly.
-  applicationHistoryReady=(data.activity||[]).length>0||!dataLoadState.active;
+  applicationHistoryReady=(data.activity||[]).length>0;
  }finally{
   if(requestId===applicationHistoryRequest){applicationHistoryLoading=false;if(ui.modal?.kind==='global-history')renderModal();}
  }
@@ -2078,7 +1843,7 @@ function persist(){
  if(!lastApiSnapshot||!window.TeamFollowUpDataApi)return Promise.resolve();
  apiPersistQueue=apiPersistQueue.then(async()=>{
   await window.TeamFollowUpDataApi.commitSnapshot(lastApiSnapshot,desired);
-  if(window.TeamFollowUpDataApi.mode==='api'){
+  {
    for(const saved of [...desired.parents,...desired.children]){
     const live=allItem(saved.id);if(!live)continue;
     const fields=['name','description','type','status','priority','ownerId','dueDate','parentId'];
@@ -2244,8 +2009,8 @@ function syncOverviewMetricPressed(){if(ui.tab!=='overview')return;const task=$(
 function spinnerMarkup(label=tr('loadingData'),compact=false){return `<div class="data-loading-state${compact?' compact':''}" role="status" aria-live="polite"><span class="loading-spinner" aria-hidden="true"></span><span class="loading-copy">${esc(label)}</span></div>`;}
 function inlineSpinnerMarkup(){return `<span class="loading-count" role="status" aria-label="${esc(tr('loadingData'))}"><span class="loading-spinner inline" aria-hidden="true"></span></span>`;}
 function loadErrorMarkup(message=''){return `<div class="data-loading-error" role="alert"><span>${esc(message||tr('loadFailed'))}</span><button class="btn btn-small" type="button" data-action="retry-data-load">${esc(tr('retry'))}</button></div>`;}
-function rootChildrenReady(rootId){return !dataLoadState.active||dataLoadState.childrenLoaded.has(String(rootId));}
-function rootActivityReady(rootId){return !dataLoadState.active||dataLoadState.activityLoaded.has(String(rootId));}
+function rootChildrenReady(rootId){return dataLoadState.childrenLoaded.has(String(rootId));}
+function rootActivityReady(rootId){return dataLoadState.activityLoaded.has(String(rootId));}
 function rootLoadingError(rootId,part){return dataLoadState.rootErrors.get(`${part}:${rootId}`)||'';}
 function rootPendingMarkup(rootId,part,label){const message=rootLoadingError(rootId,part);return message?loadErrorMarkup(message):spinnerMarkup(label,true);}
 function countValueMarkup(value,ready,rootId=null,part='children'){if(ready)return String(value);const error=(rootId?rootLoadingError(rootId,part):'')||dataLoadState.initialError||'';if(error)return `<button class="loading-inline-retry" type="button" data-action="retry-data-load" title="${esc(error)}">${icon('refresh-cw',12)} ${esc(tr('retry'))}</button>`;return `<span class="metric-loading-value">${inlineSpinnerMarkup()}</span>`;}
@@ -2255,20 +2020,20 @@ function setSelectOptions(el,items,current){el.innerHTML=items.map(([v,label])=>
 function applyTranslations(){const a=$('#app');a.classList.toggle('arabic',ui.lang==='ar');document.documentElement.lang=ui.lang;document.documentElement.dir=ui.lang==='ar'?'rtl':'ltr';document.documentElement.dataset.theme=ui.theme;
  $('#signInLogoMark').innerHTML=icon('layers',24);$('#signInBrandSubtitle').textContent=tr('brandSubtitle');$('#signInTitle').textContent=tr('signInTitle');$('#signInSubtitle').textContent=tr('signInSubtitle');$('#signInUsernameLabel').textContent=tr('username');$('#signInPasswordLabel').textContent=tr('password');$('#signInUsername').placeholder=tr('usernamePlaceholder');$('#signInPassword').placeholder=tr('passwordPlaceholder');$('#signInSubmit').textContent=tr('signIn');$('#brandMark').innerHTML=icon('layers',21);$('#brandSubtitle').textContent=tr('brandSubtitle');$('#workspaceEyebrow').textContent=tr('workspaceEyebrow');$('#workspaceTitle').textContent=tr('workspaceTitle');$('#langToggleText').textContent=ui.lang==='en'?'عربي':'English';$('#langToggle').setAttribute('aria-label',ui.lang==='en'?'Switch to Arabic':'Switch to English');$('#themeToggle').innerHTML=icon(ui.theme==='light'?'moon':'sun');$('#themeToggle').title=ui.theme==='light'?'Switch to dark mode':'Switch to light mode';$('#newParentTop').innerHTML=`${icon('plus',15)} ${esc(tr('newParent'))}`;const mobileSidebar=isMobileSidebarViewport();const sidebarOpen=!(mobileSidebar&&ui.sidebarCollapsed);const searchOpen=sidebarOpen&&ui.sidebarMode==='search';const assignedOpen=sidebarOpen&&ui.sidebarMode==='assigned';$('#sidebarContent').hidden=!sidebarOpen;$('#sidebarSearchTab').innerHTML=`${esc(tr('sidebarSearch'))}<span class="sidebar-chevron ${searchOpen?'expanded':''}" aria-hidden="true">${icon('chevron',12)}</span>`;$('#sidebarAssignedTab').innerHTML=`${esc(tr('assignedToMe'))}<span class="sidebar-chevron ${assignedOpen?'expanded':''}" aria-hidden="true">${icon('chevron',12)}</span>`;$('#sidebarSearchTab').classList.toggle('active',ui.sidebarMode==='search');$('#sidebarAssignedTab').classList.toggle('active',ui.sidebarMode==='assigned');const sidebarTabs=$('.sidebar-mode-tabs');sidebarTabs.setAttribute('role',mobileSidebar?'group':'tablist');for(const [tab,expanded] of [[ $('#sidebarSearchTab'),searchOpen ],[ $('#sidebarAssignedTab'),assignedOpen ]]){tab.setAttribute('role',mobileSidebar?'button':'tab');tab.setAttribute('aria-controls','sidebarContent');if(mobileSidebar){tab.removeAttribute('aria-selected');tab.setAttribute('aria-expanded',String(expanded));}else{tab.removeAttribute('aria-expanded');tab.setAttribute('aria-selected',String(tab.id==='sidebarSearchTab'?ui.sidebarMode==='search':ui.sidebarMode==='assigned'));}}$('.sidebar').setAttribute('aria-label',tr(ui.sidebarMode==='search'?'parentSearchTitle':'assignedItemsTitle'));$('#parentSearchTitle').textContent=tr(ui.sidebarMode==='search'?'parentSearchTitle':'assignedItemsTitle');$('#parentSearchSub').textContent=tr(ui.sidebarMode==='search'?'parentSearchSub':'assignedItemsSub');$('#parentQuery').placeholder=tr(ui.sidebarMode==='assigned'?'searchAssignedPlaceholder':'searchPlaceholder');$('#parentQuery').value=ui.parentQuery;$('#parentDateFrom').value=ui.parentDateFrom;$('#parentDateTo').value=ui.parentDateTo;$('#parentTypeLabel').textContent=tr('type');$('#parentStatusLabel').textContent=tr('status');$('#parentSortLabel').textContent=tr('dateList');$('#parentFromLabel').textContent=tr('from');$('#parentToLabel').textContent=tr('to');$('#parentListHeading').textContent=tr(ui.sidebarMode==='search'?'parentListHeading':'assignedToMe');$('#clearParentFilters').innerHTML=`${icon('filter',13)} ${esc(tr('clear'))}`;$('#clearParentFilters').hidden=false;$('#archiveButton').textContent=tr('archive');$('#archiveButton').disabled=false;$('#archiveButton').title=tr('archive');$('#applicationHistoryButton').textContent=tr('applicationHistory');$('#applicationHistoryButton').title=tr('applicationHistoryTitle');$('#applicationHistoryButton').disabled=false;$('#parentQuery').closest('.searchbox').hidden=false;$('#parentTypeFilter').closest('.filter-grid').hidden=false;$('#parentDateFrom').closest('.date-filter').hidden=false;$('#parentSearchIcon').innerHTML=icon('search',16);
  setSelectOptions($('#parentTypeFilter'),ui.sidebarMode==='assigned'?[['all',tr('allTypes')],['project',tr('project')],['job',tr('job')],['task',tr('task')],['followup',tr('followup')]]:[['all',tr('allTypes')],['project',tr('project')],['job',tr('job')]],ui.parentType);setSelectOptions($('#parentStatusFilter'),[['all',tr('allStatuses')],['not-started',tr('notStarted')],['in-progress',tr('inProgress')],['on-hold',tr('onHold')],['completed',tr('completed')],['not-completed',tr('notCompleted')]],ui.parentStatus);setSelectOptions($('#parentSortFilter'),[['updated',tr('lastUpdated')],['last-created',tr('lastCreated')],['created',tr('createdOldest')]],ui.parentDateMode);
- $('#actingAvatar').innerHTML=userAvatar(ui.actingUserId,'large');if(dataLoadState.active&&!dataLoadState.usersReady){$('#actingUserName').innerHTML=inlineSpinnerMarkup();$('#actingUserRole').textContent='';}else{$('#actingUserName').textContent=currentUser().name;$('#actingUserRole').textContent=currentUser().role;}$('#actingUserDisplay').title=(ui.lang==='ar'?'تم تسجيل الدخول باسم ':'Signed in as ')+(dataLoadState.active&&!dataLoadState.usersReady?'':currentUser().name);$('#signOutButton').innerHTML=icon('log-out',16);$('#signOutButton').title=ui.lang==='ar'?'تسجيل الخروج':'Sign out';$('#signOutButton').setAttribute('aria-label',ui.lang==='ar'?'تسجيل الخروج':'Sign out');
+ $('#actingAvatar').innerHTML=userAvatar(ui.actingUserId,'large');if(!dataLoadState.usersReady){$('#actingUserName').innerHTML=inlineSpinnerMarkup();$('#actingUserRole').textContent='';}else{$('#actingUserName').textContent=currentUser().name;$('#actingUserRole').textContent=currentUser().role;}$('#actingUserDisplay').title=(ui.lang==='ar'?'تم تسجيل الدخول باسم ':'Signed in as ')+(!dataLoadState.usersReady?'':currentUser().name);$('#signOutButton').innerHTML=icon('log-out',16);$('#signOutButton').title=ui.lang==='ar'?'تسجيل الخروج':'Sign out';$('#signOutButton').setAttribute('aria-label',ui.lang==='ar'?'تسجيل الخروج':'Sign out');
 }
 function filteredAssignedItems(baseItems=[...data.parents,...data.children]){const query=ui.parentQuery.trim().toLocaleLowerCase();const list=baseItems.filter(item=>{if(item.ownerId!==ui.actingUserId)return false;if(query&&!`${item.name} ${typeName(item.type)} ${statusName(item.status,'en')} ${statusName(item.status,'ar')} ${person(item.createdBy).name} ${person(item.updatedBy).name}`.toLocaleLowerCase().includes(query))return false;if(ui.parentType!=='all'&&item.type!==ui.parentType)return false;if(!matchesStatusFilter(item.status,ui.parentStatus))return false;if(!matchesDate(item,ui.parentDateMode,ui.parentDateFrom,ui.parentDateTo))return false;return true;});list.sort((a,b)=>compareByDateMode(a,b,ui.parentDateMode));return list;}
 function assignmentContextMarkup(item){if(item.type==='project'||item.type==='job')return esc(typeName(item.type));const parent=allItem(item.parentId);const root=rootParent(item);const parts=[esc(typeName(item.type))];if(parent?.type==='task')parts.push(`<bdi dir="auto">${esc(parent.name)}</bdi>`);if(root?.name)parts.push(`<bdi dir="auto">${esc(root.name)}</bdi>`);return parts.join(' · ');}
 let sidebarQueryTimer=null,sidebarQuerySequence=0;
 function renderAssignedList(listOverride=null){
  const list=Array.isArray(listOverride)?listOverride:filteredAssignedItems();
- $('#parentCount').innerHTML=dataLoadState.active&&!dataLoadState.initialComplete&&!list.length?inlineSpinnerMarkup():`${list.length} ${esc(tr('items'))}${dataLoadState.active&&!dataLoadState.initialComplete?` ${inlineSpinnerMarkup()}`:''}`;
+ $('#parentCount').innerHTML=!dataLoadState.initialComplete&&!list.length?inlineSpinnerMarkup():`${list.length} ${esc(tr('items'))}${!dataLoadState.initialComplete?` ${inlineSpinnerMarkup()}`:''}`;
  const cards=list.map(item=>{const isParent=item.type==='project'||item.type==='job';const selected=item.id===ui.selectedAssignedItemId||(isParent&&item.id===ui.selectedParentId);return `<article class="parent-card assigned-card ${selected?'selected':''}" data-action="select-assigned" data-id="${esc(item.id)}" tabindex="0"><span class="card-topline"><span class="type-icon">${typeIcon(item.type)}</span><span class="parent-card-copy"><span class="parent-card-title" dir="auto">${esc(item.name)}</span><span class="parent-card-type">${assignmentContextMarkup(item)}</span></span></span><span class="parent-card-bottom">${statusPill(item.status)}${item.priority?priorityPill(item.priority):''}</span><button class="mini-updated" data-action="history" data-item-id="${esc(item.id)}" type="button" aria-label="${esc(tr('activityHistory'))}" title="${esc(`${tr('lastUpdatedLabel')}: ${fmtDateTime(item.updatedAt)} · ${person(item.updatedBy).name}`)}">${icon('clock',11)} <span>${esc(tr('lastUpdatedLabel'))}: ${esc(fmtDateTime(item.updatedAt))} · ${esc(person(item.updatedBy).name)}</span></button></article>`;}).join('');
- const pending=dataLoadState.active&&!dataLoadState.initialComplete?spinnerMarkup(tr('loadingItems'),true):'';
+ const pending=!dataLoadState.initialComplete?spinnerMarkup(tr('loadingItems'),true):'';
  $('#parentList').innerHTML=cards+(pending||(!cards?`<div class="empty-state">${esc(dataLoadState.initialError||tr('noAssignedItems'))}${dataLoadState.initialError?`<div>${loadErrorMarkup(dataLoadState.initialError)}</div>`:''}</div>`:''));
 }
 function renderParentSearchList(list){
- const isPending=dataLoadState.active&&!dataLoadState.parentsReady&&!dataLoadState.initialError;
+ const isPending=!dataLoadState.parentsReady&&!dataLoadState.initialError;
  $('#parentCount').innerHTML=`${list.length} ${esc(tr('items'))}${isPending?` ${inlineSpinnerMarkup()}`:''}`;
  const cards=list.map(p=>{const selected=p.id===ui.selectedParentId;const childReady=rootChildrenReady(p.id);const itemCount=getItemSummary(p).all.length;return `<article class="parent-card ${selected?'selected':''}" data-action="select-parent" data-id="${esc(p.id)}" tabindex="0" aria-current="${selected?'true':'false'}"><span class="card-topline"><span class="type-icon">${typeIcon(p.type)}</span><span class="parent-card-copy"><span class="parent-card-title" dir="auto">${esc(p.name)}</span><span class="parent-card-type parent-card-meta"><span>${esc(typeName(p.type))}</span><span class="meta-dot">·</span>${childReady?`<span>${esc(itemCount+' '+tr('items'))}</span>`:(dataLoadState.initialError||dataLoadState.rootErrors.has(`children:${p.id}`))?countValueMarkup(itemCount,false,p.id,'children'):inlineSpinnerMarkup()}</span></span></span><span class="parent-card-bottom">${statusPill(p.status)}</span><button class="mini-updated" data-action="history" data-item-id="${esc(p.id)}" type="button" aria-label="${esc(tr('activityHistory'))}" title="${esc(`${tr('lastUpdatedLabel')}: ${fmtDateTime(p.updatedAt)} · ${person(p.updatedBy).name}`)}">${icon('clock',11)} <span>${esc(tr('lastUpdatedLabel'))}: ${esc(fmtDateTime(p.updatedAt))} · ${esc(person(p.updatedBy).name)}</span></button></article>`;}).join('');
  const pending=isPending?spinnerMarkup(tr('loadingItems'),true):'';
@@ -2280,7 +2045,7 @@ function renderParentList(){
  const modeAtRender=ui.sidebarMode;
  if(modeAtRender==='assigned')renderAssignedList(filteredAssignedItems());else renderParentSearchList(filteredParents());
  if(sidebarQueryTimer)clearTimeout(sidebarQueryTimer);
- if(dataLoadState.active&&!dataLoadState.initialComplete)return;
+ if(!dataLoadState.initialComplete)return;
  const token=++sidebarQuerySequence;
  // Render immediately from the in-memory workspace cache, then refresh the visible list via
  // the asynchronous data API. In builtin mode this executes the same key/index query contract;
@@ -2339,7 +2104,7 @@ function renderChildList(parent){
 function treeActivity(parent){const roots=childrenOf(parent.id);const ready=rootChildrenReady(parent.id);if(!roots.length&&!ready)return rootPendingMarkup(parent.id,'children',tr('loadingItems'));if(!roots.length)return `<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`;const markup=roots.map(item=>{if(item.type==='task'){const nested=childrenOf(item.id);return `<div class="tree-task-wrap"><div class="tree-task-row">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-title" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div><div class="tree-task-controls">${statusPill(item.status)}<button class="subtle-btn tree-task-edit" data-action="edit-item" data-id="${esc(item.id)}" type="button">${icon('edit',12)} ${esc(tr('edit'))}</button></div></div><details class="tree-item"><summary>${icon('chevron',13)}<span class="tree-title">${esc(tr('openFollowups'))}</span><span class="tree-count" title="${esc(tr('openFollowups'))}">${nested.length}${!ready?` ${icon('spinner',10)}`:''}</span>${icon('chevron',13)}</summary><div class="tree-contents">${nested.length?nested.map(c=>`<div class="tree-child-row">${typeIcon(c.type)}<span class="tree-child-name" dir="auto">${esc(c.name)}</span>${statusPill(c.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(c.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div>`).join(''):`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`}${!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button></div></details></div>`;}return `<div class="tree-direct">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-child-name" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div>${statusPill(item.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div>`;}).join('');return markup+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):'');}
 function timelineEvents(parent,limit=8){const events=activitiesFor(parent.id).slice(0,limit);const ready=rootActivityReady(parent.id);const error=rootLoadingError(parent.id,'activity');if(!events.length&&!ready)return rootPendingMarkup(parent.id,'activity',tr('loadingActivity'));if(!events.length)return error?loadErrorMarkup(error):`<div class="timeline-empty">${esc(tr('noActivity'))}</div>`;return `<div class="timeline">${events.map(e=>{const u=person(e.userId);return `<div class="timeline-row"><span class="timeline-dot"></span><div class="timeline-copy"><div class="timeline-title">${esc(activityText(e,parent.id))}</div><div class="timeline-meta">${userAvatar(e.userId)} <span>${esc(u.name)}</span><span>·</span><span>${esc(fmtDateTime(e.at))}</span></div></div></div>`;}).join('')}</div>${!ready?rootPendingMarkup(parent.id,'activity',tr('loadingActivity')):error?loadErrorMarkup(error):''}`;}
 function renderActivity(parent){return `<div class="content-body"><div class="activity-layout"><section class="panel-section"><div class="panel-section-head"><div><h3>${esc(tr('relatedItems'))}</h3></div></div><div class="panel-section-body">${treeActivity(parent)}</div></section><section class="panel-section"><div class="panel-section-head"><div><h3>${esc(tr('recentActivity'))}</h3></div><button class="subtle-btn" data-action="history" data-item-id="${esc(parent.id)}" type="button">${esc(tr('viewAllHistory'))} ${icon('arrow',12)}</button></div><div class="panel-section-body">${timelineEvents(parent,12)}</div></section></div><div class="detail-footer"><button class="btn btn-small" data-action="history" data-item-id="${esc(parent.id)}" type="button">${icon('activity',13)} ${esc(tr('viewAllHistory'))}</button></div></div>`;}
-function renderDetail(){const parent=data.parents.find(p=>p.id===ui.selectedParentId);if(!parent){if(dataLoadState.active&&!dataLoadState.parentsReady&&!dataLoadState.initialError){$('#mainContent').innerHTML=spinnerMarkup(tr('loadingData'));return;}if(dataLoadState.initialError&&!data.parents.length){$('#mainContent').innerHTML=loadErrorMarkup(dataLoadState.initialError);return;}if(data.parents.length){ui.selectedParentId=data.parents[0].id;return renderDetail();}$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('noFilterResults'))}</strong><button class="btn btn-primary" data-action="new-parent" type="button">${icon('plus',14)} ${esc(tr('newParent'))}</button></div>`;return;}
+function renderDetail(){const parent=data.parents.find(p=>p.id===ui.selectedParentId);if(!parent){if(!dataLoadState.parentsReady&&!dataLoadState.initialError){$('#mainContent').innerHTML=spinnerMarkup(tr('loadingData'));return;}if(dataLoadState.initialError&&!data.parents.length){$('#mainContent').innerHTML=loadErrorMarkup(dataLoadState.initialError);return;}if(data.parents.length){ui.selectedParentId=data.parents[0].id;return renderDetail();}$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('noFilterResults'))}</strong><button class="btn btn-primary" data-action="new-parent" type="button">${icon('plus',14)} ${esc(tr('newParent'))}</button></div>`;return;}
  const s=getItemSummary(parent);const creator=person(parent.createdBy);$('#mainContent').innerHTML=`<div class="main-head"><div class="breadcrumb">${icon('grid',12)} <span>${esc(tr('workspaceTitle'))}</span>${icon('chevron',11)}<strong>${esc(typeName(parent.type))}</strong></div><div class="head-actions"><button class="btn" data-action="history" data-item-id="${esc(parent.id)}" type="button">${icon('activity',14)} ${esc(tr('activityHistory'))}</button><button class="btn btn-primary" data-action="edit-item" data-id="${esc(parent.id)}" type="button">${icon('edit',14)} ${esc(tr('edit'))}</button></div></div><section class="detail-card"><div class="detail-banner"><div class="detail-top"><div class="detail-nameblock"><div class="detail-type-icon">${typeIcon(parent.type)}</div><div class="detail-title-wrap"><div class="parent-detail-title-row"><div class="detail-title" dir="auto">${esc(parent.name)}</div><span class="type-pill">${esc(typeName(parent.type))}</span><span class="type-pill">${esc(s.all.length+' '+tr('items'))}</span></div><div class="created-label parent-detail-created">${creatorLabel(parent)}</div><div class="detail-description" dir="auto">${esc(parent.description||tr('noDescription'))}</div></div></div><div class="detail-controls">${statusPill(parent.status)}</div></div><div class="detail-meta"><div class="metadata-group"><span class="owner-pill assigned-owner">${icon('user',14)}<span class="assigned-label">${esc(tr('assignedTo'))}:</span>${parent.ownerId?userAvatar(parent.ownerId):''}<span class="assigned-person">${roleLabel(parent.ownerId)}</span></span><span class="meta-piece due-date-piece">${icon('calendar',14)} <span>${esc(tr('dueDate'))}:</span><strong>${esc(parent.dueDate?fmtDate(parent.dueDate,{month:'short',day:'numeric',year:'numeric'}):tr('noDueDate'))}</strong></span></div><div class="audit-line">${auditLabel(parent)}</div></div></div><div class="tabs" role="tablist"><button class="tab ${ui.tab==='overview'?'active':''}" role="tab" aria-selected="${ui.tab==='overview'}" data-action="detail-tab" data-tab="overview" type="button">${icon('grid',15)} ${esc(tr(parent.type==='job'?'jobOverview':'projectOverview'))}</button><button class="tab ${ui.tab==='activity'?'active':''}" role="tab" aria-selected="${ui.tab==='activity'}" data-action="detail-tab" data-tab="activity" type="button">${icon('activity',15)} ${esc(tr('activityHistory'))}<span class="tab-count">${countValueMarkup(activitiesFor(parent.id).length,rootActivityReady(parent.id),parent.id,'activity')}</span></button></div>${ui.tab==='overview'?renderOverview(parent):renderActivity(parent)}</section>`;}
 function render(){applyTranslations();renderParentList();renderDetail();renderModal();}
 function userOptions(current,includeNone=true){return `${includeNone?`<option value="" ${!current?'selected':''}>${esc(tr('none'))}</option>`:''}${data.users.map(raw=>{const u=person(raw.id);return `<option value="${esc(u.id)}" ${u.id===current?'selected':''}>${esc(u.name)} — ${esc(u.role)}</option>`;}).join('')}`;}
@@ -2616,7 +2381,7 @@ function handleItemSubmit(form){const fd=new FormData(form);const kind=form.data
 }
 function clearParentFilters(){ui.parentQuery='';ui.parentType='all';ui.parentStatus='all';ui.parentDateMode='updated';ui.parentDateFrom='';ui.parentDateTo='';$('#parentQuery').value='';$('#parentDateFrom').value='';$('#parentDateTo').value='';render();toast(tr('filtersCleared'));}
 function clearChildFilters(){ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';renderDetail();}
-function handleAction(target){const actionEl=target.closest('[data-action]');if(!actionEl)return;const action=actionEl.dataset.action;const id=actionEl.dataset.id;const parentId=actionEl.dataset.parentId;if(dataLoadState.active&&!dataLoadState.initialComplete&&['new-parent','edit-item','new-child','delete-item','delete-from-modal','confirm-delete','archive-restore-selected'].includes(action)){toast(tr('loadingData'),true);return;}switch(action){
+function handleAction(target){const actionEl=target.closest('[data-action]');if(!actionEl)return;const action=actionEl.dataset.action;const id=actionEl.dataset.id;const parentId=actionEl.dataset.parentId;if(!dataLoadState.initialComplete&&['new-parent','edit-item','new-child','delete-item','delete-from-modal','confirm-delete','archive-restore-selected'].includes(action)){toast(tr('loadingData'),true);return;}switch(action){
  case 'select-parent':{ui.selectedParentId=id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();renderParentList();renderDetail();break;}
  case 'sidebar-mode':{const requestedMode=actionEl.dataset.mode==='assigned'?'assigned':'search';if(isMobileSidebarViewport()){if(ui.sidebarMode===requestedMode&&!ui.sidebarCollapsed){ui.sidebarCollapsed=true;}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}if(ui.sidebarMode==='search'&&!['all','project','job'].includes(ui.parentType))ui.parentType='all';applyTranslations();renderParentList();break;}
  case 'select-assigned':{const item=allItem(id);const root=rootParent(item);if(!item||!root)break;ui.selectedAssignedItemId=item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}renderParentList();renderDetail();if(!['project','job'].includes(item.type)){document.getElementById(`card-${item.id}`)?.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}break;}
@@ -2704,13 +2469,13 @@ function setSignInState(signedIn){
 $('#signOutButton').addEventListener('click',async()=>{try{await window.TeamFollowUpAuth?.signOut();}catch(e){console.error('Sign-out failed',e);}});
 let workspaceHydrationGeneration=0;
 async function startWorkspaceHydration(){
- if(!dataLoadState.active)return;
+ 
  const hydrationRun=++workspaceHydrationGeneration;
  dataLoadState.initialComplete=false;dataLoadState.usersReady=false;dataLoadState.parentsReady=false;dataLoadState.childrenLoaded.clear();dataLoadState.activityLoaded.clear();dataLoadState.rootErrors.clear();dataLoadState.initialError='';
  data={schema:4,users:[],parents:[],children:[],activity:[]};lastApiSnapshot=null;
  render();
  try{
-  const loaded=await window.TeamFollowUpDataApi.bootstrap(bootstrapFallbackWorkspace,(partial,meta={})=>{
+  const loaded=await window.TeamFollowUpDataApi.bootstrap((partial,meta={})=>{
    if(hydrationRun!==workspaceHydrationGeneration)return;
    data=partial;invalidateHierarchyIndex();
    if(meta.stage==='users')dataLoadState.usersReady=true;
@@ -2748,8 +2513,8 @@ setSignInState(Boolean(sessionUserIdAtLoad));
 render();
 window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;ui.actingUserId=context.teamUserId;applyTranslations();renderParentList();renderDetail();if(ui.modal)renderModal();};
 document.documentElement.classList.remove('auth-pending','app-booting');
-if(builtinBootstrapWarning){try{toast(ui.lang==='ar'?'تعذر تحميل مخزن البيانات المحلي؛ تم عرض بيانات مساحة العمل المحفوظة بدلاً منه.':'The local data store could not be loaded. The saved workspace cache is being shown instead.',true);}catch(warningError){console.warn('Could not display the workspace fallback warning.',warningError);}}
-if(dataLoadState.active)void startWorkspaceHydration();
+if(){try{toast(ui.lang==='ar'?'تعذر تحميل مخزن البيانات المحلي؛ تم عرض بيانات مساحة العمل المحفوظة بدلاً منه.':'The local data store could not be loaded. The saved workspace cache is being shown instead.',true);}catch(warningError){console.warn('Could not display the workspace fallback warning.',warningError);}}
+void startWorkspaceHydration();
 } catch(startupError) {
  console.error('Team Follow-Up app startup failed after sign-in.',startupError);
  document.documentElement.classList.remove('auth-pending','app-booting');

@@ -76,6 +76,9 @@ def main():
     if "TeamFollowUpUserPool" not in str(jwt.get("issuer")) or "TeamFollowUpUserPoolClient" not in str(jwt.get("audience")):
         fail("API JWT authorizer must use the generated Cognito pool and public client.")
     api_properties = resources["TeamFollowUpApi"]["Properties"]
+    openapi_info = api_properties.get("DefinitionBody", {}).get("info", {})
+    if api_properties.get("Name") and openapi_info.get("title"):
+        fail("SAM HttpApi Name and inline OpenAPI info.title conflict; keep the title unset when Name is configured.")
     if not api_properties.get("AccessLogSettings"):
         fail("API Gateway access logging is not configured.")
     if api_properties.get("Auth", {}).get("DefaultAuthorizer") != "CognitoJwt":

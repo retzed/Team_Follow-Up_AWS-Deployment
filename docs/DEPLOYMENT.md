@@ -38,7 +38,11 @@ aws sso login --profile team-followup-dev
 aws sts get-caller-identity --profile team-followup-dev
 ```
 
-Avoid using the AWS root user for routine deployment. Keep separate environment stacks and prefixes, for example:
+Avoid using the AWS root user for routine deployment.
+
+**Shell note:** command examples use Bash syntax and are intended to be run from the repository root. On Windows, use Git Bash, WSL, or another Bash-compatible shell; alternatively, convert line continuations to PowerShell syntax before running the commands. Use the same AWS profile and Region throughout a deployment.
+
+Keep separate environment stacks and prefixes, for example:
 
 | Environment | Stack name | `TableNamePrefix` |
 |---|---|---|

@@ -1161,7 +1161,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   },
   apiBaseUrl: ""
 });
-</script></script></script>
+</script></script>
 <script id="team-follow-up-data-api">
 /* AWS-only data access. There is no browser database, mock route, or local adapter. */
 (function(){
@@ -1355,7 +1355,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  };
  const norm=v=>String(v??'').trim().normalize('NFKC').toLocaleLowerCase();
  function setError(message){const el=$('signInError');el.textContent=message||'';el.hidden=!message;}
- function setBusy(busy,label){state.submitting=busy;$('signInSubmit').disabled=busy||(state.authMode!=='local'&&!state.modules);$('signInSubmit').textContent=label||(state.mode==='signIn'?copy.submit:state.mode==='resetConfirm'?copy.reset:copy.submit);$('signInForgotPassword').hidden=state.authMode==='local'||state.mode!=='signIn';}
+ function setBusy(busy,label){state.submitting=busy||!state.modules;$('signInSubmit').disabled=state.submitting;$('signInSubmit').textContent=label||(state.mode==='signIn'?copy.submit:state.mode==='resetConfirm'?copy.reset:copy.submit);$('signInForgotPassword').hidden=state.mode!=='signIn';}
  function baseFieldMode(){
   const input=$('signInPassword');const choice=$('signInChallengeSelect');
   input.hidden=false;input.required=true;input.disabled=false;input.value='';input.type='password';input.autocomplete='current-password';input.inputMode='text';choice.hidden=true;choice.disabled=true;choice.innerHTML='';
@@ -1401,7 +1401,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  }
  function isConfigured(){if(!(typeof cognito.userPoolId==='string'&&/^[-\w]+_[A-Za-z0-9]+$/.test(cognito.userPoolId)&&typeof cognito.userPoolClientId==='string'&&cognito.userPoolClientId.length>8&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolClientId)&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolId)))return false;try{const api=new URL(String(cfg.apiBaseUrl||''));return api.protocol==='https:'&&!api.username&&!api.password&&!api.search&&!api.hash&&['','/'].includes(api.pathname);}catch(error){return false;}}
  function resolveTeamUserId(attributes){const customName=String(cognito.teamUserAttribute||'custom:teamUserId');const custom=String(attributes?.[customName]||'').trim();return validIds.includes(custom)?custom:null;}
- async function ensureAuthenticatedContext(){async function ensureAuthenticatedContext(){
+ async function ensureAuthenticatedContext(){
   const current=await state.modules.getCurrentUser();const session=await state.modules.fetchAuthSession();
   if(!session?.tokens?.accessToken)throw new Error('NO_VALID_SESSION');
   let attributes={};try{attributes=await state.modules.fetchUserAttributes();}catch(e){}
@@ -1464,12 +1464,11 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   }
  }
  async function signOut(){
-  const app=$('app');root.classList.add('auth-pending');document.body.classList.add('signin-open');app.inert=true;app.setAttribute('aria-hidden','true');screen.hidden=false;enterDefaultMode();$('signInUsername').value='';$('signInPassword').value='';
-  if(state.authMode==='local'){try{sessionStorage.removeItem(LOCAL_SESSION_KEY);}catch(e){}}
-  else{try{await state.modules?.signOut({global:true});}catch(e){try{await state.modules?.signOut();}catch(_){}}}
-  window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;$('signInModeNote').hidden=state.authMode!=='local';$('signInUsername').focus({preventScroll:true});
- }
- window.TeamFollowUpAuth={signOut,async getAccessToken(){if(state.authMode==='local')throw new Error('Local authentication has no Cognito access token.');if(!state.modules)throw new Error('Cognito is not configured');return (await state.modules.fetchAuthSession()).tokens?.accessToken?.toString()||'';},async authenticatedFetch(path,init={}){
+   const app=$('app');root.classList.add('auth-pending');document.body.classList.add('signin-open');app.inert=true;app.setAttribute('aria-hidden','true');screen.hidden=false;enterDefaultMode();$('signInUsername').value='';$('signInPassword').value='';
+   try{await state.modules?.signOut({global:true});}catch(error){try{await state.modules?.signOut();}catch(_error){}}
+   window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;$('signInUsername').focus({preventScroll:true});
+  }
+  window.TeamFollowUpAuth={signOut,async getAccessToken(){if(state.authMode==='local')throw new Error('Local authentication has no Cognito access token.');if(!state.modules)throw new Error('Cognito is not configured');return (await state.modules.fetchAuthSession()).tokens?.accessToken?.toString()||'';},async authenticatedFetch(path,init={}){
   if(state.authMode==='local')throw new Error('Authenticated API calls are disabled in local-auth mode. Configure Cognito before connecting the backend.');
   const base=String(cfg.apiBaseUrl||'');if(!/^https:\/\//i.test(base)||/REPLACE|YOUR_|<|>/i.test(base))throw new Error('API_BASE_URL is not configured for HTTPS.');
   const baseUrl=new URL(base);if(baseUrl.protocol!=='https:'||baseUrl.username||baseUrl.password||baseUrl.search||baseUrl.hash)throw new Error('API_BASE_URL must be a plain HTTPS URL without credentials, query, or fragment.');if(!baseUrl.pathname.endsWith('/'))baseUrl.pathname+='/';
@@ -1616,7 +1615,7 @@ let lastApiSnapshot=null;
 let apiPersistQueue=Promise.resolve();
 const copyWorkspace = value => {try{if(typeof structuredClone==='function')return structuredClone(value);}catch(e){}return JSON.parse(JSON.stringify(value));};
 data={schema:4,users:[],parents:[],children:[],activity:[]};
-const dataLoadState={active:true,initialComplete:false,usersReady:false,parentsReady:false,childrenLoaded:new Set(),activityLoaded:new Set(),rootErrors:new Map(),initialError:''};
+const dataLoadState={initialComplete:false,usersReady:false,parentsReady:false,childrenLoaded:new Set(),activityLoaded:new Set(),rootErrors:new Map(),initialError:''};
 function detectInitialPreferences(){
  const fallback={lang:'en',theme:'dark'};
  try{
@@ -2513,7 +2512,6 @@ setSignInState(Boolean(sessionUserIdAtLoad));
 render();
 window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;ui.actingUserId=context.teamUserId;applyTranslations();renderParentList();renderDetail();if(ui.modal)renderModal();};
 document.documentElement.classList.remove('auth-pending','app-booting');
-if(){try{toast(ui.lang==='ar'?'تعذر تحميل مخزن البيانات المحلي؛ تم عرض بيانات مساحة العمل المحفوظة بدلاً منه.':'The local data store could not be loaded. The saved workspace cache is being shown instead.',true);}catch(warningError){console.warn('Could not display the workspace fallback warning.',warningError);}}
 void startWorkspaceHydration();
 } catch(startupError) {
  console.error('Team Follow-Up app startup failed after sign-in.',startupError);

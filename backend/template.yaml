@@ -108,11 +108,11 @@ Resources:
   TeamFollowUpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
-      Name: !Sub '${TableNamePrefix}-HttpApi'
       StageName: '$default'
       DefinitionBody:
         openapi: '3.0.1'
         info:
+          title: !Sub '${TableNamePrefix} API'
           version: '1.0'
         paths: {}
       AccessLogSettings:

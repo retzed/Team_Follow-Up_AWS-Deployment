@@ -2,6 +2,7 @@
   "tables": [
     {
       "name": "TeamFollowUp-WorkItems",
+      "physicalNameTemplate": "${TableNamePrefix}-WorkItems",
       "primaryKey": {
         "partition": "itemId"
       },
@@ -51,6 +52,7 @@
     },
     {
       "name": "TeamFollowUp-ActivityEvents",
+      "physicalNameTemplate": "${TableNamePrefix}-ActivityEvents",
       "primaryKey": {
         "partition": "eventId"
       },
@@ -92,6 +94,7 @@
     },
     {
       "name": "TeamFollowUp-UserProfiles",
+      "physicalNameTemplate": "${TableNamePrefix}-UserProfiles",
       "primaryKey": {
         "partition": "userId"
       },
@@ -111,6 +114,7 @@
     },
     {
       "name": "TeamFollowUp-Archive",
+      "physicalNameTemplate": "${TableNamePrefix}-Archive",
       "primaryKey": {
         "partition": "archiveId"
       },
@@ -158,6 +162,7 @@
   ],
   "defaultMode": "builtin",
   "actualAwsResourcesCreated": false,
+  "defaultTableNamePrefix": "TeamFollowUp",
   "notes": [
     "Infrastructure in backend/template.yaml creates the real tables when explicitly deployed.",
     "Built-in mode emulates the four tables and their materialized indexes in browser storage.",

@@ -3970,15 +3970,29 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     flex: 0 1 auto !important;
   }
 
-  /* Native date controls have a larger intrinsic width on mobile Safari than other inputs.
-     Cap their visual width instead of letting them dominate filter rows or modal forms. */
-  input[type="date"],
-  .date-input,
-  .modal input[type="date"],
-  .modal .date-input {
+  /* Bound the paired From/To filters only. Keeping each control within its own
+     shrinkable column prevents native mobile date UI from widening the filter row. */
+  #parentDateFrom,
+  #parentDateTo,
+  #childDateFrom,
+  #childDateTo {
     max-width: min(100%, 10rem) !important;
     max-inline-size: min(100%, 10rem) !important;
-    justify-self: start !important;
+    justify-self: stretch !important;
+  }
+
+  /* Due date in create/edit popups is a single full-row field, not a paired filter. */
+  .modal #formDueDate,
+  #formDueDate {
+    display: block !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    inline-size: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-inline-size: 0 !important;
+    max-inline-size: 100% !important;
+    justify-self: stretch !important;
   }
 
   /* Child-item From/To: two bounded columns; place Clear on its own row below them. */

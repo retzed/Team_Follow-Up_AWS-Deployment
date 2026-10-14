@@ -31,7 +31,7 @@ jobs:
       - name: Install backend validation dependencies
         run: python -m pip install -r backend/requirements-dev.txt
 
-      - name: Test frontend and built-in data API
+      - name: Test frontend and AWS data API
         run: npm test
 
       - name: Build the AWS-only Amplify artifact with CI test configuration

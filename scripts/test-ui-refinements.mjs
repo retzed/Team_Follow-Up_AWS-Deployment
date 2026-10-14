@@ -107,4 +107,34 @@ assert.ok(mobileFixStyle.includes('input, select, textarea { font-size: 16px !im
 assert.ok(mobileFixStyle.includes('grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);') && mobileFixStyle.includes('grid-template-columns: minmax(0, 1fr) !important;'), 'From/to date filters constrain their grid tracks and stack on narrow phones.');
 assert.ok(mobileFixStyle.includes('height: 100dvh !important;') && mobileFixStyle.includes('position: fixed !important;') && mobileFixStyle.includes('.modal.project-history-modal') && mobileFixStyle.includes('.modal.application-history-modal'), 'Both activity history dialog types occupy the top-to-bottom mobile viewport.');
 assert.ok(mobileFixStyle.includes('html[dir="rtl"] #signOutButton svg') && mobileFixStyle.includes('transform: scaleX(-1);'), 'Sign-out icon direction is mirrored in RTL on both desktop and mobile.');
+
+const mobileV2Start = html.indexOf('<style id="mobile-history-space-and-date-filter-fix-v2">');
+const mobileV2End = html.indexOf('</style>', mobileV2Start);
+const mobileV2Style = mobileV2Start >= 0 && mobileV2End > mobileV2Start
+  ? html.slice(mobileV2Start, mobileV2End + '</style>'.length)
+  : '';
+assert.ok(mobileV2Start > mobileFixEnd, 'Final mobile overrides load after the earlier responsive fix block.');
+assert.ok(
+  mobileV2Style.includes('.modal.project-history-modal .history-card-list') &&
+  mobileV2Style.includes('.modal.application-history-modal .history-card-list') &&
+  mobileV2Style.includes('flex: 1 1 0 !important;') &&
+  mobileV2Style.includes('max-height: none !important;') &&
+  mobileV2Style.includes('overflow-y: auto !important;'),
+  'Both mobile history card lists expand into the full remaining popup height and scroll internally.'
+);
+assert.ok(
+  mobileV2Style.includes('.date-filter,') &&
+  mobileV2Style.includes('grid-template-columns: minmax(0, 1fr) !important;') &&
+  mobileV2Style.includes('.date-filter input[type="date"]') &&
+  mobileV2Style.includes('width: 100% !important;'),
+  'Mobile sidebar From/To filters use a single full-width column with intrinsic date-input overflow constrained.'
+);
+assert.ok(
+  mobileV2Style.includes('#mainContent .child-toolbar .child-date-row') &&
+  mobileV2Style.includes('#mainContent .child-toolbar .child-date-row > .child-filter-field') &&
+  mobileV2Style.includes('.child-mobile-clear-button') &&
+  mobileV2Style.includes('grid-row: auto !important;'),
+  'Mobile child-item From/To filters use separate full-width rows and the Clear button moves below them.'
+);
+
 console.log('UI refinement tests passed: history widths/action labels, bilingual helper removal, concise sidebar cards, labeled child assignees, modal focus/layout and English/Arabic normalization across history views.');

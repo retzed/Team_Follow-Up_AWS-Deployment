@@ -3952,17 +3952,6 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     overflow: visible !important;
   }
 
-  /* Native date controls have a larger intrinsic width on mobile Safari than other inputs.
-     Cap their visual width instead of letting them dominate filter rows or modal forms. */
-  input[type="date"],
-  .date-input,
-  .modal input[type="date"],
-  .modal .date-input {
-    max-width: min(100%, 10rem) !important;
-    max-inline-size: min(100%, 10rem) !important;
-    justify-self: start !important;
-  }
-
   /* Constrain native controls themselves, including the due-date input in create/edit dialogs. */
   input[type="date"],
   .date-input,
@@ -3979,6 +3968,17 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     margin: 0 !important;
     padding-inline: 6px !important;
     flex: 0 1 auto !important;
+  }
+
+  /* Native date controls have a larger intrinsic width on mobile Safari than other inputs.
+     Cap their visual width instead of letting them dominate filter rows or modal forms. */
+  input[type="date"],
+  .date-input,
+  .modal input[type="date"],
+  .modal .date-input {
+    max-width: min(100%, 10rem) !important;
+    max-inline-size: min(100%, 10rem) !important;
+    justify-self: start !important;
   }
 
   /* Child-item From/To: two bounded columns; place Clear on its own row below them. */

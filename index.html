@@ -2046,9 +2046,7 @@ function renderParentList(){
  if(sidebarQueryTimer)clearTimeout(sidebarQueryTimer);
  if(!dataLoadState.initialComplete)return;
  const token=++sidebarQuerySequence;
- // Render immediately from the in-memory workspace cache, then refresh the visible list via
- // the asynchronous data API. In builtin mode this executes the same key/index query contract;
- // in API mode it queries the deployed API Gateway/Lambda/DynamoDB backend.
+ // Render the current AWS-sourced workspace snapshot, then refresh visible rows through the API.
  sidebarQueryTimer=setTimeout(async()=>{
   try{
    const api=window.TeamFollowUpDataApi;if(!api)return;

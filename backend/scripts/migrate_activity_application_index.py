@@ -84,8 +84,7 @@ def main(argv=None):
                 if args.dry_run:
                     updated += len(updates)
                 else:
-                    for start in range(0, len(updates), args.page_size):
-                        batch = updates[start:start + args.page_size]
+                    for batch in chunks(updates, args.page_size):
                         futures = [
                             executor.submit(
                                 table.update_item,

@@ -2,15 +2,15 @@
 
 This runbook takes the private repository from a clean checkout to a live shared application. Follow the steps in order. The frontend and AWS backend are deployed separately: **Amplify hosts the website; AWS SAM deploys the API, identity provider, data tables, and monitoring resources.**
 
-> **Safety:** do not enable demo/local authentication on a public site, do not commit credentials or real Cognito subject mappings, and do not delete a stack as a way to clear data. The data tables and user pool are retained by CloudFormation.
+> **AWS-only:** this repository has no demo sign-in, local database, seeded workspace, or offline data mode. The frontend requires the deployed Cognito/API configuration and fails closed without it. Never commit credentials or real Cognito subject mappings, and do not delete a stack as a way to clear data. The data tables and user pool are retained by CloudFormation.
 
 ## Deployment plan
 
 1. Prepare tools, credentials, Region, and source checks.
-2. Create the Amplify Hosting app and obtain its final HTTPS origin.
+2. Create the Amplify Hosting app and record its assigned HTTPS origin.
 3. Deploy the SAM backend stack using that exact origin.
 4. Create the six Cognito accounts and seed their DynamoDB team profiles.
-5. Configure Amplify for live API mode and redeploy the website.
+5. Configure Amplify with the real Cognito/API outputs and publish the AWS-connected website.
 6. Run the acceptance checklist and verify monitoring.
 
 ## 1. Prerequisites and environment setup
@@ -62,32 +62,23 @@ From the repository root:
 ```bash
 python -m pip install -r backend/requirements-dev.txt
 npm run test:all
-npm run build
 python -m compileall -q backend/src backend/scripts scripts/test-infrastructure.py
 sam validate --lint --template-file backend/template.yaml
 sam build --template-file backend/template.yaml
 ```
 
-The SAM commands require AWS SAM CLI, but do not create resources. Do not proceed if a command fails; fix the failure and rerun it. The GitHub Actions workflow runs the frontend regression tests, build/config tests, backend unit tests, infrastructure contract tests, Python compilation, SAM validation, and SAM build. It does **not** automatically deploy the SAM stack.
+The SAM commands require AWS SAM CLI, but do not create resources. Do not proceed if a command fails; fix the failure and rerun it. The GitHub Actions workflow runs the frontend regression tests, AWS-only build/config tests, backend unit tests, infrastructure contract tests, Python compilation, SAM validation, and SAM build. CI supplies non-production test values only to exercise the build; it does **not** deploy the SAM stack. A normal build of the release artifact requires the real Cognito/API values from the deployed stack, as shown in Step 6.
 
 The built frontend is written to `dist/index.html`; Amplify publishes the `dist/` folder. The Lambda package is built from `backend/src/`, which contains both `handler.py` and its `requirements.txt`.
 
 ## 3. Create Amplify Hosting and record the website origin
 
-Amplify must exist first because the backend CORS policy needs the final website origin.
+Amplify must exist first because the backend CORS policy needs the final website origin. The frontend has no local/demo configuration, so its first build will intentionally fail until the real Cognito/API outputs are added in Step 6. Do not add placeholder AWS IDs or introduce a local mode to bypass this check.
 
 1. Open **AWS Amplify → Create new app → Host web app** and connect the private GitHub repository.
 2. Select the branch intended for this environment. Enable the Amazon Linux 2023 build image as described above.
-3. Before relying on the first build, open **App settings → Environment variables** and add the two temporary safety values below:
-
-   | Variable | Value |
-   |---|---|
-   | `TEAM_FOLLOW_UP_DATA_MODE` | `builtin` |
-   | `TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED` | `false` |
-
-   The site is intentionally not sign-in-ready at this point. These settings prevent a public demo-password fallback while the Cognito/API stack is being created. Do not share this temporary site with the team as a working app.
-4. Let Amplify create the branch URL. Copy the exact origin, for example `https://main.abc123.amplifyapp.com`. Keep only scheme and host—no path, query, or trailing slash. If a custom domain will be used, attach and validate it first, then use that final HTTPS origin.
-5. Confirm the branch build succeeds with the explicit temporary variables. If it fails, open the Amplify build log and fix the environment/image issue before proceeding.
+3. Let Amplify register the branch and assign its default branch hostname. In the Amplify console, open the app’s **Domain management / branch domain** details and copy the exact HTTPS origin, for example `https://main.abc123.amplifyapp.com`. Keep only scheme and host—no path, query, or trailing slash. If a custom domain will be used, attach and validate it before deploying the backend, then use that final HTTPS origin.
+4. The first Amplify build may fail with a message naming missing `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, or `TEAM_FOLLOW_UP_API_BASE_URL`. This is expected before the backend exists; record the failed build, proceed with the origin, and return to Step 6 after deploying and seeding AWS resources.
 
 ## 4. Deploy Cognito, API Gateway, Lambda, DynamoDB, and CloudWatch
 
@@ -206,27 +197,25 @@ After seeding, wait until `GSI_CognitoSub` is `ACTIVE` and has propagated the wr
 
 ## 6. Switch Amplify to live shared-data mode
 
-In **Amplify → App settings → Environment variables**, replace the temporary values and set all of the following on the correct branch:
+In **Amplify → App settings → Environment variables**, add the following variables to the exact branch you are deploying:
 
 | Variable | Value |
 |---|---|
-| `TEAM_FOLLOW_UP_DATA_MODE` | `api` |
-| `TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED` | `false` |
 | `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID` | Stack output `CognitoUserPoolId` |
 | `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID` | Stack output `CognitoUserPoolClientId` |
 | `TEAM_FOLLOW_UP_API_BASE_URL` | Stack output `ApiBaseUrl` |
-| `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE` | `custom:teamUserId` |
+| `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE` | `custom:teamUserId` (optional; this is the default) |
 
-Leave `TEAM_FOLLOW_UP_COGNITO_IDENTITY_MAP` unset; the Cognito custom attribute is used for team ID mapping. The values above are public browser configuration, not secrets. **Never add AWS access keys or an app-client secret to Amplify.**
+There is no data-mode flag, browser-side identity map, local sign-in flag, or local database switch. Cognito’s administrator-managed custom attribute is the source of the team ID mapping. These values are public browser configuration, not secrets. **Never add AWS access keys or an app-client secret to Amplify.**
 
-Save the settings and trigger a new build/redeploy. The build script rejects missing/empty hosted mode values, a missing Cognito configuration, a non-HTTPS API URL, or local authentication enabled in API mode. If you later change the Amplify branch URL or custom domain, update `AllowedOrigin` in the SAM stack and redeploy it before testing browser API calls.
+Save the settings and trigger a new build/redeploy. The build fails unless the Cognito IDs and valid HTTPS API base URL are all present and valid. If you later change the Amplify branch URL or custom domain, update `AllowedOrigin` in the SAM stack and redeploy it before testing browser API calls.
 
 ## 7. Verify the deployed environment
 
 Before inviting the team, use two separate browsers or sessions and at least two team accounts.
 
 1. Sign in with a provisioned account and confirm the application loads instead of staying on the startup screen. An unmapped or disabled profile should be denied by the API.
-2. Create a project and a job. Refresh and open the site in the second session; both items should appear there. If the data exists only in one browser, verify that Amplify deployed `TEAM_FOLLOW_UP_DATA_MODE=api`.
+2. Create a project and a job. Refresh and open the site in the second session; both items should appear there. If the data does not appear in the second session, verify the deployed Amplify environment variables, the API URL, and API/DynamoDB permissions; there is no browser database to fall back to.
 3. Add a task and a follow-up under a project. Add follow-ups under a job and task. Confirm the API refuses invalid hierarchy combinations.
 4. Edit a task’s name, assignee, status, priority, or due date. Confirm the action appears in Activity History and is attributed to the signed-in user.
 5. Archive an item subtree. Verify the items appear in Archive and their existing activity history remains. Restore a valid parent/child selection and verify the hierarchy. If restore reports a conflict or partial result, refresh Archive and review which IDs were restored before retrying.
@@ -280,8 +269,8 @@ Check the projected number of rows. Then repeat without `--dry-run` to write the
 
 | Symptom | What to check |
 |---|---|
-| Amplify build fails before publishing | Confirm Amazon Linux 2023/Node 24, and explicit non-empty `TEAM_FOLLOW_UP_DATA_MODE` and `TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED` values. Read the exact failed build step. |
-| Site loads but sign-in is unavailable | Verify final API-mode variables were saved and the Amplify branch was rebuilt. The temporary fail-closed `builtin` configuration is not a live deployment. |
+| Amplify build fails before publishing | Confirm Amazon Linux 2023/Node 24 and all three required AWS settings: `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, and `TEAM_FOLLOW_UP_API_BASE_URL`. Read the exact failed build step. |
+| Site is not available after the first failed Amplify build | This is expected until Step 6. Confirm the three real AWS variables were saved to the correct branch, then trigger a new build. The application has no local/demo mode. |
 | Cognito accepts credentials but the app says the account is not linked | Check the user’s `custom:teamUserId`, matching UserProfiles row, correct `cognitoSub`, `enabled=true`, and `GSI_CognitoSub` status. |
 | API returns 401 or 403 | A 401 indicates missing/invalid access token; a 403 generally indicates no enabled profile mapping. Verify the deployed pool/client IDs and JWT issuer/audience. |
 | Browser reports CORS | Confirm `AllowedOrigin` exactly matches the browser’s HTTPS origin, then redeploy SAM. Do not use `*`. |

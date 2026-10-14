@@ -124,6 +124,9 @@ def main():
         fail("Lambda requires explicit transaction-write permission scoped to WorkItems, ActivityEvents, and Archive.")
     if "dynamodb:EnclosingOperation" not in str(policies) or "ConditionCheckItem" not in str(policies):
         fail("Transactional item permissions must be limited to the enclosing write transaction.")
+    for required_action in ("dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"):
+        if required_action not in str(policies):
+            fail(f"Missing transactional item permission: {required_action}.")
     if not any(
         "dynamodb:BatchWriteItem" in str(statement.get("Action", []))
         and "ActivityEventsTable.Arn" in str(statement.get("Resource"))

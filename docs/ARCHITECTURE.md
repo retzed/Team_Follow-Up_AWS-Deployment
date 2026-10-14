@@ -39,7 +39,7 @@ flowchart LR
 | **Amazon DynamoDB** | Shared source of truth for active items, append-only activity events, enabled team profiles, and archived items. |
 | **Amazon CloudWatch** | Stores Lambda/API access logs and exposes operational metrics, alarms, and a dashboard. |
 
-The frontend and backend have separate release steps: Amplify publishes the web app; AWS SAM deploys or updates the backend stack. The CI workflow validates and builds the backend package, but does not deploy the SAM stack.
+The frontend and backend have separate release steps: Amplify publishes the web app; AWS SAM deploys or updates the backend stack. A CI build uses explicitly supplied test configuration to validate the artifact; it does not deploy the SAM stack. A real Amplify release must use the actual Cognito/API outputs from the target AWS stack.
 
 ## 2. Sign-in and request sequence
 
@@ -95,7 +95,7 @@ The index partition/sort keys are materialized by the Lambda handler and are als
 
 The web app is public client-side code. Build-time Cognito IDs, API URL, mode, and the custom attribute name are public browser configuration—not secrets. Never put AWS access keys, client secrets, or private Cognito-subject mappings into Amplify variables or frontend files.
 
-Hosted builds require explicit `TEAM_FOLLOW_UP_DATA_MODE` and `TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED` values. API mode requires real Cognito IDs and an HTTPS API base URL and refuses local/demo authentication. Keep local authentication disabled on any site reachable by other people.
+The repository has no local authentication mode, mock data adapter, browser database, seeded workspace, or offline work-data cache. Every work item, team profile, archive record, and activity event is obtained from or written through the Cognito-authenticated API to DynamoDB. The frontend keeps a transient in-memory view of the API response only so it can render and edit the current screen; that view is not a database and is never used as a fallback source after a failed request. The build fails unless a valid Cognito User Pool ID, public app-client ID, and HTTPS API base URL are supplied.
 
 ### Authentication and API authorization
 
@@ -122,6 +122,6 @@ Monitor both Lambda logs and API Gateway access logs. The dashboard reports requ
 - **Frontend release:** Amplify connects to the repository branch and publishes `dist/` using `amplify.yml`.
 - **Backend release:** run checks, `sam validate --lint`, and `sam build`, then deploy the packaged template with `sam deploy`.
 - **Identity bootstrap:** create the six Cognito accounts, assign `custom:teamUserId` values `u1`–`u6`, and seed UserProfiles from the actual Cognito subjects.
-- **Go-live:** switch Amplify to `TEAM_FOLLOW_UP_DATA_MODE=api`, use the stack outputs for Cognito and API configuration, keep local authentication disabled, and complete the smoke-test checklist.
+- **Go-live:** configure Amplify with `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, `TEAM_FOLLOW_UP_API_BASE_URL`, and optionally `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE=custom:teamUserId`; then complete the smoke-test checklist.
 
 For the ordered console steps, exact commands, environment variables, migration instructions, rollback cautions, and troubleshooting, follow [DEPLOYMENT.md](DEPLOYMENT.md).

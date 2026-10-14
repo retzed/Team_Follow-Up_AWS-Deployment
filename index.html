@@ -4139,5 +4139,41 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
 }
 </style>
 
+
+<style id="mobile-child-date-field-width-cap">
+/* Keep child-item From/To controls within the same compact mobile width as the
+   sidebar date filters; native date inputs can otherwise appear wider than
+   adjacent filter controls on narrow screens. */
+@media (max-width: 700px) {
+  #mainContent .child-toolbar.expanded .child-date-row {
+    box-sizing: border-box !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #mainContent .child-toolbar.expanded .child-date-row > .child-filter-field {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #mainContent .child-toolbar.expanded .child-date-row #childDateFrom,
+  #mainContent .child-toolbar.expanded .child-date-row #childDateTo {
+    box-sizing: border-box !important;
+    width: min(100%, 10.75rem) !important;
+    inline-size: min(100%, 10.75rem) !important;
+    min-width: 0 !important;
+    min-inline-size: 0 !important;
+    max-width: min(100%, 10.75rem) !important;
+    max-inline-size: min(100%, 10.75rem) !important;
+    padding-inline: 5px !important;
+    align-self: flex-start !important;
+  }
+}
+</style>
+
 </body>
 </html>

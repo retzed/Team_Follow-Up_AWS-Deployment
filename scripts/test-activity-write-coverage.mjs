@@ -28,7 +28,7 @@ assert.match(deletion, /const event=activityRecord\(item,`Deleted \$\{item\.type
 assert.doesNotMatch(deletion, /for\(const snapshot of doomedItems\).*data\.activity\.push/, 'Deletion must not generate one activity event per descendant.');
 assert.doesNotMatch(deletion, /root\.updatedAt=deletedAt/, 'Deleting a child must not trigger an unnecessary parent PATCH before the DELETE.');
 assert.ok(html.includes("const removalRoots=removed.filter(item=>!removedIds.has(String(item.parentId||''))).sort"), 'A subtree removal identifies only removed items whose parent is not also removed.');
-assert.match(html, /await request\('DELETE',`\/items\/\$\{encodeURIComponent\(id\)\}`,\{activityEvents:deletionEvents,cascade:true\}\)/, 'The data API must atomically archive the subtree and attach its single delete summary.');
+assert.match(html, /await request\('DELETE','\/items\/'\+encodeURIComponent\(id\),\{activityEvents:deletionEvents,cascade:true\}\)/, 'The AWS data API must atomically archive the subtree and attach its single delete summary.');
 assert.match(html, /function deleteItem\(id\)[\s\S]*?persist\(\);ui\.modal=null;/, 'The UI persists one cascade-delete command instead of serial per-child deletes.');
 assert.match(backend, /if event_kind=='create':[\s\S]*?if event_kind=='delete':/, 'Lambda must construct create and delete audit events server-side.');
 assert.match(backend, /fields=\[\('name','name'\),\('description','description'\),\('type','type'\),\('priority','priority'\),\('ownerId','assignee'\),\('dueDate','due date'\)\]/, 'Lambda covers all editable non-status fields in its audit diff.');

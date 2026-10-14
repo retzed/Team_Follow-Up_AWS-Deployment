@@ -363,13 +363,6 @@ def validate_item(event, item, previous=None):
     return index_work_item(item),profile
 
 
-def add_activity(item, actor, action, kind='update', when=None):
-    at=when or now()
-    eid='evt_'+uuid.uuid4().hex
-    e={'eventId':eid,'itemId':item['itemId'],'itemNameSnapshot':item.get('name',''),'itemTypeSnapshot':item.get('type',''),'rootParentId':item.get('rootParentId') or item['itemId'],'parentId':item.get('parentId'),'ancestorIds':item.get('ancestorIds',[]),'actorUserId':actor.get('userId',''),'action':action,'summary':action,'kind':kind,'at':at}
-    ACTIVITY.put_item(Item=activity_item(e))
-
-
 def ancestor_ids_for(item):
     ids=[]
     seen=set()
@@ -501,6 +494,24 @@ def query_work_items_all(qs):
 # ---------------------------------------------------------------------------
 # API Gateway HTTP API entry point
 # ---------------------------------------------------------------------------
+def restore_root_completion_positions(ordered, selected_roots, selected_under):
+    """Return the last ordered-item position belonging to each restore summary root.
+
+    Restore writes are chunked. A root summary can be committed with the same
+    transaction as the final selected item beneath that root.
+    """
+    positions = {}
+    for root in selected_roots:
+        root_id = str(root.get("itemId") or "")
+        matching = [
+            index for index, row in enumerate(ordered)
+            if selected_under(row, root_id)
+        ]
+        if matching:
+            positions[root_id] = max(matching)
+    return positions
+
+
 def lambda_handler(event, context):
     """Handle API Gateway HTTP API requests."""
     request_id = getattr(context, "aws_request_id", None) or event.get("requestContext", {}).get("requestId", "unknown")
@@ -614,6 +625,8 @@ def lambda_handler(event, context):
                     seen.add(current_id)
                     cursor=selected.get(str(cursor.get('parentId') or ''))
                 return False
+            root_last_position=restore_root_completion_positions(ordered,selected_roots,selected_under)
+            completed_root_ids=set()
             actor_id=profile['userId']
             at=now()
             restored_ids=[]
@@ -644,8 +657,10 @@ def lambda_handler(event, context):
                     'actorUserId':actor_id,'action':action,'summary':action,'kind':'restore','at':at,
                     'bulkOperation':'restore-subtree' if desc_count else 'restore-item','affectedCount':len(group),
                     'affectedDescendantCount':desc_count})
-            # Two writes per restored item; grouped audit records are written in the final chunk,
-            # keeping each DynamoDB transaction below its 100-action limit.
+            # Each item needs two actions (restore + archive delete). A root summary
+            # is included with the chunk containing that root's last selected item.
+            # With 30 items per chunk, each transaction uses at most 60 item actions
+            # plus 30 summary-event actions, below DynamoDB's 100-action limit.
             chunk_size=30
             for start in range(0,len(ordered),chunk_size):
                 chunk=ordered[start:start+chunk_size]
@@ -665,13 +680,21 @@ def lambda_handler(event, context):
                       {'Delete':{'TableName':ARCHIVE.name,'Key':av_map({'archiveId':item_id}),'ConditionExpression':'attribute_exists(#archiveId)','ExpressionAttributeNames':{'#archiveId':'archiveId'}}}
                     ])
                     prepared.append(item)
-                is_final=start+len(chunk)>=len(ordered)
+                chunk_end=start+len(chunk)
+                included=set(restored_ids)
+                included.update(str(x['itemId']) for x in prepared)
                 chunk_events=[]
-                if is_final:
-                    included=set(str(x['itemId']) for x in ordered)
-                    chunk_events=[event for root in selected_roots if (event:=summary_event(root,included)) is not None]
-                    for event in chunk_events:
-                        writes.append({'Put':{'TableName':ACTIVITY.name,'Item':av_map(event),'ConditionExpression':'attribute_not_exists(#eventId)','ExpressionAttributeNames':{'#eventId':'eventId'}}})
+                chunk_root_ids=[]
+                for root in selected_roots:
+                    root_id=str(root.get('itemId') or '')
+                    last_position=root_last_position.get(root_id)
+                    if last_position is not None and start <= last_position < chunk_end:
+                        audit_event=summary_event(root,included)
+                        if audit_event is not None:
+                            chunk_events.append(audit_event)
+                            chunk_root_ids.append(root_id)
+                for audit_event in chunk_events:
+                    writes.append({'Put':{'TableName':ACTIVITY.name,'Item':av_map(audit_event),'ConditionExpression':'attribute_not_exists(#eventId)','ExpressionAttributeNames':{'#eventId':'eventId'}}})
                 try:
                     ddb.meta.client.transact_write_items(TransactItems=writes)
                 except ClientError:
@@ -681,6 +704,9 @@ def lambda_handler(event, context):
                         included=set(restored_ids)
                         partial=[]
                         for root in selected_roots:
+                            root_id=str(root.get('itemId') or '')
+                            if root_id in completed_root_ids:
+                                continue
                             event=summary_event(root,included)
                             if event:
                                 partial.append(event)
@@ -692,6 +718,7 @@ def lambda_handler(event, context):
                     return response(409,{'message':'Some items may already have been restored. Refresh Archive to see the remaining items and retry.','restoredIds':restored_ids,'restoredItems':restored_items,'activityEvents':all_events})
                 restored_ids.extend(str(x['itemId']) for x in prepared)
                 restored_items.extend(public_item(x) for x in prepared)
+                completed_root_ids.update(chunk_root_ids)
                 all_events.extend(public_event(e) for e in chunk_events)
             return response(200,{'ok':True,'restoredIds':restored_ids,'restoredItems':restored_items,'activityEvents':all_events})
         if path=='/items' and method=='GET':

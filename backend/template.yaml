@@ -5,8 +5,8 @@ Parameters:
   TableNamePrefix:
     Type: String
     Default: TeamFollowUp
-    Description: Prefix for this environment's resource names; use different values for dev and prod.
-    AllowedPattern: '^[A-Za-z0-9_.-]{3,20}$'
+    Description: Prefix for this environment's resource names; use different values for dev and prod. Must start with a letter or number.
+    AllowedPattern: '^[A-Za-z0-9][A-Za-z0-9_.-]{2,19}$'
     ConstraintDescription: Use 3-20 letters, numbers, dots, underscores, or hyphens.
   AllowedOrigin:
     Type: String
@@ -356,17 +356,23 @@ Resources:
         SystemLogLevel: WARN
         LogGroup: !Ref ApiFunctionLogGroup
       Policies:
-        - DynamoDBCrudPolicy:
+        # Keep reads separate from explicit write operations.
+        - DynamoDBReadPolicy:
             TableName: !Ref WorkItemsTable
-        - DynamoDBCrudPolicy:
+        - DynamoDBReadPolicy:
             TableName: !Ref ActivityEventsTable
-        - DynamoDBCrudPolicy:
+        - DynamoDBReadPolicy:
             TableName: !Ref UserProfilesTable
-        - DynamoDBCrudPolicy:
+        - DynamoDBReadPolicy:
             TableName: !Ref ArchiveTable
         - Version: '2012-10-17'
           Statement:
-            - Sid: AllowAtomicWorkItemAndAuditTransactions
+            - Sid: AllowPartialRestoreActivitySummaries
+              Effect: Allow
+              Action:
+                - dynamodb:BatchWriteItem
+              Resource: !GetAtt ActivityEventsTable.Arn
+            - Sid: AllowAtomicWorkItemArchiveAndAuditTransactions
               Effect: Allow
               Action:
                 - dynamodb:TransactWriteItems

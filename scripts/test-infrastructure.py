@@ -64,6 +64,9 @@ def main():
         fail("AllowedOrigin must be explicit, not a public placeholder default.")
     if not origin.get("AllowedPattern", "").startswith("^https://"):
         fail("AllowedOrigin must enforce HTTPS.")
+    prefix_pattern = parameters.get("TableNamePrefix", {}).get("AllowedPattern", "")
+    if not prefix_pattern.startswith("^[A-Za-z0-9]"):
+        fail("TableNamePrefix must start with a letter or number to produce valid DynamoDB table names.")
 
     cognito_client = resources["TeamFollowUpUserPoolClient"]["Properties"]
     if cognito_client.get("GenerateSecret") is not False:
@@ -92,8 +95,39 @@ def main():
         fail("Lambda log retention must be controlled by LogRetentionDays.")
 
     policies = resources["ApiFunction"]["Properties"].get("Policies", [])
-    if "dynamodb:TransactWriteItems" not in str(policies):
-        fail("Lambda requires explicit least-scoped dynamodb:TransactWriteItems permission.")
+    if "DynamoDBCrudPolicy" in str(policies):
+        fail("Lambda must not receive broad DynamoDB CRUD permissions; use read policies and explicit write actions.")
+    read_tables = {
+        policy["DynamoDBReadPolicy"]["TableName"].get("Ref")
+        for policy in policies
+        if isinstance(policy, dict)
+        and isinstance(policy.get("DynamoDBReadPolicy"), dict)
+        and isinstance(policy["DynamoDBReadPolicy"].get("TableName"), dict)
+    }
+    if read_tables != {"WorkItemsTable", "ActivityEventsTable", "UserProfilesTable", "ArchiveTable"}:
+        fail("Lambda must use read-only policy templates for each of the four application tables.")
+    inline_statements = [
+        statement
+        for policy in policies if isinstance(policy, dict)
+        for statement in (policy.get("Statement", []) if isinstance(policy.get("Statement", []), list) else [policy.get("Statement")])
+        if isinstance(statement, dict)
+    ]
+    transaction_resources = next(
+        (statement.get("Resource") for statement in inline_statements
+         if "dynamodb:TransactWriteItems" in str(statement.get("Action", []))),
+        None,
+    )
+    if transaction_resources is None or not all(
+        table_id in str(transaction_resources)
+        for table_id in ("WorkItemsTable", "ActivityEventsTable", "ArchiveTable")
+    ):
+        fail("Lambda requires explicit transaction-write permission scoped to WorkItems, ActivityEvents, and Archive.")
+    if not any(
+        "dynamodb:BatchWriteItem" in str(statement.get("Action", []))
+        and "ActivityEventsTable.Arn" in str(statement.get("Resource"))
+        for statement in inline_statements
+    ):
+        fail("Partial restore audit summaries require BatchWriteItem only on the ActivityEvents table.")
     if resources["ApiFunction"]["Properties"].get("CodeUri") != "backend/src/":
         fail("Lambda CodeUri must remain backend/src/ so the handler and dependency manifest package together.")
     if not (ROOT / "backend" / "src" / "requirements.txt").exists():

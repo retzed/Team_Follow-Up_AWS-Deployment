@@ -20,6 +20,34 @@ import handler  # noqa: E402
 
 
 class HandlerHelperTests(unittest.TestCase):
+    def test_restore_summary_is_scheduled_after_the_last_selected_descendant(self):
+        ordered = [
+            {"itemId": "root-a"},
+            {"itemId": "child-a"},
+            {"itemId": "root-b"},
+            {"itemId": "followup-a"},
+        ]
+        roots = [{"itemId": "root-a"}, {"itemId": "root-b"}]
+        membership = {
+            "root-a": {"root-a", "child-a", "followup-a"},
+            "root-b": {"root-b"},
+        }
+        positions = handler.restore_root_completion_positions(
+            ordered, roots,
+            lambda row, root_id: row["itemId"] in membership[root_id],
+        )
+        self.assertEqual(positions, {"root-a": 3, "root-b": 2})
+        first_chunk = [
+            root["itemId"] for root in roots
+            if 0 <= positions[root["itemId"]] < 3
+        ]
+        second_chunk = [
+            root["itemId"] for root in roots
+            if 3 <= positions[root["itemId"]] < 4
+        ]
+        self.assertEqual(first_chunk, ["root-b"])
+        self.assertEqual(second_chunk, ["root-a"])
+
     def test_index_work_item_materializes_project_keys(self):
         row = handler.index_work_item(
             {

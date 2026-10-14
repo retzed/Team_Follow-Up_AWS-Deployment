@@ -1,0 +1,496 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: "Team Follow-Up backend - Cognito, HTTP API, Python Lambda, DynamoDB tables, and CloudWatch observability."
+Parameters:
+  TableNamePrefix:
+    Type: String
+    Default: TeamFollowUp
+    Description: Prefix for this environment's resource names; use different values for dev and prod.
+    AllowedPattern: '^[A-Za-z0-9_.-]{3,20}$'
+    ConstraintDescription: Use 3-20 letters, numbers, dots, underscores, or hyphens.
+  AllowedOrigin:
+    Type: String
+    Description: Exact HTTPS origin of the deployed Amplify site (scheme + host only; no path or trailing slash).
+    AllowedPattern: '^https://[A-Za-z0-9.-]+(:[0-9]+)?$'
+    ConstraintDescription: Enter the deployed Amplify HTTPS origin, for example https://main.abc123.amplifyapp.com.
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+    AllowedValues: [7, 14, 30, 60, 90]
+    Description: CloudWatch log retention period.
+  EnablePointInTimeRecovery:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Enable DynamoDB point-in-time recovery for protection against accidental changes (additional charges apply).
+Conditions:
+  UsePointInTimeRecovery: !Equals [!Ref EnablePointInTimeRecovery, 'true']
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 20
+    MemorySize: 256
+    Environment:
+      Variables:
+        WORK_ITEMS_TABLE: !Ref WorkItemsTable
+        ACTIVITY_TABLE: !Ref ActivityEventsTable
+        USER_PROFILES_TABLE: !Ref UserProfilesTable
+        ARCHIVE_TABLE: !Ref ArchiveTable
+Resources:
+  TeamFollowUpUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: !Sub '${TableNamePrefix}-UserPool'
+      UsernameConfiguration:
+        CaseSensitive: false
+      AliasAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+      MfaConfiguration: OPTIONAL
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: teamUserId
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: '2'
+            MaxLength: '2'
+  TeamFollowUpUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${TableNamePrefix}-BrowserClient'
+      UserPoolId: !Ref TeamFollowUpUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      ReadAttributes:
+        - email
+        - email_verified
+        - custom:teamUserId
+      WriteAttributes:
+        - email
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/${TableNamePrefix}/apigateway/access'
+      RetentionInDays: !Ref LogRetentionDays
+
+  TeamFollowUpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: !Sub '${TableNamePrefix}-HttpApi'
+      StageName: '$default'
+      DefinitionBody:
+        openapi: '3.0.1'
+        info:
+          title: !Sub '${TableNamePrefix} API'
+          version: '1.0'
+        paths: {}
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","method":"$context.httpMethod","routeKey":"$context.routeKey","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","integrationErrorMessage":"$context.integrationErrorMessage"}'
+      CorsConfiguration:
+        AllowOrigins: [!Ref AllowedOrigin]
+        AllowHeaders: [authorization, content-type]
+        AllowMethods: [GET, POST, PATCH, DELETE, OPTIONS]
+        MaxAge: 600
+      Auth:
+        DefaultAuthorizer: CognitoJwt
+        Authorizers:
+          CognitoJwt:
+            IdentitySource: '$request.header.Authorization'
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${TeamFollowUpUserPool}'
+              audience: [!Ref TeamFollowUpUserPoolClient]
+  WorkItemsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub '${TableNamePrefix}-WorkItems'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: itemId
+          AttributeType: S
+        - AttributeName: listPK
+          AttributeType: S
+        - AttributeName: updatedSort
+          AttributeType: S
+        - AttributeName: createdSort
+          AttributeType: S
+        - AttributeName: rootPK
+          AttributeType: S
+        - AttributeName: rootUpdatedSort
+          AttributeType: S
+        - AttributeName: assigneePK
+          AttributeType: S
+        - AttributeName: assigneeUpdatedSort
+          AttributeType: S
+        - AttributeName: assigneeCreatedSort
+          AttributeType: S
+      KeySchema:
+        - AttributeName: itemId
+          KeyType: HASH
+      PointInTimeRecoverySpecification: !If
+        - UsePointInTimeRecovery
+        - {PointInTimeRecoveryEnabled: true}
+        - !Ref AWS::NoValue
+        
+      SSESpecification:
+        SSEEnabled: true
+      GlobalSecondaryIndexes:
+        - IndexName: GSI_ListUpdated
+          KeySchema:
+            - AttributeName: listPK
+              KeyType: HASH
+            - AttributeName: updatedSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+        - IndexName: GSI_ListCreated
+          KeySchema:
+            - AttributeName: listPK
+              KeyType: HASH
+            - AttributeName: createdSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+        - IndexName: GSI_RootUpdated
+          KeySchema:
+            - AttributeName: rootPK
+              KeyType: HASH
+            - AttributeName: rootUpdatedSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+        - IndexName: GSI_AssignedUpdated
+          KeySchema:
+            - AttributeName: assigneePK
+              KeyType: HASH
+            - AttributeName: assigneeUpdatedSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+        - IndexName: GSI_AssignedCreated
+          KeySchema:
+            - AttributeName: assigneePK
+              KeyType: HASH
+            - AttributeName: assigneeCreatedSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+  ActivityEventsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub '${TableNamePrefix}-ActivityEvents'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: eventId
+          AttributeType: S
+        - AttributeName: itemPK
+          AttributeType: S
+        - AttributeName: itemSort
+          AttributeType: S
+        - AttributeName: applicationPK
+          AttributeType: S
+        - AttributeName: applicationSort
+          AttributeType: S
+        - AttributeName: rootPK
+          AttributeType: S
+        - AttributeName: rootSort
+          AttributeType: S
+        - AttributeName: parentPK
+          AttributeType: S
+        - AttributeName: parentSort
+          AttributeType: S
+      KeySchema:
+        - AttributeName: eventId
+          KeyType: HASH
+      PointInTimeRecoverySpecification: !If
+        - UsePointInTimeRecovery
+        - {PointInTimeRecoveryEnabled: true}
+        - !Ref AWS::NoValue
+        
+      SSESpecification:
+        SSEEnabled: true
+      GlobalSecondaryIndexes:
+        - IndexName: GSI_ItemTimeline
+          KeySchema:
+            - AttributeName: itemPK
+              KeyType: HASH
+            - AttributeName: itemSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+        - IndexName: GSI_ApplicationTimeline
+          KeySchema:
+            - AttributeName: applicationPK
+              KeyType: HASH
+            - AttributeName: applicationSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+        - IndexName: GSI_RootTimeline
+          KeySchema:
+            - AttributeName: rootPK
+              KeyType: HASH
+            - AttributeName: rootSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+        - IndexName: GSI_ParentTimeline
+          KeySchema:
+            - AttributeName: parentPK
+              KeyType: HASH
+            - AttributeName: parentSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+  ArchiveTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub '${TableNamePrefix}-Archive'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: archiveId
+          AttributeType: S
+        - AttributeName: archivePK
+          AttributeType: S
+        - AttributeName: archiveSort
+          AttributeType: S
+        - AttributeName: archiveRootPK
+          AttributeType: S
+        - AttributeName: archiveRootSort
+          AttributeType: S
+      KeySchema:
+        - AttributeName: archiveId
+          KeyType: HASH
+      PointInTimeRecoverySpecification: !If
+        - UsePointInTimeRecovery
+        - {PointInTimeRecoveryEnabled: true}
+        - !Ref AWS::NoValue
+        
+      SSESpecification:
+        SSEEnabled: true
+      GlobalSecondaryIndexes:
+        - IndexName: GSI_ArchiveIndex
+          KeySchema:
+            - AttributeName: archivePK
+              KeyType: HASH
+            - AttributeName: archiveSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+        - IndexName: GSI_ArchiveRoot
+          KeySchema:
+            - AttributeName: archiveRootPK
+              KeyType: HASH
+            - AttributeName: archiveRootSort
+              KeyType: RANGE
+          Projection: {ProjectionType: ALL}
+  UserProfilesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub '${TableNamePrefix}-UserProfiles'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: cognitoSub
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      PointInTimeRecoverySpecification: !If
+        - UsePointInTimeRecovery
+        - {PointInTimeRecoveryEnabled: true}
+        - !Ref AWS::NoValue
+        
+      SSESpecification:
+        SSEEnabled: true
+      GlobalSecondaryIndexes:
+        - IndexName: GSI_CognitoSub
+          KeySchema:
+            - AttributeName: cognitoSub
+              KeyType: HASH
+          Projection: {ProjectionType: ALL}
+  ApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${TableNamePrefix}-Api'
+      RetentionInDays: !Ref LogRetentionDays
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${TableNamePrefix}-Api'
+      CodeUri: backend/src/
+      Handler: handler.lambda_handler
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+        LogGroup: !Ref ApiFunctionLogGroup
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WorkItemsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ActivityEventsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UserProfilesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ArchiveTable
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: AllowAtomicWorkItemAndAuditTransactions
+              Effect: Allow
+              Action:
+                - dynamodb:TransactWriteItems
+              Resource:
+                - !GetAtt WorkItemsTable.Arn
+                - !GetAtt ActivityEventsTable.Arn
+                - !GetAtt ArchiveTable.Arn
+      Events:
+        AllRoutes:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TeamFollowUpApi
+            Path: /{proxy+}
+            Method: ANY
+  ApiLambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${TableNamePrefix}-Lambda-Errors'
+      AlarmDescription: The Team Follow-Up API Lambda returned an error during the evaluation period. Configure an SNS action after deployment if notifications are required.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+  ApiLambdaThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${TableNamePrefix}-Lambda-Throttles'
+      AlarmDescription: The Team Follow-Up API Lambda was throttled during the evaluation period. Configure an SNS action after deployment if notifications are required.
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+  ApiGateway5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${TableNamePrefix}-ApiGateway-5xx'
+      AlarmDescription: API Gateway returned at least one 5xx response during the evaluation period. Configure an SNS action after deployment if notifications are required.
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref TeamFollowUpApi
+        - Name: Stage
+          Value: '$default'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+  TeamFollowUpDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${TableNamePrefix}-Operations'
+      DashboardBody: !Sub |
+        {
+          "start": "-PT6H",
+          "widgets": [
+            {
+              "type": "metric", "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda invocations, errors, and throttles",
+                "view": "timeSeries", "region": "${AWS::Region}", "period": 300,
+                "metrics": [
+                  ["AWS/Lambda", "Invocations", "FunctionName", "${TableNamePrefix}-Api"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "${TableNamePrefix}-Api"],
+                  ["AWS/Lambda", "Throttles", "FunctionName", "${TableNamePrefix}-Api"]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "API Gateway request volume and 5xx errors",
+                "view": "timeSeries", "region": "${AWS::Region}", "period": 300,
+                "metrics": [
+                  ["AWS/ApiGateway", "Count", "ApiId", "${TeamFollowUpApi}", "Stage", "$default"],
+                  ["AWS/ApiGateway", "5xx", "ApiId", "${TeamFollowUpApi}", "Stage", "$default"]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda duration",
+                "view": "timeSeries", "region": "${AWS::Region}", "period": 300,
+                "metrics": [["AWS/Lambda", "Duration", "FunctionName", "${TableNamePrefix}-Api", {"stat": "p95"}]]
+              }
+            }
+          ]
+        }
+Outputs:
+  CognitoUserPoolId:
+    Description: Set TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID in Amplify Hosting.
+    Value: !Ref TeamFollowUpUserPool
+  CognitoUserPoolClientId:
+    Description: Set TEAM_FOLLOW_UP_COGNITO_CLIENT_ID in Amplify Hosting. This is a public client with no secret.
+    Value: !Ref TeamFollowUpUserPoolClient
+  CloudWatchDashboardName:
+    Description: CloudWatch operations dashboard.
+    Value: !Ref TeamFollowUpDashboard
+  ApiBaseUrl:
+    Description: API Gateway HTTPS base URL; configure dataMode='api' and apiBaseUrl in index.html to use the real backend.
+    Value: !Sub 'https://${TeamFollowUpApi}.execute-api.${AWS::Region}.amazonaws.com'
+  WorkItemsTableName:
+    Value: !Ref WorkItemsTable
+  ActivityEventsTableName:
+    Value: !Ref ActivityEventsTable
+  UserProfilesTableName:
+    Value: !Ref UserProfilesTable
+  ArchiveTableName:
+    Value: !Ref ArchiveTable

@@ -1,0 +1,23 @@
+{
+  "name": "team-follow-up-application",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Team Follow-Up application for AWS Amplify Hosting, Cognito and DynamoDB-compatible API access.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test:syntax": "node scripts/check-syntax.mjs",
+    "test:data-api": "node scripts/test-data-api.mjs",
+    "test": "npm run test:syntax && npm run test:data-api && npm run test:build-config && npm run test:progressive-loading && npm run test:child-search && npm run test:activity-coverage && npm run test:activity-merge && npm run test:history-structure && npm run test:ui-refinements",
+    "test:build-config": "node scripts/test-build-config.mjs",
+    "test:progressive-loading": "node scripts/test-progressive-loading.mjs",
+    "test:child-search": "node scripts/test-child-search-arabic-activity.mjs",
+    "test:activity-coverage": "node scripts/test-activity-write-coverage.mjs",
+    "test:history-structure": "node scripts/test-history-structure.mjs",
+    "test:activity-merge": "node scripts/test-activity-merge-idempotency.mjs",
+    "test:ui-refinements": "node scripts/test-ui-refinements.mjs",
+    "test:backend": "python -m unittest discover -s backend/tests -v",
+    "test:infrastructure": "python scripts/test-infrastructure.py",
+    "test:all": "npm test && npm run test:backend && npm run test:infrastructure"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,166 @@
+{
+  "tables": [
+    {
+      "name": "TeamFollowUp-WorkItems",
+      "primaryKey": {
+        "partition": "itemId"
+      },
+      "gsis": [
+        {
+          "name": "GSI_ListUpdated",
+          "pk": "listPK",
+          "sk": "updatedSort"
+        },
+        {
+          "name": "GSI_ListCreated",
+          "pk": "listPK",
+          "sk": "createdSort"
+        },
+        {
+          "name": "GSI_RootUpdated",
+          "pk": "rootPK",
+          "sk": "rootUpdatedSort"
+        },
+        {
+          "name": "GSI_AssignedUpdated",
+          "pk": "assigneePK",
+          "sk": "assigneeUpdatedSort"
+        },
+        {
+          "name": "GSI_AssignedCreated",
+          "pk": "assigneePK",
+          "sk": "assigneeCreatedSort"
+        }
+      ],
+      "businessFields": [
+        "type",
+        "name",
+        "description",
+        "status",
+        "priority",
+        "parentId",
+        "rootParentId",
+        "ownerId",
+        "createdByUserId",
+        "createdAt",
+        "updatedByUserId",
+        "updatedAt",
+        "dueDate",
+        "version"
+      ]
+    },
+    {
+      "name": "TeamFollowUp-ActivityEvents",
+      "primaryKey": {
+        "partition": "eventId"
+      },
+      "gsis": [
+        {
+          "name": "GSI_ItemTimeline",
+          "pk": "itemPK",
+          "sk": "itemSort"
+        },
+        {
+          "name": "GSI_ApplicationTimeline",
+          "pk": "applicationPK",
+          "sk": "applicationSort"
+        },
+        {
+          "name": "GSI_RootTimeline",
+          "pk": "rootPK",
+          "sk": "rootSort"
+        },
+        {
+          "name": "GSI_ParentTimeline",
+          "pk": "parentPK",
+          "sk": "parentSort"
+        }
+      ],
+      "businessFields": [
+        "itemId",
+        "itemNameSnapshot",
+        "itemTypeSnapshot",
+        "rootParentId",
+        "parentId",
+        "ancestorIds",
+        "actorUserId",
+        "action",
+        "summary",
+        "kind",
+        "at"
+      ]
+    },
+    {
+      "name": "TeamFollowUp-UserProfiles",
+      "primaryKey": {
+        "partition": "userId"
+      },
+      "gsis": [
+        {
+          "name": "GSI_CognitoSub",
+          "pk": "cognitoSub",
+          "sk": null
+        }
+      ],
+      "businessFields": [
+        "displayName",
+        "role",
+        "enabled",
+        "cognitoSub"
+      ]
+    },
+    {
+      "name": "TeamFollowUp-Archive",
+      "primaryKey": {
+        "partition": "archiveId"
+      },
+      "gsis": [
+        {
+          "name": "GSI_ArchiveIndex",
+          "pk": "archivePK",
+          "sk": "archiveSort"
+        },
+        {
+          "name": "GSI_ArchiveRoot",
+          "pk": "archiveRootPK",
+          "sk": "archiveRootSort"
+        }
+      ],
+      "businessFields": [
+        "itemId",
+        "type",
+        "name",
+        "description",
+        "status",
+        "priority",
+        "parentId",
+        "rootParentId",
+        "ownerId",
+        "createdByUserId",
+        "createdAt",
+        "updatedByUserId",
+        "updatedAt",
+        "dueDate",
+        "version",
+        "archiveRootId",
+        "archiveRootName",
+        "archiveParentId",
+        "archiveParentName",
+        "archivedAt",
+        "archivedByUserId"
+      ],
+      "notes": [
+        "Archived records preserve the original item ID, parent/root relationships, content and timestamps.",
+        "Activity events remain in TeamFollowUp-ActivityEvents and keep their item/root/parent references.",
+        "Restoring moves only selected archived rows back to WorkItems, after validating that every archived ancestor is restored too or already active."
+      ]
+    }
+  ],
+  "defaultMode": "builtin",
+  "actualAwsResourcesCreated": false,
+  "notes": [
+    "Infrastructure in backend/template.yaml creates the real tables when explicitly deployed.",
+    "Built-in mode emulates the four tables and their materialized indexes in browser storage.",
+    "The WorkItems API maps DynamoDB user IDs to the dashboard fields ownerId, createdBy and updatedBy at the API boundary."
+  ]
+}

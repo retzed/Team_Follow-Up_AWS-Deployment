@@ -1,0 +1,21 @@
+# Build and local tooling
+.aws-sam/
+node_modules/
+dist/
+coverage/
+__pycache__/
+*.py[cod]
+
+# Deployment-specific settings and identities
+samconfig.toml
+.env
+.env.*
+!.env.example
+backend/team-users.json
+backend/team-users-private.json
+
+# Local editor / OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

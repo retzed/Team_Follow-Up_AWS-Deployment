@@ -3970,28 +3970,42 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     flex: 0 1 auto !important;
   }
 
-  /* Bound the paired From/To filters only. Keeping each control within its own
-     shrinkable column prevents native mobile date UI from widening the filter row. */
+  /* Parent From/To: slightly wider than the previous fix, but never beyond
+     the width available to each filter column. */
   #parentDateFrom,
-  #parentDateTo,
-  #childDateFrom,
-  #childDateTo {
-    max-width: min(100%, 10rem) !important;
-    max-inline-size: min(100%, 10rem) !important;
-    justify-self: stretch !important;
+  #parentDateTo {
+    box-sizing: border-box !important;
+    width: min(100%, 10.75rem) !important;
+    max-width: min(100%, 10.75rem) !important;
+    max-inline-size: min(100%, 10.75rem) !important;
+    min-width: 0 !important;
   }
 
-  /* Due date in create/edit popups is a single full-row field, not a paired filter. */
+  /* Child From/To need a more-specific selector than the historical toolbar rules;
+     size the input itself, not just its wrapper, to stop native date sizing escaping. */
+  #mainContent .child-toolbar .child-date-row #childDateFrom,
+  #mainContent .child-toolbar .child-date-row #childDateTo {
+    box-sizing: border-box !important;
+    width: min(100%, 10.75rem) !important;
+    max-width: min(100%, 10.75rem) !important;
+    max-inline-size: min(100%, 10.75rem) !important;
+    min-width: 0 !important;
+    min-inline-size: 0 !important;
+  }
+
+  /* The popup's date control should stretch with its full-width field wrapper.
+     Auto width plus stretch avoids native date intrinsic sizing oversizing the box. */
   .modal #formDueDate,
   #formDueDate {
     display: block !important;
     box-sizing: border-box !important;
-    width: 100% !important;
-    inline-size: 100% !important;
+    width: auto !important;
+    inline-size: auto !important;
     min-width: 0 !important;
-    max-width: 100% !important;
     min-inline-size: 0 !important;
+    max-width: 100% !important;
     max-inline-size: 100% !important;
+    align-self: stretch !important;
     justify-self: stretch !important;
   }
 

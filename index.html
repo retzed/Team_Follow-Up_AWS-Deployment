@@ -1161,7 +1161,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   },
   apiBaseUrl: ""
 });
-</script></script>
+</script>
 <script id="team-follow-up-data-api">
 /* AWS-only data access. There is no browser database, mock route, or local adapter. */
 (function(){
@@ -1333,7 +1333,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function restoreArchive(itemIds){return request('POST','/archive/restore',{itemIds:[...new Set((itemIds||[]).map(String))]});}
  window.TeamFollowUpDataApi=Object.freeze({request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive});
 })();
-</script></script>
+</script>
 
 <script id="pre-auth-gate">
 (function(){
@@ -1468,8 +1468,8 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
    try{await state.modules?.signOut({global:true});}catch(error){try{await state.modules?.signOut();}catch(_error){}}
    window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;$('signInUsername').focus({preventScroll:true});
   }
-  window.TeamFollowUpAuth={signOut,async getAccessToken(){if(state.authMode==='local')throw new Error('Local authentication has no Cognito access token.');if(!state.modules)throw new Error('Cognito is not configured');return (await state.modules.fetchAuthSession()).tokens?.accessToken?.toString()||'';},async authenticatedFetch(path,init={}){
-  if(state.authMode==='local')throw new Error('Authenticated API calls are disabled in local-auth mode. Configure Cognito before connecting the backend.');
+  window.TeamFollowUpAuth={signOut,async getAccessToken(){if(!state.modules)throw new Error('Cognito is not configured');return (await state.modules.fetchAuthSession()).tokens?.accessToken?.toString()||'';},async authenticatedFetch(path,init={}){
+  
   const base=String(cfg.apiBaseUrl||'');if(!/^https:\/\//i.test(base)||/REPLACE|YOUR_|<|>/i.test(base))throw new Error('API_BASE_URL is not configured for HTTPS.');
   const baseUrl=new URL(base);if(baseUrl.protocol!=='https:'||baseUrl.username||baseUrl.password||baseUrl.search||baseUrl.hash)throw new Error('API_BASE_URL must be a plain HTTPS URL without credentials, query, or fragment.');if(!baseUrl.pathname.endsWith('/'))baseUrl.pathname+='/';
   const relativePath=String(path||'').replace(/^\/+/, '');const url=new URL(relativePath,baseUrl);if(url.origin!==baseUrl.origin||!url.pathname.startsWith(baseUrl.pathname))throw new Error('Only paths beneath the configured API base URL are allowed.');

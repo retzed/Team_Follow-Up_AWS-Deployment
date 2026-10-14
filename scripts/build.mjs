@@ -1,67 +1,79 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
-const source = await readFile('index.html', 'utf8');
-const readString = (key, fallback) => {
-  const re = new RegExp(`${key}:\\s*["']([^"']*)["']`);
-  return source.match(re)?.[1] ?? fallback;
+const SOURCE_PATH = 'index.html';
+const OUTPUT_PATH = 'dist/index.html';
+const required = {
+  userPoolId: 'TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID',
+  userPoolClientId: 'TEAM_FOLLOW_UP_COGNITO_CLIENT_ID',
+  apiBaseUrl: 'TEAM_FOLLOW_UP_API_BASE_URL'
 };
-const isAmplifyBuild = Boolean(process.env.AWS_APP_ID);
-const configuredDataMode = process.env.TEAM_FOLLOW_UP_DATA_MODE;
-if (isAmplifyBuild && (configuredDataMode === undefined || !configuredDataMode.trim())) {
-  throw new Error('Set TEAM_FOLLOW_UP_DATA_MODE to a non-empty value in Amplify Hosting; refusing to publish with an implicit local/demo mode.');
-}
-if (configuredDataMode !== undefined && !configuredDataMode.trim()) {
-  throw new Error('TEAM_FOLLOW_UP_DATA_MODE must not be empty.');
-}
-const dataMode = (configuredDataMode !== undefined ? configuredDataMode : readString('dataMode', 'builtin')).trim().toLowerCase();
-if (!['builtin', 'api'].includes(dataMode)) throw new Error('TEAM_FOLLOW_UP_DATA_MODE must be builtin or api.');
-const userPoolId = process.env.TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID || readString('userPoolId', 'REPLACE_WITH_COGNITO_USER_POOL_ID');
-const clientId = process.env.TEAM_FOLLOW_UP_COGNITO_CLIENT_ID || readString('userPoolClientId', 'REPLACE_WITH_PUBLIC_APP_CLIENT_ID');
-const apiBaseUrl = process.env.TEAM_FOLLOW_UP_API_BASE_URL || readString('apiBaseUrl', 'REPLACE_WITH_API_GATEWAY_BASE_URL');
-const teamUserAttribute = process.env.TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE || readString('teamUserAttribute', 'custom:teamUserId');
-let identityMap = {};
-if (process.env.TEAM_FOLLOW_UP_COGNITO_IDENTITY_MAP) {
-  try { identityMap = JSON.parse(process.env.TEAM_FOLLOW_UP_COGNITO_IDENTITY_MAP); }
-  catch { throw new Error('TEAM_FOLLOW_UP_COGNITO_IDENTITY_MAP must be valid JSON.'); }
-  if (!identityMap || typeof identityMap !== 'object' || Array.isArray(identityMap)) throw new Error('TEAM_FOLLOW_UP_COGNITO_IDENTITY_MAP must be a JSON object.');
-}
-const configuredCognito = !/REPLACE_WITH|^\s*$/.test(userPoolId) && !/REPLACE_WITH|^\s*$/.test(clientId);
-const localEnv = process.env.TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED;
-const normalizedLocalEnv = localEnv === undefined ? undefined : localEnv.trim().toLowerCase();
-if (isAmplifyBuild && localEnv === undefined) {
-  throw new Error('Set TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED explicitly in Amplify Hosting; use false for hosted builds.');
-}
-const truthy = ['1', 'true', 'yes', 'on'];
-const falsy = ['0', 'false', 'no', 'off'];
-if (normalizedLocalEnv !== undefined && ![...truthy, ...falsy].includes(normalizedLocalEnv)) {
-  throw new Error('TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED must be true or false.');
-}
-const localAuthEnabled = localEnv !== undefined
-  ? truthy.includes(normalizedLocalEnv)
-  : (dataMode === 'builtin' && !configuredCognito);
-if (dataMode === 'api' && !configuredCognito) throw new Error('API mode requires TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID and TEAM_FOLLOW_UP_COGNITO_CLIENT_ID.');
-if (dataMode === 'api' && /REPLACE_WITH|^\s*$/.test(apiBaseUrl)) throw new Error('API mode requires TEAM_FOLLOW_UP_API_BASE_URL.');
-if (dataMode === 'api') {
-  let parsedApiUrl;
-  try { parsedApiUrl = new URL(apiBaseUrl); }
-  catch { throw new Error('TEAM_FOLLOW_UP_API_BASE_URL must be a valid HTTPS URL.'); }
-  if (parsedApiUrl.protocol !== 'https:' || parsedApiUrl.username || parsedApiUrl.password || parsedApiUrl.search || parsedApiUrl.hash || !['', '/'].includes(parsedApiUrl.pathname)) {
-    throw new Error('TEAM_FOLLOW_UP_API_BASE_URL must be a base HTTPS URL without credentials, query, fragment, or a path.');
-  }
-}
-if (dataMode === 'api' && localAuthEnabled) throw new Error('Local auth must be disabled when TEAM_FOLLOW_UP_DATA_MODE=api.');
 
-const config = {
-  cognito: { userPoolId, userPoolClientId: clientId, teamUserAttribute, identityMap },
-  localAuth: { enabled: localAuthEnabled },
-  dataMode,
+function requireValue(envName) {
+  const value = process.env[envName];
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`Missing required AWS deployment setting: ${envName}. Configure the Cognito/API outputs in Amplify or your build environment.`);
+  }
+  return value.trim();
+}
+
+function validateUserPoolId(value) {
+  if (!/^[A-Za-z0-9-]+_[A-Za-z0-9]+$/.test(value) || /REPLACE|YOUR_|<|>/i.test(value)) {
+    throw new Error(`${required.userPoolId} must be a real Cognito User Pool ID (for example, us-east-1_abc123).`);
+  }
+  return value;
+}
+
+function validateClientId(value) {
+  if (!/^[A-Za-z0-9]{8,128}$/.test(value) || /REPLACE|YOUR_|<|>/i.test(value)) {
+    throw new Error(`${required.userPoolClientId} must be the real public Cognito app-client ID.`);
+  }
+  return value;
+}
+
+function validateApiBaseUrl(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${required.apiBaseUrl} must be a valid HTTPS API Gateway base URL.`);
+  }
+  if (
+    parsed.protocol !== 'https:' ||
+    !parsed.hostname ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash ||
+    !['', '/'].includes(parsed.pathname) ||
+    /example\.(com|invalid)$/i.test(parsed.hostname)
+  ) {
+    throw new Error(`${required.apiBaseUrl} must be a real HTTPS base URL without credentials, a path, query, or fragment.`);
+  }
+  return parsed.origin;
+}
+
+const source = await readFile(SOURCE_PATH, 'utf8');
+const configRegex = /<script id="team-follow-up-runtime-config">[\s\S]*?<\/script>/;
+if (!configRegex.test(source)) {
+  throw new Error('Could not find the runtime config block in index.html.');
+}
+
+const userPoolId = validateUserPoolId(requireValue(required.userPoolId));
+const userPoolClientId = validateClientId(requireValue(required.userPoolClientId));
+const apiBaseUrl = validateApiBaseUrl(requireValue(required.apiBaseUrl));
+const teamUserAttribute = (process.env.TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE || 'custom:teamUserId').trim();
+if (teamUserAttribute !== 'custom:teamUserId') {
+  throw new Error('TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE must be custom:teamUserId; team identity mapping is managed by Cognito.');
+}
+
+const runtimeConfig = {
+  cognito: { userPoolId, userPoolClientId, teamUserAttribute },
   apiBaseUrl
 };
-const safelySerialized = JSON.stringify(config, null, 2).replaceAll('<', '\\u003c');
-const replacement = `<script id="team-follow-up-runtime-config">\n/* Generated at build time from public Amplify environment variables. Never put secrets here. */\nwindow.TEAM_FOLLOW_UP_CONFIG = Object.freeze(${safelySerialized});\n</script>`;
-const configRegex = /<script id="team-follow-up-runtime-config">[\s\S]*?<\/script>/;
-if (!configRegex.test(source)) throw new Error('Could not find the runtime config block in index.html.');
+const serialized = JSON.stringify(runtimeConfig, null, 2).replaceAll('<', '\\u003c');
+const replacement = `<script id="team-follow-up-runtime-config">\n/* Generated at build time from public AWS configuration. Never put secrets here. */\nwindow.TEAM_FOLLOW_UP_CONFIG = Object.freeze(${serialized});\n</script>`;
 const output = source.replace(configRegex, replacement);
+
 await mkdir('dist', { recursive: true });
-await writeFile('dist/index.html', output, 'utf8');
-console.log(`Built static dashboard to dist/ (dataMode=${dataMode}, cognito=${configuredCognito ? 'configured' : 'placeholder'}, localAuth=${localAuthEnabled})`);
+await writeFile(OUTPUT_PATH, output, 'utf8');
+console.log(`Built AWS-only frontend to ${OUTPUT_PATH} (Cognito + HTTPS API configured).`);

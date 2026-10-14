@@ -902,6 +902,99 @@ html[dir="rtl"] .breadcrumb svg:nth-of-type(2){transform:scaleX(-1)}
 
 
 
+<style id="mobile-input-and-history-fixes">
+/* Keep mobile browsers from auto-zooming when a small-font form control receives focus.
+   Pinch-to-zoom remains available for accessibility. */
+@media (max-width: 700px) {
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Native date inputs have a large intrinsic minimum width in some mobile browsers. */
+  .date-filter {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    min-width: 0;
+  }
+  .date-filter > .field {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .date-filter .date-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-inline: 6px;
+  }
+}
+
+/* On narrow phones, stack date bounds instead of squeezing or overlapping the
+   browser-native date controls. Apply the same rule to child-item date filters. */
+@media (max-width: 420px) {
+  .date-filter {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .date-filter > .field,
+  .date-filter .date-input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .child-date-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100%;
+    max-width: 100%;
+  }
+  .child-date-row .child-filter-field,
+  .child-date-row .date-input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* History dialogs use the full mobile viewport and start at its top edge,
+   matching the creation dialog's available screen area. */
+@media (max-width: 700px) {
+  .modal.project-history-modal,
+  .modal.application-history-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  .modal.project-history-modal .modal-content,
+  .modal.application-history-modal .modal-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+  .modal.project-history-modal .modal-head,
+  .modal.application-history-modal .modal-head {
+    padding-top: calc(15px + env(safe-area-inset-top));
+  }
+  .modal.project-history-modal .modal-footer,
+  .modal.application-history-modal .modal-footer {
+    padding-bottom: calc(11px + env(safe-area-inset-bottom));
+  }
+}
+
+/* The sign-out door/arrow icon should point outward consistently in RTL. */
+html[dir="rtl"] #signOutButton svg {
+  transform: scaleX(-1);
+  transform-origin: center;
+}
+</style>
+
 </head>
 <body>
 <section class="signin-screen" id="signInScreen" role="dialog" aria-modal="true" aria-labelledby="signInTitle" hidden>

@@ -1344,8 +1344,8 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  const cfg=window.TEAM_FOLLOW_UP_CONFIG||{};
  const cognito=cfg.cognito||{};
  const validIds=['u1','u2','u3','u4','u5','u6'];
- const state={modules:null,authMode:null,mode:'signIn',pendingUser:'',nextStep:null,appStarted:false,submitting:false};
- const LOCAL_SESSION_KEY='team-follow-up-local-auth-v1';
+ const state={modules:null,mode:'signIn',pendingUser:'',nextStep:null,appStarted:false,submitting:false};
+
  screen.hidden=false;screen.lang=root.lang;screen.dir=root.dir;
  const ar=root.lang==='ar';
  const copy=ar?{

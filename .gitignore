@@ -11,8 +11,8 @@ samconfig.toml
 .env
 .env.*
 !.env.example
-backend/team-users.json
-backend/team-users-private.json
+backend/team-users*.json
+!backend/team-users.example.json
 
 # Local editor / OS files
 .DS_Store

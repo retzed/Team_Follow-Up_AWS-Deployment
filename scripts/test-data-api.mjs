@@ -88,6 +88,7 @@ const window = {
       if (method === 'GET' && url.pathname === '/items/assigned-to-me') return ok({ items: [task], count: 1, nextOffset: null });
       if (method === 'GET' && url.pathname === '/items/project-1/children') return ok({ items: [task], count: 1, nextOffset: null });
       if (method === 'GET' && url.pathname === '/archive') return ok({ items: [], count: 0, nextOffset: null });
+      if (method === 'POST' && url.pathname === '/archive/restore') return ok({ restoredIds: body?.itemIds || [] });
       if (method === 'PATCH' && url.pathname === '/items/project-1') {
         return ok({ item: { ...body, id: 'project-1' }, activityEvents: body.activityEvents || [] });
       }

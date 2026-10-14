@@ -48,7 +48,7 @@ html.auth-pending #app,html.app-booting #app,body.signin-open #app{visibility:hi
 .child-search-field .child-search-box { padding-block: 0; align-self: stretch; }
 .child-search-field .child-search-box input { height: 100%; min-height: 0; padding-block: 0; line-height: 1.35; }
 .sidebar-utility-actions { display:flex; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:10px; margin-top:4px; }
-.sidebar-utility-actions .reset-demo-data-button { margin-top:0; }
+.sidebar-utility-actions .sidebar-utility-button { margin-top:0; }
 
 </style>
 <style>
@@ -356,8 +356,8 @@ select option:disabled{color:var(--muted);opacity:.5}
 .sidebar-content .searchbox {
   margin-bottom: 1px;
 }
-.reset-demo-data-button { align-self: flex-start; margin-top: 4px; padding-inline: 3px; color: var(--muted); font-size: 10px; font-weight: 650; }
-.reset-demo-data-button:hover { color: var(--accent); text-decoration: underline; }
+.sidebar-utility-button { align-self: flex-start; margin-top: 4px; padding-inline: 3px; color: var(--muted); font-size: 10px; font-weight: 650; }
+.sidebar-utility-button:hover { color: var(--accent); text-decoration: underline; }
 
 @media (max-width: 820px) {
   .history-table-wrap {
@@ -1775,8 +1775,8 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
       <div class="list-title"><strong id="parentListHeading">Projects &amp; jobs</strong><button class="subtle-btn" id="clearParentFilters" type="button"></button></div>
       <div class="parent-list" id="parentList" aria-live="polite"></div>
       <div class="sidebar-utility-actions" aria-label="Workspace utilities">
-        <button class="subtle-btn reset-demo-data-button" id="archiveButton" data-action="open-archive" type="button"></button>
-        <button class="subtle-btn reset-demo-data-button" id="applicationHistoryButton" data-action="global-history" type="button" aria-label="Application-wide activity history"></button>
+        <button class="subtle-btn sidebar-utility-button" id="archiveButton" data-action="open-archive" type="button"></button>
+        <button class="subtle-btn sidebar-utility-button" id="applicationHistoryButton" data-action="global-history" type="button" aria-label="Application-wide activity history"></button>
       </div>
       </div>
     </aside>
@@ -1789,7 +1789,6 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
 (async () => {
 'use strict';
 try {
-const STORAGE_KEY = 'team-follow-up-demo-v3';
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -1839,232 +1838,20 @@ const ICONS = {
 };
 function icon(name,size=16){const paths=ICONS[name]||ICONS.grid;return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;}
 const t = {
- en:{signInTitle:'Sign in',signInSubtitle:'Enter your team username to continue.',username:'Username',password:'Password',usernamePlaceholder:'Enter username',passwordPlaceholder:'Enter password',signIn:'Sign in',signInUnknownUser:'Username not recognized. Enter the username of a team member.',brandSubtitle:'Work, connected.',workspaceEyebrow:'WORKSPACE',workspaceTitle:'Projects & Jobs',parentSearchTitle:'Find a project or job',parentSearchSub:'Browse projects and jobs, sorted by recent updates.',searchPlaceholder:'Search projects & jobs…',searchAssignedPlaceholder:'Search assigned items…',type:'Type',status:'Status',dateList:'Date',lastUpdated:'Last updated',lastCreated:'Last created',createdOldest:'Created',from:'From',to:'To',parentListHeading:'Projects & jobs',clear:'Clear',newParent:'New Project/Job',project:'Project',job:'Job',task:'Task',followup:'Follow-up',allTypes:'All types',allStatuses:'All statuses',notStarted:'Not started',inProgress:'In progress',onHold:'On hold',completed:'Completed',notCompleted:'Not completed',createdBy:'Created by',createdAt:'Created',updated:'Updated',owner:'Owner',dueDate:'Due date',edit:'Edit',delete:'Delete',overview:'Overview',activityHistory:'Activity history',children:'Project items',projectOverview:'Project Overview',jobOverview:'Job Overview',projectItems:'Project items',jobItems:'Job items',projectItemsHint:'Tasks and follow-ups attached to this Project.',jobItemsHint:'Follow-ups attached to this Job.',inThisProject:'in this project',inThisJob:'in this job',editJobTitle:'Edit job',childrenHint:'Tasks and follow-ups attached to this Project/Job.',newTask:'New task',newFollowup:'New follow-up',directFollowups:'Direct follow-ups',taskList:'Tasks',priority:'Priority',assignee:'Assignee',high:'High',medium:'Medium',low:'Low',urgent:'Urgent',description:'Description',noDescription:'No description added.',noChildItems:'No child items yet',noChildHint:'Add a task or follow-up to get work moving. Relationships are enforced automatically.',addFirstTask:'Add first task',searchChildren:'Search child items…',allPriorities:'All priorities',allChildTypes:'All types',items:'items',item:'item',inThisParent:'in this parent',openTasks:'Tasks',openFollowups:'Follow-ups',completedItems:'Completed',notCompletedItems:'Not Completed',parentOverview:'Parent overview',parentOverviewHint:'The details and ownership for this work item.',projectOverviewHint:'Project details, ownership, and current progress.',jobOverviewHint:'Job details, ownership, and current progress.',relatedItems:'Related item hierarchy',recentActivity:'Recent activity',viewAllHistory:'View full history',noActivity:'No activity recorded yet.',statusChanged:'Status last changed',noStatusChange:'No status changes recorded yet.',updatedBy:'Updated by',createdByTime:'Created by',addChild:'Add child item',newParentTitle:'Create a project or job',newChildTitle:'Create a child item',editParentTitle:'Edit project',editChildTitle:'Edit child item',name:'Name',namePlaceholder:'Give this item a clear name',descriptionPlaceholder:'Add context, outcome, or next steps…',save:'Save changes',create:'Create item',cancel:'Cancel',deleteConfirm:'Delete this item?',deleteWarning:'This item and its child items will be moved to Archive. You can restore them later.',parentRelationshipHint:'Projects and jobs are top-level items.',childRelationshipHint:'A task must belong to a project. A follow-up can belong to a project, job, or task.',chooseParent:'Attach to item',statusLabel:'Status',priorityLabel:'Priority',assignedTo:'Assigned to',followupAutoAssignHint:'Choose the teammate responsible for this follow-up.',selectUser:'Select a teammate',noDueDate:'No due date',historyTitle:'Activity history',time:'Time',date:'Date',user:'User',allUsers:'All users',action:'Action',parentItem:'Parent Item',childItem:'Child Item',actionCreated:'Created',actionDeleted:'Deleted',actionRestored:'Restored',actionArchived:'Archived',allActivity:'All activity',statusOnly:'Status changes only',searchHistory:'Search by date, user, item, or action…',searchParentHistory:'Search date/time, user/role, item name/type, or action…',searchApplicationHistory:'Search date/time, user/role, project/job, parent/child item name/type, or action…',itemSearch:'Item search',searchHistoryItems:'Search item name, type, or project…',historyCount:'events',deleteAction:'Delete item',confirmDelete:'Delete',parentRequired:'Choose a project, job, or task before creating a child item.',invalidChild:'This item cannot contain that type of child.',saved:'Changes saved.',created:'Item created.',deleted:'Item moved to Archive.',filtersCleared:'Filters cleared.',noResults:'No items match these filters.',activityAdded:'Activity recorded.',role:'Job title',noAssignee:'Unassigned',none:'None',sidebarSearch:'Search',assignedToMe:'Assigned to me',assignedItemsTitle:'Items assigned to me',assignedItemsSub:'Projects, jobs, tasks, and follow-ups assigned to the logged-in user.',noAssignedItems:'No items are assigned to this user.',thisItemOnly:'This item only',recent:'Recent',directFollowupHint:'This follow-up belongs directly to the selected Project/Job, not to a task.',directProjectFollowupHint:'This follow-up belongs directly to this project, not to a task.',directJobFollowupHint:'This follow-up belongs directly to this job, not to a task.',taskNestedHint:'Follow-ups can be attached to a task.',lastUpdatedLabel:'Last updated',updatedOn:'Updated',statusAuditPrefix:'Status changed',noFilterResults:'No projects or jobs match your search.',statusAction:'Status changed',createdAction:'Created item',updatedAction:'Updated item',childCreatedAction:'Created child item',deletedAction:'Deleted item',updatedFieldAction:'Updated',currentStatus:'Current status',priorityHint:'Priority helps the team triage work; it does not grant access.',createdLabel:'Created by',saveAndClose:'Save',close:'Close',requiredField:'Required field',archiveChildItemsLabel:'Child items',archiveFollowupsLabel:'Follow-ups',unknownUser:'Unknown user',applicationHistory:'Application activity',applicationHistoryTitle:'Application-wide activity history',applicationHistorySubtitle:'All recorded events across projects, jobs, tasks, and follow-ups.',unknownProject:'Unknown or archived project/job',projectColumn:'Project / Job',itemColumn:'Item',archive:'Archive',archiveEmpty:'Nothing has been archived yet.',archiveHint:'Restore a parent alone, or select it with all or specific archived children. Archived children can also be restored later after their parent is active.',archiveParentRequired:'Select an archived parent with its child, or restore the parent first. A follow-up under a task requires that task to be active or selected too.',archivedAt:'Archived',archivedBy:'Archived by',selectHierarchy:'Select all in hierarchy',clearSelection:'Clear selection',restoreSelected:'Restore selected',selectedItems:'selected',archiveRestored:'Selected items restored.',archiveRestoreFailed:'Some items could not be restored. Refresh the archive and check parent selections.',restoreParentFirst:'Select this item’s archived parent too, or restore the parent first.',resetDemoData:'Reset demo data',resetDemoConfirm:'Reset the demo data in this browser? This will replace all current local changes.',demoResetComplete:'Demo data reset.',},
- ar:{signInTitle:'تسجيل الدخول',signInSubtitle:'أدخل اسم المستخدم الخاص بك للمتابعة.',username:'اسم المستخدم',password:'كلمة المرور',usernamePlaceholder:'أدخل اسم المستخدم',passwordPlaceholder:'أدخل كلمة المرور',signIn:'تسجيل الدخول',signInUnknownUser:'اسم المستخدم غير معروف. أدخل اسم مستخدم أحد أعضاء الفريق.',brandSubtitle:'العمل، بتناغم.',workspaceEyebrow:'مساحة العمل',workspaceTitle:'المشروعات والأعمال المؤقتة',parentSearchTitle:'ابحث عن مشروع أو عمل مؤقت',parentSearchSub:'المشروعات والأعمال المؤقتة مرتبة حسب أحدث تحديث.',searchPlaceholder:'ابحث في المشروعات والأعمال المؤقتة…',searchAssignedPlaceholder:'ابحث في العناصر المكلّف بها…',type:'النوع',status:'الحالة',dateList:'التاريخ',lastUpdated:'آخر تحديث',lastCreated:'الأحدث إنشاءً',createdOldest:'تاريخ الإنشاء (تصاعديًا)',from:'من',to:'إلى',parentListHeading:'المشروعات والأعمال المؤقتة',clear:'مسح',newParent:'مشروع/عمل مؤقت جديد',project:'مشروع',job:'عمل مؤقت',task:'مهمة',followup:'متابعة',allTypes:'كل الأنواع',allStatuses:'كل الحالات',notStarted:'لم تبدأ',inProgress:'قيد التنفيذ',onHold:'معلّقة',completed:'مكتملة',notCompleted:'غير مكتملة',createdBy:'أنشأه',createdAt:'تاريخ الإنشاء',updated:'آخر تحديث',owner:'المسؤول',dueDate:'موعد التسليم',edit:'تعديل',delete:'حذف',overview:'نظرة عامة',activityHistory:'سجل النشاط',children:'عناصر المشروع',projectOverview:'نظرة عامة على المشروع',jobOverview:'نظرة عامة على العمل المؤقت',projectItems:'عناصر المشروع',jobItems:'عناصر العمل المؤقت',projectItemsHint:'المهام والمتابعات المرتبطة بهذا المشروع.',jobItemsHint:'المتابعات المرتبطة بهذا العمل المؤقت.',inThisProject:'في هذا المشروع',inThisJob:'في هذا العمل المؤقت',editJobTitle:'تعديل العمل المؤقت',childrenHint:'المهام والمتابعات المرتبطة بهذا المشروع أو العمل المؤقت.',newTask:'مهمة جديدة',newFollowup:'متابعة جديدة',directFollowups:'متابعات مباشرة',taskList:'المهام',priority:'الأولوية',assignee:'المكلّف',high:'مرتفعة',medium:'متوسطة',low:'منخفضة',urgent:'عاجلة',description:'الوصف',noDescription:'لا يوجد وصف.',noChildItems:'لا توجد عناصر فرعية بعد',noChildHint:'أضف مهمة أو متابعة لبدء العمل. تُطبّق قواعد الارتباط تلقائيًا.',addFirstTask:'إضافة أول مهمة',searchChildren:'ابحث في العناصر الفرعية…',allPriorities:'كل الأولويات',allChildTypes:'كل الأنواع',items:'عناصر',item:'عنصر',inThisParent:'ضمن هذا العنصر',openTasks:'المهام',openFollowups:'المتابعات',completedItems:'المكتملة',notCompletedItems:'غير المكتملة',parentOverview:'نظرة عامة على العنصر',parentOverviewHint:'التفاصيل والمسؤولية عن عنصر العمل.',projectOverviewHint:'تفاصيل المشروع والمسؤولية عنه وتقدّمه الحالي.',jobOverviewHint:'تفاصيل العمل المؤقت والمسؤولية عنه وتقدّمه الحالي.',relatedItems:'العناصر المرتبطة',recentActivity:'النشاط الأخير',viewAllHistory:'عرض السجل الكامل',noActivity:'لا يوجد نشاط مسجل بعد.',statusChanged:'آخر تغيير للحالة',noStatusChange:'لا توجد تغييرات مسجلة للحالة.',updatedBy:'حدّثه',createdByTime:'أنشأه',addChild:'إضافة عنصر فرعي',newParentTitle:'إنشاء مشروع أو عمل مؤقت',newChildTitle:'إنشاء عنصر فرعي',editParentTitle:'تعديل المشروع',editChildTitle:'تعديل العنصر الفرعي',name:'الاسم',namePlaceholder:'اكتب اسمًا واضحًا للعنصر',descriptionPlaceholder:'أضف السياق أو النتيجة أو الخطوات التالية…',save:'حفظ التغييرات',create:'إنشاء العنصر',cancel:'إلغاء',deleteConfirm:'حذف هذا العنصر؟',deleteWarning:'سيتم نقل هذا العنصر والعناصر الفرعية التابعة له إلى الأرشيف، ويمكنك استعادتها لاحقًا.',parentRelationshipHint:'المشروعات والأعمال المؤقتة عناصر رئيسية.',childRelationshipHint:'يجب أن ترتبط المهمة بمشروع. ويمكن ربط المتابعة بمشروع أو عمل مؤقت أو مهمة.',chooseParent:'إلحاق بالعنصر',statusLabel:'الحالة',priorityLabel:'الأولوية',assignedTo:'مكلّف إلى',followupAutoAssignHint:'اختر الزميل المسؤول عن هذه المتابعة.',selectUser:'اختر زميلًا',noDueDate:'لا يوجد موعد تسليم',historyTitle:'سجل النشاط',time:'الوقت',date:'التاريخ',user:'المستخدم',allUsers:'كل المستخدمين',action:'الإجراء',allActivity:'كل الأنشطة',statusOnly:'تغييرات الحالة فقط',searchHistory:'ابحث بالتاريخ أو المستخدم أو الإجراء…',searchParentHistory:'ابحث بالتاريخ/الوقت أو المستخدم/المسمى الوظيفي أو اسم/نوع العنصر أو الإجراء…',searchApplicationHistory:'ابحث بالتاريخ/الوقت أو المستخدم/المسمى الوظيفي أو المشروع/العمل المؤقت أو اسم/نوع العنصر الرئيسي/الفرعي أو الإجراء…',itemSearch:'البحث عن عنصر',searchHistoryItems:'ابحث باسم العنصر أو نوعه أو المشروع…',historyCount:'أحداث',deleteAction:'حذف العنصر',confirmDelete:'حذف',parentRequired:'اختر مشروعًا أو عملًا مؤقتًا أو مهمة قبل إنشاء عنصر فرعي.',invalidChild:'لا يمكن لهذا العنصر احتواء هذا النوع من العناصر الفرعية.',saved:'تم حفظ التغييرات.',created:'تم إنشاء العنصر.',deleted:'تم نقل العنصر إلى الأرشيف.',filtersCleared:'تم مسح عوامل التصفية.',noResults:'لا توجد عناصر تطابق عوامل التصفية.',activityAdded:'تم تسجيل النشاط.',role:'المسمى الوظيفي',noAssignee:'غير معيّن',none:'بدون',sidebarSearch:'بحث',assignedToMe:'العناصر المكلّف بها',assignedItemsTitle:'العناصر المكلّف بها المستخدم الحالي',assignedItemsSub:'المشروعات والوظائف والمهام والمتابعات المسندة إلى المستخدم الحالي.',noAssignedItems:'لا توجد عناصر مسندة إلى هذا المستخدم.',thisItemOnly:'هذا العنصر فقط',recent:'الأحدث',directFollowupHint:'ترتبط هذه المتابعة مباشرة بالمشروع أو العمل المؤقت وليست تابعة لمهمة.',directProjectFollowupHint:'ترتبط هذه المتابعة مباشرة بهذا المشروع وليست تابعة لمهمة.',directJobFollowupHint:'ترتبط هذه المتابعة مباشرة بهذا العمل المؤقت وليست تابعة لمهمة.',taskNestedHint:'يمكن ربط المتابعات بمهمة.',lastUpdatedLabel:'آخر تحديث',updatedOn:'تم التحديث',statusAuditPrefix:'تغيّرت الحالة',createdAction:'إنشاء عنصر',updatedAction:'تعديل عنصر',childCreatedAction:'إنشاء عنصر فرعي',deletedAction:'حذف عنصر',updatedFieldAction:'تحديث',currentStatus:'الحالة الحالية',priorityHint:'تساعد الأولوية الفريق على ترتيب العمل ولا تمنح صلاحيات.',createdLabel:'أنشأه',saveAndClose:'حفظ',close:'إغلاق',requiredField:'حقل مطلوب',archiveChildItemsLabel:'العناصر الفرعية',archiveFollowupsLabel:'المتابعات',unknownUser:'مستخدم غير معروف',applicationHistory:'نشاط التطبيق',applicationHistoryTitle:'سجل نشاط التطبيق بالكامل',applicationHistorySubtitle:'كل الأحداث المسجلة عبر المشروعات والأعمال المؤقتة والمهام والمتابعات.',unknownProject:'مشروع أو عمل مؤقت غير معروف أو مؤرشف',projectColumn:'المشروع / العمل المؤقت',itemColumn:'العنصر',archive:'الأرشيف',archiveEmpty:'لا توجد عناصر مؤرشفة حتى الآن.',archiveHint:'استعد العنصر الرئيسي وحده، أو حدده مع كل العناصر الفرعية المؤرشفة أو بعضها. ويمكن استعادة العناصر الفرعية لاحقًا بعد استعادة العنصر الرئيسي.',archiveParentRequired:'حدد العنصر الرئيسي المؤرشف مع العنصر الفرعي، أو استعد العنصر الرئيسي أولًا. وتتطلب المتابعة المرتبطة بمهمة أن تكون المهمة نشطة أو محددة معها.',archivedAt:'تاريخ الأرشفة',archivedBy:'أُرشف بواسطة',selectHierarchy:'تحديد كل عناصر التسلسل',clearSelection:'مسح التحديد',restoreSelected:'استعادة المحدد',selectedItems:'محدد',archiveRestored:'تمت استعادة العناصر المحددة.',archiveRestoreFailed:'تعذرت استعادة بعض العناصر. حدّث الأرشيف وتحقق من تحديد العناصر الرئيسية.',restoreParentFirst:'حدد العنصر الرئيسي المؤرشف أيضًا أو استعده أولًا.',resetDemoData:'إعادة تعيين البيانات التجريبية',resetDemoConfirm:'هل تريد إعادة تعيين البيانات التجريبية في هذا المتصفح؟ سيؤدي ذلك إلى استبدال جميع التغييرات المحلية الحالية.',demoResetComplete:'تمت إعادة تعيين البيانات التجريبية.',}
+ en:{signInTitle:'Sign in',signInSubtitle:'Enter your team username to continue.',username:'Username',password:'Password',usernamePlaceholder:'Enter username',passwordPlaceholder:'Enter password',signIn:'Sign in',signInUnknownUser:'Username not recognized. Enter the username of a team member.',brandSubtitle:'Work, connected.',workspaceEyebrow:'WORKSPACE',workspaceTitle:'Projects & Jobs',parentSearchTitle:'Find a project or job',parentSearchSub:'Browse projects and jobs, sorted by recent updates.',searchPlaceholder:'Search projects & jobs…',searchAssignedPlaceholder:'Search assigned items…',type:'Type',status:'Status',dateList:'Date',lastUpdated:'Last updated',lastCreated:'Last created',createdOldest:'Created',from:'From',to:'To',parentListHeading:'Projects & jobs',clear:'Clear',newParent:'New Project/Job',project:'Project',job:'Job',task:'Task',followup:'Follow-up',allTypes:'All types',allStatuses:'All statuses',notStarted:'Not started',inProgress:'In progress',onHold:'On hold',completed:'Completed',notCompleted:'Not completed',createdBy:'Created by',createdAt:'Created',updated:'Updated',owner:'Owner',dueDate:'Due date',edit:'Edit',delete:'Delete',overview:'Overview',activityHistory:'Activity history',children:'Project items',projectOverview:'Project Overview',jobOverview:'Job Overview',projectItems:'Project items',jobItems:'Job items',projectItemsHint:'Tasks and follow-ups attached to this Project.',jobItemsHint:'Follow-ups attached to this Job.',inThisProject:'in this project',inThisJob:'in this job',editJobTitle:'Edit job',childrenHint:'Tasks and follow-ups attached to this Project/Job.',newTask:'New task',newFollowup:'New follow-up',directFollowups:'Direct follow-ups',taskList:'Tasks',priority:'Priority',assignee:'Assignee',high:'High',medium:'Medium',low:'Low',urgent:'Urgent',description:'Description',noDescription:'No description added.',noChildItems:'No child items yet',noChildHint:'Add a task or follow-up to get work moving. Relationships are enforced automatically.',addFirstTask:'Add first task',searchChildren:'Search child items…',allPriorities:'All priorities',allChildTypes:'All types',items:'items',item:'item',inThisParent:'in this parent',openTasks:'Tasks',openFollowups:'Follow-ups',completedItems:'Completed',notCompletedItems:'Not Completed',parentOverview:'Parent overview',parentOverviewHint:'The details and ownership for this work item.',projectOverviewHint:'Project details, ownership, and current progress.',jobOverviewHint:'Job details, ownership, and current progress.',relatedItems:'Related item hierarchy',recentActivity:'Recent activity',viewAllHistory:'View full history',noActivity:'No activity recorded yet.',statusChanged:'Status last changed',noStatusChange:'No status changes recorded yet.',updatedBy:'Updated by',createdByTime:'Created by',addChild:'Add child item',newParentTitle:'Create a project or job',newChildTitle:'Create a child item',editParentTitle:'Edit project',editChildTitle:'Edit child item',name:'Name',namePlaceholder:'Give this item a clear name',descriptionPlaceholder:'Add context, outcome, or next steps…',save:'Save changes',create:'Create item',cancel:'Cancel',deleteConfirm:'Delete this item?',deleteWarning:'This item and its child items will be moved to Archive. You can restore them later.',parentRelationshipHint:'Projects and jobs are top-level items.',childRelationshipHint:'A task must belong to a project. A follow-up can belong to a project, job, or task.',chooseParent:'Attach to item',statusLabel:'Status',priorityLabel:'Priority',assignedTo:'Assigned to',followupAutoAssignHint:'Choose the teammate responsible for this follow-up.',selectUser:'Select a teammate',noDueDate:'No due date',historyTitle:'Activity history',time:'Time',date:'Date',user:'User',allUsers:'All users',action:'Action',parentItem:'Parent Item',childItem:'Child Item',actionCreated:'Created',actionDeleted:'Deleted',actionRestored:'Restored',actionArchived:'Archived',allActivity:'All activity',statusOnly:'Status changes only',searchHistory:'Search by date, user, item, or action…',searchParentHistory:'Search date/time, user/role, item name/type, or action…',searchApplicationHistory:'Search date/time, user/role, project/job, parent/child item name/type, or action…',itemSearch:'Item search',searchHistoryItems:'Search item name, type, or project…',historyCount:'events',deleteAction:'Delete item',confirmDelete:'Delete',parentRequired:'Choose a project, job, or task before creating a child item.',invalidChild:'This item cannot contain that type of child.',saved:'Changes saved.',created:'Item created.',deleted:'Item moved to Archive.',filtersCleared:'Filters cleared.',noResults:'No items match these filters.',activityAdded:'Activity recorded.',role:'Job title',noAssignee:'Unassigned',none:'None',sidebarSearch:'Search',assignedToMe:'Assigned to me',assignedItemsTitle:'Items assigned to me',assignedItemsSub:'Projects, jobs, tasks, and follow-ups assigned to the logged-in user.',noAssignedItems:'No items are assigned to this user.',thisItemOnly:'This item only',recent:'Recent',directFollowupHint:'This follow-up belongs directly to the selected Project/Job, not to a task.',directProjectFollowupHint:'This follow-up belongs directly to this project, not to a task.',directJobFollowupHint:'This follow-up belongs directly to this job, not to a task.',taskNestedHint:'Follow-ups can be attached to a task.',lastUpdatedLabel:'Last updated',updatedOn:'Updated',statusAuditPrefix:'Status changed',noFilterResults:'No projects or jobs match your search.',statusAction:'Status changed',createdAction:'Created item',updatedAction:'Updated item',childCreatedAction:'Created child item',deletedAction:'Deleted item',updatedFieldAction:'Updated',currentStatus:'Current status',priorityHint:'Priority helps the team triage work; it does not grant access.',createdLabel:'Created by',saveAndClose:'Save',close:'Close',requiredField:'Required field',archiveChildItemsLabel:'Child items',archiveFollowupsLabel:'Follow-ups',unknownUser:'Unknown user',applicationHistory:'Application activity',applicationHistoryTitle:'Application-wide activity history',applicationHistorySubtitle:'All recorded events across projects, jobs, tasks, and follow-ups.',unknownProject:'Unknown or archived project/job',projectColumn:'Project / Job',itemColumn:'Item',archive:'Archive',archiveEmpty:'Nothing has been archived yet.',archiveHint:'Restore a parent alone, or select it with all or specific archived children. Archived children can also be restored later after their parent is active.',archiveParentRequired:'Select an archived parent with its child, or restore the parent first. A follow-up under a task requires that task to be active or selected too.',archivedAt:'Archived',archivedBy:'Archived by',selectHierarchy:'Select all in hierarchy',clearSelection:'Clear selection',restoreSelected:'Restore selected',selectedItems:'selected',archiveRestored:'Selected items restored.',archiveRestoreFailed:'Some items could not be restored. Refresh the archive and check parent selections.',restoreParentFirst:'Select this item’s archived parent too, or restore the parent first.',},
+ ar:{signInTitle:'تسجيل الدخول',signInSubtitle:'أدخل اسم المستخدم الخاص بك للمتابعة.',username:'اسم المستخدم',password:'كلمة المرور',usernamePlaceholder:'أدخل اسم المستخدم',passwordPlaceholder:'أدخل كلمة المرور',signIn:'تسجيل الدخول',signInUnknownUser:'اسم المستخدم غير معروف. أدخل اسم مستخدم أحد أعضاء الفريق.',brandSubtitle:'العمل، بتناغم.',workspaceEyebrow:'مساحة العمل',workspaceTitle:'المشروعات والأعمال المؤقتة',parentSearchTitle:'ابحث عن مشروع أو عمل مؤقت',parentSearchSub:'المشروعات والأعمال المؤقتة مرتبة حسب أحدث تحديث.',searchPlaceholder:'ابحث في المشروعات والأعمال المؤقتة…',searchAssignedPlaceholder:'ابحث في العناصر المكلّف بها…',type:'النوع',status:'الحالة',dateList:'التاريخ',lastUpdated:'آخر تحديث',lastCreated:'الأحدث إنشاءً',createdOldest:'تاريخ الإنشاء (تصاعديًا)',from:'من',to:'إلى',parentListHeading:'المشروعات والأعمال المؤقتة',clear:'مسح',newParent:'مشروع/عمل مؤقت جديد',project:'مشروع',job:'عمل مؤقت',task:'مهمة',followup:'متابعة',allTypes:'كل الأنواع',allStatuses:'كل الحالات',notStarted:'لم تبدأ',inProgress:'قيد التنفيذ',onHold:'معلّقة',completed:'مكتملة',notCompleted:'غير مكتملة',createdBy:'أنشأه',createdAt:'تاريخ الإنشاء',updated:'آخر تحديث',owner:'المسؤول',dueDate:'موعد التسليم',edit:'تعديل',delete:'حذف',overview:'نظرة عامة',activityHistory:'سجل النشاط',children:'عناصر المشروع',projectOverview:'نظرة عامة على المشروع',jobOverview:'نظرة عامة على العمل المؤقت',projectItems:'عناصر المشروع',jobItems:'عناصر العمل المؤقت',projectItemsHint:'المهام والمتابعات المرتبطة بهذا المشروع.',jobItemsHint:'المتابعات المرتبطة بهذا العمل المؤقت.',inThisProject:'في هذا المشروع',inThisJob:'في هذا العمل المؤقت',editJobTitle:'تعديل العمل المؤقت',childrenHint:'المهام والمتابعات المرتبطة بهذا المشروع أو العمل المؤقت.',newTask:'مهمة جديدة',newFollowup:'متابعة جديدة',directFollowups:'متابعات مباشرة',taskList:'المهام',priority:'الأولوية',assignee:'المكلّف',high:'مرتفعة',medium:'متوسطة',low:'منخفضة',urgent:'عاجلة',description:'الوصف',noDescription:'لا يوجد وصف.',noChildItems:'لا توجد عناصر فرعية بعد',noChildHint:'أضف مهمة أو متابعة لبدء العمل. تُطبّق قواعد الارتباط تلقائيًا.',addFirstTask:'إضافة أول مهمة',searchChildren:'ابحث في العناصر الفرعية…',allPriorities:'كل الأولويات',allChildTypes:'كل الأنواع',items:'عناصر',item:'عنصر',inThisParent:'ضمن هذا العنصر',openTasks:'المهام',openFollowups:'المتابعات',completedItems:'المكتملة',notCompletedItems:'غير المكتملة',parentOverview:'نظرة عامة على العنصر',parentOverviewHint:'التفاصيل والمسؤولية عن عنصر العمل.',projectOverviewHint:'تفاصيل المشروع والمسؤولية عنه وتقدّمه الحالي.',jobOverviewHint:'تفاصيل العمل المؤقت والمسؤولية عنه وتقدّمه الحالي.',relatedItems:'العناصر المرتبطة',recentActivity:'النشاط الأخير',viewAllHistory:'عرض السجل الكامل',noActivity:'لا يوجد نشاط مسجل بعد.',statusChanged:'آخر تغيير للحالة',noStatusChange:'لا توجد تغييرات مسجلة للحالة.',updatedBy:'حدّثه',createdByTime:'أنشأه',addChild:'إضافة عنصر فرعي',newParentTitle:'إنشاء مشروع أو عمل مؤقت',newChildTitle:'إنشاء عنصر فرعي',editParentTitle:'تعديل المشروع',editChildTitle:'تعديل العنصر الفرعي',name:'الاسم',namePlaceholder:'اكتب اسمًا واضحًا للعنصر',descriptionPlaceholder:'أضف السياق أو النتيجة أو الخطوات التالية…',save:'حفظ التغييرات',create:'إنشاء العنصر',cancel:'إلغاء',deleteConfirm:'حذف هذا العنصر؟',deleteWarning:'سيتم نقل هذا العنصر والعناصر الفرعية التابعة له إلى الأرشيف، ويمكنك استعادتها لاحقًا.',parentRelationshipHint:'المشروعات والأعمال المؤقتة عناصر رئيسية.',childRelationshipHint:'يجب أن ترتبط المهمة بمشروع. ويمكن ربط المتابعة بمشروع أو عمل مؤقت أو مهمة.',chooseParent:'إلحاق بالعنصر',statusLabel:'الحالة',priorityLabel:'الأولوية',assignedTo:'مكلّف إلى',followupAutoAssignHint:'اختر الزميل المسؤول عن هذه المتابعة.',selectUser:'اختر زميلًا',noDueDate:'لا يوجد موعد تسليم',historyTitle:'سجل النشاط',time:'الوقت',date:'التاريخ',user:'المستخدم',allUsers:'كل المستخدمين',action:'الإجراء',allActivity:'كل الأنشطة',statusOnly:'تغييرات الحالة فقط',searchHistory:'ابحث بالتاريخ أو المستخدم أو الإجراء…',searchParentHistory:'ابحث بالتاريخ/الوقت أو المستخدم/المسمى الوظيفي أو اسم/نوع العنصر أو الإجراء…',searchApplicationHistory:'ابحث بالتاريخ/الوقت أو المستخدم/المسمى الوظيفي أو المشروع/العمل المؤقت أو اسم/نوع العنصر الرئيسي/الفرعي أو الإجراء…',itemSearch:'البحث عن عنصر',searchHistoryItems:'ابحث باسم العنصر أو نوعه أو المشروع…',historyCount:'أحداث',deleteAction:'حذف العنصر',confirmDelete:'حذف',parentRequired:'اختر مشروعًا أو عملًا مؤقتًا أو مهمة قبل إنشاء عنصر فرعي.',invalidChild:'لا يمكن لهذا العنصر احتواء هذا النوع من العناصر الفرعية.',saved:'تم حفظ التغييرات.',created:'تم إنشاء العنصر.',deleted:'تم نقل العنصر إلى الأرشيف.',filtersCleared:'تم مسح عوامل التصفية.',noResults:'لا توجد عناصر تطابق عوامل التصفية.',activityAdded:'تم تسجيل النشاط.',role:'المسمى الوظيفي',noAssignee:'غير معيّن',none:'بدون',sidebarSearch:'بحث',assignedToMe:'العناصر المكلّف بها',assignedItemsTitle:'العناصر المكلّف بها المستخدم الحالي',assignedItemsSub:'المشروعات والوظائف والمهام والمتابعات المسندة إلى المستخدم الحالي.',noAssignedItems:'لا توجد عناصر مسندة إلى هذا المستخدم.',thisItemOnly:'هذا العنصر فقط',recent:'الأحدث',directFollowupHint:'ترتبط هذه المتابعة مباشرة بالمشروع أو العمل المؤقت وليست تابعة لمهمة.',directProjectFollowupHint:'ترتبط هذه المتابعة مباشرة بهذا المشروع وليست تابعة لمهمة.',directJobFollowupHint:'ترتبط هذه المتابعة مباشرة بهذا العمل المؤقت وليست تابعة لمهمة.',taskNestedHint:'يمكن ربط المتابعات بمهمة.',lastUpdatedLabel:'آخر تحديث',updatedOn:'تم التحديث',statusAuditPrefix:'تغيّرت الحالة',createdAction:'إنشاء عنصر',updatedAction:'تعديل عنصر',childCreatedAction:'إنشاء عنصر فرعي',deletedAction:'حذف عنصر',updatedFieldAction:'تحديث',currentStatus:'الحالة الحالية',priorityHint:'تساعد الأولوية الفريق على ترتيب العمل ولا تمنح صلاحيات.',createdLabel:'أنشأه',saveAndClose:'حفظ',close:'إغلاق',requiredField:'حقل مطلوب',archiveChildItemsLabel:'العناصر الفرعية',archiveFollowupsLabel:'المتابعات',unknownUser:'مستخدم غير معروف',applicationHistory:'نشاط التطبيق',applicationHistoryTitle:'سجل نشاط التطبيق بالكامل',applicationHistorySubtitle:'كل الأحداث المسجلة عبر المشروعات والأعمال المؤقتة والمهام والمتابعات.',unknownProject:'مشروع أو عمل مؤقت غير معروف أو مؤرشف',projectColumn:'المشروع / العمل المؤقت',itemColumn:'العنصر',archive:'الأرشيف',archiveEmpty:'لا توجد عناصر مؤرشفة حتى الآن.',archiveHint:'استعد العنصر الرئيسي وحده، أو حدده مع كل العناصر الفرعية المؤرشفة أو بعضها. ويمكن استعادة العناصر الفرعية لاحقًا بعد استعادة العنصر الرئيسي.',archiveParentRequired:'حدد العنصر الرئيسي المؤرشف مع العنصر الفرعي، أو استعد العنصر الرئيسي أولًا. وتتطلب المتابعة المرتبطة بمهمة أن تكون المهمة نشطة أو محددة معها.',archivedAt:'تاريخ الأرشفة',archivedBy:'أُرشف بواسطة',selectHierarchy:'تحديد كل عناصر التسلسل',clearSelection:'مسح التحديد',restoreSelected:'استعادة المحدد',selectedItems:'محدد',archiveRestored:'تمت استعادة العناصر المحددة.',archiveRestoreFailed:'تعذرت استعادة بعض العناصر. حدّث الأرشيف وتحقق من تحديد العناصر الرئيسية.',restoreParentFirst:'حدد العنصر الرئيسي المؤرشف أيضًا أو استعده أولًا.',}
 };
 Object.assign(t.en,{loadingData:'Loading data…',loadingItems:'Loading items…',loadingActivity:'Loading activity…',loadFailed:'Could not load this data.',retry:'Retry',childSearchFilters:'Search & filters'});
 Object.assign(t.ar,{loadingData:'جارٍ تحميل البيانات…',loadingItems:'جارٍ تحميل العناصر…',loadingActivity:'جارٍ تحميل النشاط…',loadFailed:'تعذر تحميل هذه البيانات.',retry:'إعادة المحاولة',childSearchFilters:'البحث والتصفية'});
 Object.assign(t.ar,{actionArchived:'تمت الأرشفة',actionCreated:'تم الإنشاء',actionDeleted:'تم الحذف',actionRestored:'تمت الاستعادة',childItem:'العنصر الفرعي',noFilterResults:'لا توجد مشروعات أو أعمال مؤقتة تطابق البحث.',parentItem:'العنصر الرئيسي',statusAction:'تغيير الحالة'});
 const tr = key => (t[ui.lang] && t[ui.lang][key]) || t.en[key] || key;
-function seedData(){
- const users=[
-  {id:'u1',name:'Marwa',role:'Team Leader'},
-  {id:'u2',name:'Zyad',role:'AWS Engineer'},
-  {id:'u3',name:'Nadine',role:'AWS Engineer'},
-  {id:'u4',name:'Omar',role:'AWS Engineer'},
-  {id:'u5',name:'Haneen',role:'AWS Engineer'},
-  {id:'u6',name:'Dina',role:'AWS Engineer'}
- ];
- const memberIdAt = index => users[((index % users.length) + users.length) % users.length].id;
- const projectSpecs=[
-  {id:'p1',name:'01 · Architecture & AWS Foundation',description:'Establish a shared understanding of the Team Follow-Up Application, its AWS components, request flow, region, naming, and safe lab guardrails.',ownerId:'u1',status:'in-progress',due:12,tasks:[
-   {id:'t1',name:'Confirm scope, architecture and request flow',description:'Agree how the browser UI, identity provider, API, persistence and monitoring fit together.',ownerId:'u1',priority:'high',status:'completed',steps:[
-    ['Map the browser → CloudFront/S3 delivery path','Document how static HTML, CSS and JavaScript reach the browser over HTTPS.','u1','completed'],
-    ['Map Cognito → API Gateway → Lambda → DynamoDB','Record where login tokens are issued, validated, and used to protect data operations.','u2','completed'],
-    ['Agree the first-release work-item rules','Confirm project/job parent rules, nested tasks/follow-ups, assignment, and newest-first audit history.','u1','completed']
-   ]},
-   {id:'t2',name:'Prepare the AWS account and region',description:'Choose one deployment region for regional services and define names for every resource.',ownerId:'u2',priority:'high',status:'in-progress',steps:[
-    ['Choose one AWS Region and keep regional services together','Use eu-central-1 (Frankfurt) for this lab unless account policy requires another region.','u2','completed'],
-    ['Choose a unique resource-name prefix','Prepare names for the DynamoDB table, Lambda function, API, bucket, and Cognito pool.','u2','in-progress'],
-    ['Create a budget alert before provisioning','Set a small monthly budget and email alert; budgets notify but do not automatically cap all charges.','u1','not-started']
-   ]}
-  ]},
-  {id:'p2',name:'02 · IAM & Security Baseline',description:'Create least-privilege execution permissions and keep human access, application access, and service-to-service permissions separate.',ownerId:'u2',status:'not-started',due:16,tasks:[
-   {id:'t3',name:'Create the Lambda execution role',description:'Allow the function to write logs and access only the application data table and its index.',ownerId:'u2',priority:'urgent',status:'not-started',steps:[
-    ['Create a trusted role for the Lambda service','In IAM, create a role trusted by lambda.amazonaws.com.','u2','not-started'],
-    ['Attach the basic Lambda logging policy','Add AWSLambdaBasicExecutionRole so the function can create log streams and publish logs.','u2','not-started'],
-    ['Add table-scoped DynamoDB permissions','Allow the required GetItem, PutItem, UpdateItem, DeleteItem, Query, Scan and BatchWriteItem actions only on the lab table and its indexes.','u2','not-started']
-   ]},
-   {id:'t4',name:'Review browser and API security boundaries',description:'Keep secrets out of static assets and require a verified user token on business routes.',ownerId:'u1',priority:'high',status:'not-started',steps:[
-    ['Keep the S3 bucket private','Do not disable S3 Block Public Access to make the website work.','u5','not-started'],
-    ['Use CloudFront Origin Access Control','Allow only the intended CloudFront distribution to read the bucket.','u5','not-started'],
-    ['Confirm no privileged role is inferred from job title','Treat Team Leader and AWS Engineer as display labels, not authorization rules.','u1','not-started']
-   ]}
-  ]},
-  {id:'p3',name:'03 · Amazon Cognito Identity',description:'Create the user pool and app client, register the hosted-login return URLs, and provision the six named team members.',ownerId:'u4',status:'not-started',due:19,tasks:[
-   {id:'t5',name:'Create and configure the user pool',description:'Configure sign-in by email and use an app client without a client secret for browser-based OAuth.',ownerId:'u4',priority:'high',status:'not-started',steps:[
-    ['Create a Cognito User Pool','Use email as the sign-in identifier and disable self-service sign-up to keep access restricted to invited team members, if the console offers that option.','u4','not-started'],
-    ['Create a public app client with OAuth authorization code flow','Do not create a client secret for the browser application; use authorization code with PKCE.','u4','not-started'],
-    ['Set callback and sign-out URLs after CloudFront exists','Use the exact HTTPS CloudFront distribution URL; update these allow-lists if the URL changes.','u4','not-started']
-   ]},
-   {id:'t6',name:'Provision the team identities',description:'Create named user accounts and map each email to a stable user ID and informational role.',ownerId:'u4',priority:'medium',status:'not-started',steps:[
-    ['Create Marwa, Zyad, Nadine, Omar, Haneen and Dina','Use each team member’s real work email; never put passwords in the project tracker or source code.','u4','not-started'],
-    ['Record the Cognito user sub and email mapping','Use stable IDs u1–u6 in the UI data contract and link each to the appropriate Cognito identity.','u3','not-started'],
-    ['Test sign-in, sign-out, and token expiry','Verify callback URLs and that expired or missing tokens cannot access protected routes.','u4','not-started']
-   ]}
-  ]},
-  {id:'p4',name:'04 · Amazon DynamoDB Data Model',description:'Create a single-table model for root projects/jobs, nested tasks/follow-ups, activity records and an owner index for Assigned to me.',ownerId:'u6',status:'not-started',due:20,tasks:[
-   {id:'t7',name:'Create the Team Follow-Up data table',description:'Use a root partition for all items and audit entries belonging to one project/job.',ownerId:'u6',priority:'urgent',status:'not-started',steps:[
-    ['Create the TeamFollowUpData table','Set partition key pk (String), sort key sk (String), and on-demand capacity.','u6','not-started'],
-    ['Add the OwnerIndex global secondary index','Set gsi1pk (String) as partition key and gsi1sk (String) as sort key; project all attributes.','u6','not-started'],
-    ['Define item and activity key conventions','Use ROOT#rootId as pk, ITEM#itemId for item rows, and ACTIVITY#timestamp#eventId for immutable activity rows.','u3','not-started']
-   ]},
-   {id:'t8',name:'Validate access patterns and data retention',description:'Support root list, one-root hierarchy, assigned-to-me queries and historical activity without overwriting audit rows.',ownerId:'u6',priority:'high',status:'not-started',steps:[
-    ['Add the owner index fields to item records','Store gsi1pk=OWNER#ownerId and gsi1sk=UPDATED#timestamp#itemId for assigned-item sorting.','u6','not-started'],
-    ['Keep activity records immutable','Append a new event for creation, changes, status transitions and deletion; never delete old child events when deleting a child.','u3','not-started'],
-    ['Test query sorting and pagination behavior','Verify newest-first activity and define a page-size/continuation strategy before large data volumes.','u6','not-started']
-   ]}
-  ]},
-  {id:'p5',name:'05 · AWS Lambda Application API',description:'Implement the API handler, validate the project/job/task/follow-up rules server-side, and append audit entries for every mutation.',ownerId:'u3',status:'not-started',due:23,tasks:[
-   {id:'t9',name:'Create the team-follow-up-api function',description:'Use a supported Python runtime, the least-privilege role, table-name environment variable and structured JSON responses.',ownerId:'u3',priority:'urgent',status:'not-started',steps:[
-    ['Create the Lambda function and attach the execution role','Choose Python 3.13 or the current supported Python runtime in the console; use the custom role from IAM.','u3','not-started'],
-    ['Configure TABLE_NAME and TEAM_MEMBERS_JSON','Set the table name and a JSON list mapping u1–u6 to real emails, names and display-only job titles.','u3','not-started'],
-    ['Add the CRUD and query handler','Support root listing/creation, root-scoped item/activity reads, child create/update/delete, team listing, and assigned-to-me query.','u3','not-started']
-   ]},
-   {id:'t10',name:'Enforce domain rules and audit integrity',description:'Reject invalid parent/type combinations in the API even if a client UI sends a malformed request.',ownerId:'u3',priority:'urgent',status:'not-started',steps:[
-    ['Reject tasks under a job or follow-up','Tasks may belong only to a project; follow-ups may belong to a project, job, or task.','u3','not-started'],
-    ['Validate owner IDs against the team directory','Allow an explicit None/unassigned value when the form supports it, and record who made the change.','u3','not-started'],
-    ['Log status changes separately from ordinary edits','Record time, actor, item snapshot, action and root ID to support parent-scoped history.','u3','not-started']
-   ]}
-  ]},
-  {id:'p6',name:'06 · Amazon API Gateway HTTP API',description:'Expose the Lambda handler through named routes, configure CORS for the deployed front end and protect business operations with Cognito JWT validation.',ownerId:'u4',status:'not-started',due:24,tasks:[
-   {id:'t11',name:'Create routes and Lambda integration',description:'Create an HTTP API and attach the same handler to the required REST-like route patterns.',ownerId:'u4',priority:'high',status:'not-started',steps:[
-    ['Create the HTTP API and Lambda integration','Choose the existing team-follow-up-api Lambda function as the integration target.','u4','not-started'],
-    ['Add GET /roots and GET /assigned','Return parent projects/jobs and the current user’s assigned work, respectively.','u4','not-started'],
-    ['Add root, activity and child mutation routes','Configure GET /roots/{rootId}, GET /roots/{rootId}/activity, POST /roots, POST /roots/{rootId}/items, PATCH and DELETE child routes.','u4','not-started']
-   ]},
-   {id:'t12',name:'Configure JWT authorizer and CORS',description:'Verify access tokens and allow browser requests only from the expected CloudFront origin.',ownerId:'u4',priority:'urgent',status:'not-started',steps:[
-    ['Create a JWT authorizer for the Cognito user pool','Set issuer URL to the pool issuer and audience to the app client ID; require it on business routes.','u4','not-started'],
-    ['Configure CORS with the CloudFront origin','Allow only required methods and headers such as Authorization and Content-Type; avoid wildcard origins for the real app.','u4','not-started'],
-    ['Deploy and save the API invoke URL','Test an unauthenticated request is denied and an authenticated request succeeds.','u4','not-started']
-   ]}
-  ]},
-  {id:'p7',name:'07 · Amazon S3 & CloudFront Front End',description:'Deploy the browser interface to a private S3 bucket and deliver it through CloudFront with Origin Access Control and HTTPS.',ownerId:'u5',status:'not-started',due:18,tasks:[
-   {id:'t13',name:'Prepare and upload static web assets',description:'Create a deployment folder containing index.html, CSS, JavaScript and any local assets needed by the UI.',ownerId:'u5',priority:'high',status:'not-started',steps:[
-    ['Prepare the front-end entry point and assets','Rename the final web-app entry file to index.html and keep scripts/styles in the same release folder.','u5','not-started'],
-    ['Create a private S3 bucket','Use a globally unique bucket name, keep Block Public Access enabled, and use Bucket owner enforced object ownership.','u5','not-started'],
-    ['Upload the static assets','Upload index.html and all referenced files; do not paste AWS credentials or client secrets into the front end.','u5','not-started']
-   ]},
-   {id:'t14',name:'Create CloudFront with Origin Access Control',description:'Keep the S3 origin private and use the default CloudFront HTTPS domain for the first lab release.',ownerId:'u5',priority:'urgent',status:'not-started',steps:[
-    ['Create a CloudFront distribution with the S3 bucket origin','Choose the regular S3 bucket origin, not the S3 website endpoint, to use OAC.','u5','not-started'],
-    ['Enable Origin Access Control and sign requests','Use the recommended always-sign option and apply the generated bucket policy scoped to the distribution.','u5','not-started'],
-    ['Set default root object to index.html and wait for deployment','Open the CloudFront domain over HTTPS and verify the page and its assets load.','u5','not-started']
-   ]}
-  ]},
-  {id:'p8',name:'08 · Front End, Localization & API Integration',description:'Wire the browser UI to Cognito and API Gateway, keep English/Arabic UI behavior, and replace local-only persistence for shared production data.',ownerId:'u5',status:'not-started',due:28,tasks:[
-   {id:'t15',name:'Configure sign-in and API client',description:'Complete the hosted-login redirect, token management, API base URL, and error states.',ownerId:'u5',priority:'urgent',status:'not-started',steps:[
-    ['Add the Cognito domain, app client ID and CloudFront callback','Keep these public browser config values separate from secrets; no client secret belongs in JavaScript.','u5','not-started'],
-    ['Implement authorization-code flow with PKCE','Store the transient verifier safely, exchange the code for tokens, and handle sign-out/token expiry.','u5','not-started'],
-    ['Send the access token in the Authorization header','Call the protected API over HTTPS and show useful messages for 401, 403, validation and network errors.','u5','not-started']
-   ]},
-   {id:'t16',name:'Connect the existing UI to shared APIs',description:'Replace localStorage-backed work data with API reads and writes while preserving the established component hierarchy and audit UI.',ownerId:'u3',priority:'urgent',status:'not-started',steps:[
-    ['Map parent search and Assigned to me to API responses','Use GET /roots and GET /assigned; filter/sort by update/create dates and retain the page-relative sidebar behavior.','u3','not-started'],
-    ['Wire project/job/task/follow-up CRUD forms','Use root-scoped read/write routes and keep project/job/task/follow-up type validation in both UI and Lambda.','u3','not-started'],
-    ['Wire newest-first activity history','Read the root’s activity records and filter by date, user and action; display a child’s historical events under its root.','u3','not-started'],
-    ['Preserve English/Arabic and light/dark controls','Translate UI labels and user display names/roles only; keep entered work-item text unchanged and support RTL.','u5','not-started']
-   ]}
-  ]},
-  {id:'p9',name:'09 · Amazon CloudWatch, Budgets & Monitoring',description:'Create log visibility and basic cost controls so the team can debug the lab and notice unexpected spend.',ownerId:'u6',status:'not-started',due:29,tasks:[
-   {id:'t17',name:'Configure diagnostic logs and alarms',description:'Use CloudWatch Logs for Lambda execution, API access metrics, and an alert for repeated errors.',ownerId:'u6',priority:'high',status:'not-started',steps:[
-    ['Inspect the Lambda log group','Confirm logs contain request IDs and sanitized failures, never passwords, tokens or secrets.','u6','not-started'],
-    ['Review API Gateway 4xx/5xx and Lambda error metrics','Create a simple CloudWatch alarm for errors after establishing baseline traffic.','u6','not-started'],
-    ['Create an AWS Budget notification','Send email alerts at agreed thresholds and review actual costs during the lab.','u6','not-started']
-   ]},
-   {id:'t18',name:'Document runbook and recovery procedures',description:'Prepare a simple operations note for deploy, cache invalidation, auth failures, rollback and cleanup.',ownerId:'u6',priority:'medium',status:'not-started',steps:[
-    ['Document the deploy and cache-invalidation procedure','Record which files change, how to invalidate /index.html and how to verify CloudFront refresh.','u5','not-started'],
-    ['Document common authentication and CORS failures','Include issuer/audience mismatch, callback URL mismatch, expired token and missing allow-origin cases.','u4','not-started'],
-    ['Record owners and escalation path','Marwa coordinates the team; component engineers retain operational responsibility for their assigned services.','u1','not-started']
-   ]}
-  ]},
-  {id:'p10',name:'10 · End-to-End Validation & Handover',description:'Validate real user journeys and data integrity before calling the first release complete.',ownerId:'u1',status:'not-started',due:30,tasks:[
-   {id:'t19',name:'Run functional, security and usability checks',description:'Exercise the app using at least two team accounts and test the required nesting and history behavior.',ownerId:'u1',priority:'urgent',status:'not-started',steps:[
-    ['Test project vs temporary job child rules','Verify a project can contain tasks and direct follow-ups; a job contains follow-ups only; a task contains follow-ups only.','u1','not-started'],
-    ['Test assignments and cross-user visibility','Create an item as one account, assign it to a second account, and confirm Assigned to me is correct for each.','u1','not-started'],
-    ['Test audit history, sorting and deleted-child retention','Confirm events show newest first, include actor/date/action, and historical child events remain visible in root history.','u1','not-started'],
-    ['Test responsive layout and accessibility basics','Check desktop/mobile, keyboard focus, empty results, long names, dark dropdowns and Arabic RTL.','u5','not-started']
-   ]},
-   {id:'t20',name:'Complete launch review and cleanup decisions',description:'Review cost, data, open issues, backup/export requirements and the resources that should remain deployed.',ownerId:'u1',priority:'high',status:'not-started',steps:[
-    ['Run a final smoke test from the CloudFront URL','Test login, parent/child CRUD, assigned search, activity history, language/theme switching and refresh behavior.','u1','not-started'],
-    ['Review security and spend before team-wide use','Check IAM scope, S3 public access block, OAC policy, Cognito callback list, API JWT authorizer and Budget status.','u2','not-started'],
-    ['Approve handover and identify remaining gaps','Separate features validated for release from remaining production hardening, including backups, throttling and recovery testing.','u1','not-started']
-   ]}
-  ]}
- ];
- const parents=[];const children=[];
- for(let pi=0;pi<projectSpecs.length;pi++){
-  const spec=projectSpecs[pi];const pCreated=ago(27-pi,pi*7);const pUpdated=ago(Math.max(0,Math.floor(pi/3)),18+pi*5);
-  parents.push({id:spec.id,type:'project',name:spec.name,description:spec.description,status:spec.status,ownerId:spec.ownerId,dueDate:dateKey(ago(-spec.due)),createdAt:pCreated,createdBy:memberIdAt(pi),updatedAt:pUpdated,updatedBy:spec.ownerId});
-  for(let ti=0;ti<spec.tasks.length;ti++){
-   const ts=spec.tasks[ti];const taskCreated=ago(Math.max(2,17-pi+ti),ti*13);const taskUpdated=ago(Math.max(0,Math.floor(pi/3)),35+pi*8+ti*9);
-   children.push({id:ts.id,parentId:spec.id,rootParentId:spec.id,type:'task',name:ts.name,description:ts.description,status:ts.status||'not-started',priority:ts.priority,ownerId:ts.ownerId,dueDate:dateKey(ago(-(spec.due-ti-1))),createdAt:taskCreated,createdBy:memberIdAt(pi*2+ti),updatedAt:taskUpdated,updatedBy:ts.ownerId});
-   for(let si=0;si<ts.steps.length;si++){
-    const st=ts.steps[si];const fid=`f${ts.id.slice(1)}_${si+1}`;const fCreated=ago(Math.max(0,10-pi+ti+si),si*17);const fUpdated=ago(Math.max(0,Math.floor(pi/4)),45+pi*9+ti*12+si*8);
-    children.push({id:fid,parentId:ts.id,rootParentId:spec.id,type:'followup',name:st[0],description:st[1],status:st[3]||'not-started',priority:si===0?'high':(si===1?'medium':'low'),ownerId:st[2],dueDate:dateKey(ago(-(spec.due-ti-si-1))),createdAt:fCreated,createdBy:memberIdAt(pi*7+ti*3+si),updatedAt:fUpdated,updatedBy:st[2]});
-   }
-  }
- }
- const job={id:'p11',type:'job',name:'11 · Temporary AWS Environment & Cost Review',description:'A temporary operational work item for cost visibility, safe testing and removal of disposable resources. Jobs contain follow-ups only.',status:'in-progress',ownerId:'u4',dueDate:dateKey(ago(-7)),createdAt:ago(20),createdBy:memberIdAt(10),updatedAt:ago(0,55),updatedBy:'u4'};
- parents.push(job);
- const directJobFollowups=[
-  {id:'fj1',name:'Check the estimated cost of the current AWS resource set',description:'Review DynamoDB on-demand requests, Lambda invocations, API Gateway requests, CloudFront data transfer and Cognito MAUs.',ownerId:'u6',status:'in-progress',priority:'medium',created:9,updated:55},
-  {id:'fj2',name:'Confirm temporary test resources are tagged and documented',description:'Apply a common project tag and record resource names, regions, and ownership before sharing access with the team.',ownerId:'u2',status:'not-started',priority:'high',created:5,updated:145},
-  {id:'fj3',name:'Decide which resources to retain after the lab',description:'Retain only what the team needs; remove unused distributions, APIs, tables, functions, pools and buckets after exporting required evidence.',ownerId:'u1',status:'not-started',priority:'high',created:3,updated:180},
-  {id:'fj4',name:'Verify no secrets or real customer data are stored in application records',description:'Use synthetic project records during testing and verify passwords and access tokens are never written to browser storage, logs or screenshots.',ownerId:'u4',status:'not-started',priority:'urgent',created:2,updated:90}
- ];
- for(const [fi,f] of directJobFollowups.entries()){children.push({id:f.id,parentId:job.id,rootParentId:job.id,type:'followup',name:f.name,description:f.description,status:f.status,priority:f.priority,ownerId:f.ownerId,dueDate:dateKey(ago(-3)),createdAt:ago(f.created),createdBy:memberIdAt(10+fi),updatedAt:ago(0,f.updated),updatedBy:f.ownerId});}
- const all=[...parents,...children];const find=id=>all.find(x=>x.id===id);
- const ancestors=item=>{const ids=[];let cur=item;const seen=new Set();while(cur&&cur.parentId&&!seen.has(cur.parentId)){seen.add(cur.parentId);ids.push(cur.parentId);cur=find(cur.parentId);}if(item?.rootParentId&&!ids.includes(item.rootParentId))ids.push(item.rootParentId);return [...new Set(ids)];};
- const activity=[];
- const add=(itemId,at,userId,action,kind='update')=>{const item=find(itemId);if(!item)return;const root=item.type==='project'||item.type==='job'?item.id:item.rootParentId;activity.push({id:uid('a'),itemId:item.id,rootParentId:root,parentId:item.parentId||null,ancestorIds:ancestors(item),itemName:item.name,itemType:item.type,at,userId,action,kind});};
- for(const item of all){
-  add(item.id,item.createdAt,item.createdBy,`Created ${item.type}: ${item.name}`,'create');
-  if(new Date(item.updatedAt).getTime()>new Date(item.createdAt).getTime()+60000){
-   if(item.status!=='not-started')add(item.id,item.updatedAt,item.updatedBy,`Status changed from Not started to ${item.status==='completed'?'Completed':item.status==='in-progress'?'In progress':'On hold'}.`,'status');
-   else add(item.id,item.updatedAt,item.updatedBy,`Updated details for ${item.type}: ${item.name}.`,'update');
-  }
- }
- return {schema:4,users,parents,children,activity};
-}
+
 let data;
 let lastApiSnapshot=null;
 let apiPersistQueue=Promise.resolve();
 const copyWorkspace = value => {try{if(typeof structuredClone==='function')return structuredClone(value);}catch(e){}return JSON.parse(JSON.stringify(value));};
-try { const saved=localStorage.getItem(STORAGE_KEY); data=saved?JSON.parse(saved):seedData(); if(!data||!Array.isArray(data.parents)||!Array.isArray(data.children)||!Array.isArray(data.users)) data=seedData(); }
-catch { data=seedData(); }
-// Migrate built-in sample creator metadata from earlier releases across all six team members.
-// Only known seeded item IDs and their creation events are changed; other items/events remain intact.
-(function migrateSampleActivityCreators(){
- try {
-  if(!data || (Number(data.schema)||0)>=4 || !Array.isArray(data.users) || !Array.isArray(data.parents) || !Array.isArray(data.children) || !Array.isArray(data.activity)) return;
-  const expected=[['u1','Marwa'],['u2','Zyad'],['u3','Nadine'],['u4','Omar'],['u5','Haneen'],['u6','Dina']];
-  if(!expected.every(([id,name])=>data.users.some(u=>u.id===id&&u.name===name))) return;
-  const memberIdAt = index => expected[((index % expected.length)+expected.length)%expected.length][0];
-  for(const item of [...data.parents,...data.children]){
-   let index=null; let m;
-   if((m=/^p(\d+)$/.exec(item.id)) && Number(m[1])>=1 && Number(m[1])<=11) index=Number(m[1])-1;
-   else if((m=/^t(\d+)$/.exec(item.id)) && Number(m[1])>=1 && Number(m[1])<=20) index=Number(m[1])-1;
-   else if((m=/^f(\d+)_(\d+)$/.exec(item.id)) && Number(m[1])>=1 && Number(m[1])<=20) index=(Number(m[1])-1)*3+Number(m[2])-1;
-   else if((m=/^fj(\d+)$/.exec(item.id)) && Number(m[1])>=1 && Number(m[1])<=4) index=10+Number(m[1])-1;
-   if(index===null) continue;
-   const creatorId=memberIdAt(index);
-   item.createdBy=creatorId;
-   const createEvent=data.activity.find(e=>e.itemId===item.id&&e.kind==='create');
-   if(createEvent) createEvent.userId=creatorId;
-  }
-  data.schema=4;
-  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
- } catch(error) { console.warn('Sample activity migration was skipped.',error); }
-})();
-// Built-in mode hydrates locally before rendering. API mode starts with an empty cache and
-// progressively fills it after the UI's loading placeholders are rendered.
-const bootstrapFallbackWorkspace = copyWorkspace(data);
-const dataLoadState = {
- active: window.TeamFollowUpDataApi?.mode==='api',
- initialComplete: window.TeamFollowUpDataApi?.mode!=='api',
- usersReady: window.TeamFollowUpDataApi?.mode!=='api',
- parentsReady: window.TeamFollowUpDataApi?.mode!=='api',
- childrenLoaded:new Set(), activityLoaded:new Set(), rootErrors:new Map(), initialError:''
-};
-let builtinBootstrapWarning='';
-if(dataLoadState.active){data={schema:4,users:[],parents:[],children:[],activity:[]};invalidateHierarchyIndex();lastApiSnapshot=null;}
-else {
- try {data=await window.TeamFollowUpDataApi.bootstrap(data);lastApiSnapshot=copyWorkspace(data);}
- catch(bootstrapError){
-  console.error('Built-in workspace bootstrap failed; continuing with the saved workspace cache.',bootstrapError);
-  data=copyWorkspace(bootstrapFallbackWorkspace);lastApiSnapshot=copyWorkspace(data);
-  builtinBootstrapWarning=String(bootstrapError?.message||'');
- }
-}
+data={schema:4,users:[],parents:[],children:[],activity:[]};
+const dataLoadState={active:true,initialComplete:false,usersReady:false,parentsReady:false,childrenLoaded:new Set(),activityLoaded:new Set(),rootErrors:new Map(),initialError:''};
 function detectInitialPreferences(){
  const fallback={lang:'en',theme:'dark'};
  try{
@@ -2086,7 +1873,7 @@ function detectInitialPreferences(){
 const initialPreferences=detectInitialPreferences();
 function isMobileSidebarViewport(){try{return typeof window.matchMedia==='function'&&window.matchMedia('(max-width: 820px)').matches;}catch{return false;}}
 let previousMobileSidebarViewport=isMobileSidebarViewport();
-const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:isMobileSidebarViewport(),selectedParentId:'p1',tab:'overview',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||'u1'),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all'};
+const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:isMobileSidebarViewport(),selectedParentId:'',tab:'overview',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||''),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all'};
 const activityRefreshRequests=new Map();
 let activityIndexRevision=0;
 let activityIndexCache={source:null,length:-1,revision:-1,byId:new Map(),byRoot:new Map(),all:[]};
@@ -2098,9 +1885,9 @@ let historySearchTimer=0;
 let historySearchCache=new Map();
 let activityRootSnapshotCache={source:null,length:-1,revision:-1,byId:new Map()};
 let activityIdsNormalized=false;
-let workspaceCacheSaveTimer=0;
+
 let applicationHistoryRequest=0;
-let applicationHistoryReady=window.TeamFollowUpDataApi?.mode!=='api';
+let applicationHistoryReady=false;
 let applicationHistoryLoading=false;
 let applicationHistoryError='';
 function invalidateActivityIndexes(){activityIndexRevision++;activityIndexCache.source=null;activityRootSnapshotCache.source=null;historySearchCache.clear();}
@@ -2238,7 +2025,7 @@ async function refreshActivityFor(itemId,scope='all'){
   const changed=mergeActivityEventsIntoWorkspace(incoming);
   if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],incoming);lastApiSnapshot.activity=merged.rows;}
   if(ui.modal?.kind==='history'&&String(ui.modal.itemId)===String(itemId))ui.modal.historyRefreshError='';
-  if(changed){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(copyWorkspace(data)));}catch(e){}}
+  
   renderAfterActivityRefresh(String(itemId),scope);
  }catch(error){
   console.warn('Could not refresh activity history from the data API.',error);
@@ -2259,7 +2046,7 @@ async function refreshApplicationHistory(silent=false){
   const changed=mergeActivityEventsIntoWorkspace(incoming);
   if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],incoming);lastApiSnapshot.activity=merged.rows;}
   applicationHistoryReady=true;applicationHistoryError='';
-  if(changed){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(copyWorkspace(data)));}catch(e){}}
+  
   if(ui.sidebarMode==='search')renderParentSearchList(filteredParents());
   const selected=data.parents.find(p=>String(p.id)===String(ui.selectedParentId));
   if(selected&&ui.tab==='overview'){const list=$('#childItemsList');if(list)list.innerHTML=renderChildList(selected);updateNotCompletedMetricCount(selected);syncOverviewMetricPressed();}
@@ -2272,10 +2059,6 @@ async function refreshApplicationHistory(silent=false){
  }finally{
   if(requestId===applicationHistoryRequest){applicationHistoryLoading=false;if(ui.modal?.kind==='global-history')renderModal();}
  }
-}
-function scheduleWorkspaceCacheSave(){
- if(workspaceCacheSaveTimer)clearTimeout(workspaceCacheSaveTimer);
- workspaceCacheSaveTimer=setTimeout(()=>{workspaceCacheSaveTimer=0;try{localStorage.setItem(STORAGE_KEY,JSON.stringify(copyWorkspace(data)));}catch(e){console.warn('Could not save the UI cache to localStorage.',e);}},0);
 }
 function persist(){
  invalidateHierarchyIndex();historySearchCache.clear();
@@ -2291,7 +2074,7 @@ function persist(){
    }
   }
  }
- scheduleWorkspaceCacheSave();
+ 
  if(!lastApiSnapshot||!window.TeamFollowUpDataApi)return Promise.resolve();
  apiPersistQueue=apiPersistQueue.then(async()=>{
   await window.TeamFollowUpDataApi.commitSnapshot(lastApiSnapshot,desired);
@@ -2301,7 +2084,7 @@ function persist(){
     const fields=['name','description','type','status','priority','ownerId','dueDate','parentId'];
     if(fields.every(key=>(live[key]??null)===(saved[key]??null))){for(const key of ['createdAt','updatedAt','createdBy','updatedBy','version'])if(saved[key]!==undefined)live[key]=saved[key];}
    }
-   mergeActivityEventsIntoWorkspace(desired.activity||[]);scheduleWorkspaceCacheSave();
+   mergeActivityEventsIntoWorkspace(desired.activity||[]);
   }
   lastApiSnapshot=copyWorkspace(desired);
  }).catch(error=>{
@@ -2320,7 +2103,7 @@ const localizedUserRoles={'Team Leader':'قائد الفريق','AWS Engineer':'
 const sessionUserIdAtLoad=window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||'';
 if(sessionUserIdAtLoad&&data.users.some(u=>u.id===sessionUserIdAtLoad))ui.actingUserId=sessionUserIdAtLoad;
 
-function person(id){const raw=data.users.find(u=>u.id===id)||data.users[0]||{id:'unknown',name:'Unknown user',role:'Team member'};if(ui.lang!=='ar')return raw;return {...raw,name:localizedUserNames[raw.id]||raw.name,role:localizedUserRoles[raw.role]||raw.role};}
+function person(id){const raw=data.users.find(u=>u.id===id)||{id:'unknown',name:'Unknown user',role:'Team member'};if(ui.lang!=='ar')return raw;return {...raw,name:localizedUserNames[raw.id]||raw.name,role:localizedUserRoles[raw.role]||raw.role};}
 function currentUser(){return person(ui.actingUserId);}
 function assigneeName(id){return id?person(id).name:tr('noAssignee');}
 function allItem(id){if(id===undefined||id===null||id==='')return null;return ensureHierarchyIndex().byId.get(String(id))||null;}
@@ -2763,13 +2546,6 @@ function renderModal(){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='
 }
 let toastTimer;
 function toast(message,error=false){const region=$('#toastRegion');const node=document.createElement('div');node.className=`toast${error?' error':''}`;node.innerHTML=`${icon(error?'info':'check',16)}<span>${esc(message)}</span>`;region.append(node);setTimeout(()=>node.remove(),3600);}
-function resetDemoData(){
- if(window.TeamFollowUpDataApi?.mode==='api'){toast(ui.lang==='ar'?'إعادة تعيين البيانات التجريبية معطّلة عند استخدام بيانات AWS المشتركة.':'Reset demo data is disabled while using shared AWS data.',true);return;}
- if(!window.confirm(tr('resetDemoConfirm')))return;
- data=seedData();activityIdsNormalized=false;invalidateActivityIndexes();invalidateHierarchyIndex();applicationHistoryReady=true;applicationHistoryError='';
- ui.selectedParentId=data.parents[0]?.id||null;ui.tab='overview';ui.sidebarMode='search';ui.selectedAssignedItemId=null;ui.parentQuery='';ui.parentType='all';ui.parentStatus='all';ui.parentDateMode='updated';ui.parentDateFrom='';ui.parentDateTo='';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();ui.modal=null;ui.historyQuery='';ui.historyScope='all';ui.sidebarCollapsed=isMobileSidebarViewport();
- persist();render();toast(tr('demoResetComplete'));
-}
 function archiveItemDepth(item,byId){let depth=0,cursor=item,seen=new Set();while(cursor&&cursor.parentId&&byId.has(String(cursor.parentId))&&!seen.has(String(cursor.parentId))){seen.add(String(cursor.parentId));depth++;cursor=byId.get(String(cursor.parentId));}return depth;}
 function archiveGroups(items){const groups=new Map();for(const item of items){const rootId=String(item.archiveRootId||item.rootParentId||item.id);if(!groups.has(rootId))groups.set(rootId,{rootId,rootName:item.archiveRootName||item.rootParentName||item.name,items:[]});const group=groups.get(rootId);if(item.type==='project'||item.type==='job'){group.rootName=item.name;}group.items.push(item);}for(const group of groups.values()){const byId=new Map(group.items.map(x=>[String(x.id),x]));const children=new Map();for(const item of group.items){const p=String(item.parentId||'');if(!children.has(p))children.set(p,[]);children.get(p).push(item);}for(const list of children.values())list.sort((a,b)=>(Date.parse(a.createdAt)||0)-(Date.parse(b.createdAt)||0)||String(a.name).localeCompare(String(b.name)));const ordered=[],seen=new Set();const visit=(item)=>{const id=String(item.id);if(seen.has(id))return;seen.add(id);ordered.push(item);for(const child of children.get(id)||[])visit(child);};const roots=group.items.filter(item=>!byId.has(String(item.parentId||''))||String(item.parentId)===String(group.rootId));for(const item of roots)visit(item);for(const item of group.items)visit(item);group.items=ordered;}return [...groups.values()].sort((a,b)=>Math.max(...a.items.map(x=>Date.parse(x.archivedAt)||Date.parse(x.deletedAt)||0))-Math.max(...b.items.map(x=>Date.parse(x.archivedAt)||Date.parse(x.deletedAt)||0))).reverse();}
 function renderArchivePreservingScroll(){const content=$('.archive-modal-content');const groups=$('.archive-groups');const contentTop=content?.scrollTop||0;const groupsTop=groups?.scrollTop||0;renderModal();const nextContent=$('.archive-modal-content');const nextGroups=$('.archive-groups');if(nextContent)nextContent.scrollTop=contentTop;if(nextGroups)nextGroups.scrollTop=groupsTop;}
@@ -2791,7 +2567,7 @@ async function restoreSelectedArchive(){
   // The restore endpoint returns the committed summary events; don't wait for a GSI to become consistent.
   mergeActivityEventsIntoWorkspace(result?.activityEvents||[]);
   invalidateActivityIndexes();invalidateHierarchyIndex();lastApiSnapshot=copyWorkspace(data);
-  scheduleWorkspaceCacheSave();
+  
   const restoredIds=new Set((result?.restoredIds||restoredRows.map(x=>x.id||x.itemId)||selected).map(String));
   const remainingArchive=(modal.archiveItems||[]).filter(x=>!restoredIds.has(String(x.id||x.archiveId||x.itemId)));
   ui.modal={kind:'archive',loading:false,archiveItems:remainingArchive,selectedIds:[],error:''};
@@ -2799,7 +2575,7 @@ async function restoreSelectedArchive(){
   render();toast(tr('archiveRestored'));
  }catch(error){
   // If a multi-item restore was partially committed by a remote API failure, re-query to show the exact remaining archive state.
-  let items=modal.archiveItems||[];try{const current=await window.TeamFollowUpDataApi.listArchive();items=current.items||[];data=await window.TeamFollowUpDataApi.bootstrap(data);lastApiSnapshot=copyWorkspace(data);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}catch(e){}}catch(e){}
+  let items=modal.archiveItems||[];try{const current=await window.TeamFollowUpDataApi.listArchive();items=current.items||[];data=await window.TeamFollowUpDataApi.bootstrap(data);lastApiSnapshot=copyWorkspace(data);}catch(e){}
   const rawMessage=String(error?.message||'');const displayMessage=/restore the parent item together|restore the parent first|parent item.+together/i.test(rawMessage)?tr('archiveParentRequired'):(rawMessage||tr('archiveRestoreFailed'));ui.modal={kind:'archive',loading:false,archiveItems:items,selectedIds:selected.filter(id=>items.some(x=>x.id===id)),error:displayMessage};render();toast(ui.modal.error,true);
  }
 }
@@ -2966,8 +2742,8 @@ async function startWorkspaceHydration(){
   dataLoadState.initialComplete=true;dataLoadState.initialError=String(error?.message||tr('loadFailed'));renderParentList();renderDetail();if(ui.modal)renderModal();
  }
 }
-// Start with the current cached workspace in built-in mode; API mode progressively populates the UI.
-if(!dataLoadState.active&&!data.parents.some(p=>p.id===ui.selectedParentId))ui.selectedParentId=data.parents[0]?.id||'';
+// Start with an empty workspace and populate it exclusively from the AWS API.
+if(!data.parents.some(p=>p.id===ui.selectedParentId))ui.selectedParentId=data.parents[0]?.id||'';
 setSignInState(Boolean(sessionUserIdAtLoad));
 render();
 window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;ui.actingUserId=context.teamUserId;applyTranslations();renderParentList();renderDetail();if(ui.modal)renderModal();};
@@ -3496,7 +3272,7 @@ select optgroup { background: var(--panel); color: var(--text); }
 
 
 <style id="archive-ui-styles">
-.sidebar-content > .reset-demo-data-button { margin-top: auto !important; flex: 0 0 auto; padding: 10px 4px; }
+.sidebar-content > .sidebar-utility-button { margin-top: auto !important; flex: 0 0 auto; padding: 10px 4px; }
 @media (min-width: 821px) { .sidebar-content { min-height: 0; } .sidebar-content > .parent-list { flex: 1 1 0; } }
 .archive-groups{display:flex;flex-direction:column;gap:14px;max-height:min(66vh,780px);overflow:auto;padding:2px 3px 8px;overscroll-behavior:contain}
 .archive-group{border:1px solid var(--border);border-radius:13px;background:var(--panel-2);overflow:hidden}

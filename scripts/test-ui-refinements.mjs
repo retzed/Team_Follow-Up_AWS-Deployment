@@ -100,7 +100,9 @@ activityContext.ui.lang = 'ar';
 assert.equal(activityContext.activityText({ action: 'Status changed from In progress to Not started.' }, 'p1'), 'تم تحديث الحالة', 'Recent activity status normalization is localized to Arabic.');
 assert.equal(activityContext.activityText({ action: 'Updated Assigned to for task: Review.' }, 'p1'), 'تم تحديث المكلّف', 'Recent activity legacy assignee normalization is localized to Arabic.');
 
-const mobileFixStyle = html.match(/<style id="mobile-input-and-history-fixes">([\\s\\S]*?)<\\/style>/)?.[1] || '';
+const mobileFixStart = html.indexOf('<style id="mobile-input-and-history-fixes">');
+const mobileFixEnd = html.indexOf('</style>', mobileFixStart);
+const mobileFixStyle = mobileFixStart >= 0 && mobileFixEnd > mobileFixStart ? html.slice(mobileFixStart, mobileFixEnd + '</style>'.length) : '';
 assert.ok(mobileFixStyle.includes('input, select, textarea { font-size: 16px !important; }'), 'Mobile sign-in and app controls use a 16px minimum effective font size to prevent iOS focus zoom.');
 assert.ok(mobileFixStyle.includes('grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);') && mobileFixStyle.includes('grid-template-columns: minmax(0, 1fr) !important;'), 'From/to date filters constrain their grid tracks and stack on narrow phones.');
 assert.ok(mobileFixStyle.includes('height: 100dvh !important;') && mobileFixStyle.includes('position: fixed !important;') && mobileFixStyle.includes('.modal.project-history-modal') && mobileFixStyle.includes('.modal.application-history-modal'), 'Both activity history dialog types occupy the top-to-bottom mobile viewport.');

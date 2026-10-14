@@ -1788,6 +1788,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
 <script type="text/plain" id="application-bootstrap">
 (async () => {
 'use strict';
+try {
 const STORAGE_KEY = 'team-follow-up-demo-v3';
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
@@ -2054,8 +2055,16 @@ const dataLoadState = {
  parentsReady: window.TeamFollowUpDataApi?.mode!=='api',
  childrenLoaded:new Set(), activityLoaded:new Set(), rootErrors:new Map(), initialError:''
 };
+let builtinBootstrapWarning='';
 if(dataLoadState.active){data={schema:4,users:[],parents:[],children:[],activity:[]};invalidateHierarchyIndex();lastApiSnapshot=null;}
-else {data=await window.TeamFollowUpDataApi.bootstrap(data);lastApiSnapshot=copyWorkspace(data);}
+else {
+ try {data=await window.TeamFollowUpDataApi.bootstrap(data);lastApiSnapshot=copyWorkspace(data);}
+ catch(bootstrapError){
+  console.error('Built-in workspace bootstrap failed; continuing with the saved workspace cache.',bootstrapError);
+  data=copyWorkspace(bootstrapFallbackWorkspace);lastApiSnapshot=copyWorkspace(data);
+  builtinBootstrapWarning=String(bootstrapError?.message||'');
+ }
+}
 function detectInitialPreferences(){
  const fallback={lang:'en',theme:'dark'};
  try{
@@ -2963,7 +2972,27 @@ setSignInState(Boolean(sessionUserIdAtLoad));
 render();
 window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;ui.actingUserId=context.teamUserId;applyTranslations();renderParentList();renderDetail();if(ui.modal)renderModal();};
 document.documentElement.classList.remove('auth-pending','app-booting');
+if(builtinBootstrapWarning){try{toast(ui.lang==='ar'?'تعذر تحميل مخزن البيانات المحلي؛ تم عرض بيانات مساحة العمل المحفوظة بدلاً منه.':'The local data store could not be loaded. The saved workspace cache is being shown instead.',true);}catch(warningError){console.warn('Could not display the workspace fallback warning.',warningError);}}
 if(dataLoadState.active)void startWorkspaceHydration();
+} catch(startupError) {
+ console.error('Team Follow-Up app startup failed after sign-in.',startupError);
+ document.documentElement.classList.remove('auth-pending','app-booting');
+ document.body.classList.remove('signin-open');
+ const appRoot=document.getElementById('app');
+ if(appRoot){appRoot.inert=false;appRoot.removeAttribute('aria-hidden');}
+ const signInScreen=document.getElementById('signInScreen');
+ if(signInScreen)signInScreen.hidden=true;
+ const target=document.getElementById('mainContent')||appRoot;
+ if(target){
+  target.replaceChildren();
+  const panel=document.createElement('div');panel.className='empty-children';panel.setAttribute('role','alert');
+  const heading=document.createElement('strong');heading.textContent=document.documentElement.lang==='ar'?'تعذر تشغيل التطبيق.':'The application could not finish starting.';
+  const message=document.createElement('p');message.textContent=(document.documentElement.lang==='ar'?'خطأ بدء التشغيل: ':'Startup error: ')+String(startupError?.message||startupError||'Unknown error');
+  const retry=document.createElement('button');retry.type='button';retry.className='btn btn-primary';retry.textContent=document.documentElement.lang==='ar'?'إعادة تحميل التطبيق':'Reload application';
+  retry.addEventListener('click',()=>window.location.reload());
+  panel.append(heading,message,retry);target.append(panel);
+ }
+}
 })();
 </script>
 <style>

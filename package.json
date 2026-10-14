@@ -19,5 +19,8 @@
     "test:infrastructure": "python scripts/test-infrastructure.py",
     "test:all": "npm test && npm run test:backend && npm run test:infrastructure"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "engines": {
+    "node": ">=24 <25"
+  }
 }

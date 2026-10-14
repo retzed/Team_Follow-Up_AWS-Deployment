@@ -2,6 +2,26 @@ import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 
+const sourceHtml = await readFile('index.html', 'utf8');
+for (const forbidden of [
+  'localStorage',
+  'team-follow-up-local-auth-v1',
+  'initializeLocalAuth',
+  'makeLocalContext',
+  'seedData(',
+  'function resetDemoData(',
+  'mockRoute',
+  'TEAM_FOLLOW_UP_DATA_MODE',
+  'TEAM_FOLLOW_UP_LOCAL_AUTH_ENABLED',
+  'localAuth',
+  'builtin.local',
+  'memoryTables',
+  'TABLES_KEY',
+  'STORAGE_KEY'
+]) {
+  assert.ok(!sourceHtml.includes(forbidden), `AWS-only frontend must not contain ${forbidden}`);
+}
+
 const envKeys = [
   'TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID',
   'TEAM_FOLLOW_UP_COGNITO_CLIENT_ID',

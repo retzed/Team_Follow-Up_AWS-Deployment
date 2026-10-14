@@ -47,5 +47,5 @@ assert.equal(new Set(collisions.rows.map(row => row.id)).size, 2, 'True event-ID
 const firstAdapterIdentity = html.indexOf('function activityIdentity(event){');
 const firstAdapterIdentityEnd = html.indexOf('\n', firstAdapterIdentity);
 const adapterIdentity = html.slice(firstAdapterIdentity, firstAdapterIdentityEnd);
-assert.ok(firstAdapterIdentity >= 0 && adapterIdentity.length > 0 && !adapterIdentity.includes("String(event.at||'')"), 'The built-in event store must treat a timestamp normalization as the same event ID, not a new audit row.');
+assert.ok(firstAdapterIdentity >= 0 && adapterIdentity.length > 0 && !adapterIdentity.includes("String(event.at||'')"), 'The AWS activity merge must treat a timestamp normalization as the same event ID, not a new audit row.');
 console.log('Activity merge idempotency tests passed: server-normalized deletes do not duplicate, legacy timestamp aliases are repaired, and true ID collisions are preserved.');

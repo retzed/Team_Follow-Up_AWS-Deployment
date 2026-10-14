@@ -3908,11 +3908,10 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
 </style>
 
 <style id="mobile-date-input-overflow-fix-v3">
-/* Final mobile date-control sizing. This block is intentionally last in the document,
-   after the legacy responsive rules which previously forced date fields wider than
-   their grid tracks on phones. */
+/* Final mobile date-control sizing. Keep paired date bounds in equal, shrinkable
+   columns rather than stacking both as full-width fields or squeezing them beside Clear. */
 @media (max-width: 700px) {
-  /* Let every containing layout shrink below the native date input's intrinsic width. */
+  /* Every containing layout must be allowed to shrink below native date-input intrinsic sizing. */
   .sidebar,
   .sidebar-content,
   #mainContent,
@@ -3926,36 +3925,34 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     max-width: 100% !important;
   }
 
-  /* Workspace From/To filters: one full-width field per row. */
+  /* Sidebar From/To: equal-width tracks that match the other paired filter controls. */
   .sidebar-content > .date-filter,
   .date-filter {
-    display: flex !important;
-    flex: 0 1 auto !important;
-    flex-direction: column !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-flow: row !important;
     align-items: stretch !important;
-    gap: 10px !important;
+    gap: 8px !important;
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    overflow: hidden;
+    overflow: visible !important;
   }
 
   .sidebar-content > .date-filter > .field,
   .date-filter > .field {
     display: flex !important;
-    flex: 0 1 auto !important;
+    flex: initial !important;
     flex-direction: column !important;
     align-self: stretch !important;
-    width: 100% !important;
+    width: auto !important;
     min-width: 0 !important;
     max-width: 100% !important;
     grid-column: auto !important;
-    overflow: hidden;
+    overflow: visible !important;
   }
 
-  /* Use the same hard width constraints for every native date input, including
-     child filters and date controls inside create/edit popups. */
+  /* Constrain native controls themselves, including the due-date input in create/edit dialogs. */
   input[type="date"],
   .date-input,
   .modal input[type="date"],
@@ -3969,12 +3966,11 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     max-inline-size: 100% !important;
     inline-size: 100% !important;
     margin: 0 !important;
-    padding-inline: 8px !important;
+    padding-inline: 6px !important;
     flex: 0 1 auto !important;
   }
 
-  /* Child-item filters had a later rule giving From/To narrow grid tracks plus
-     a max-content Clear column. Override that layout instead of just the inputs. */
+  /* Child-item From/To: two bounded columns; place Clear on its own row below them. */
   #mainContent .child-toolbar.expanded {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     min-width: 0 !important;
@@ -3982,46 +3978,46 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   }
 
   #mainContent .child-toolbar .child-date-row {
-    display: flex !important;
-    flex: 0 1 auto !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: auto auto !important;
+    grid-auto-flow: row !important;
+    align-items: end !important;
     grid-column: 1 / -1 !important;
     grid-row: 4 !important;
-    gap: 9px !important;
+    gap: 8px !important;
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
-    overflow: hidden;
+    overflow: visible !important;
   }
 
   #mainContent .child-toolbar .child-date-row > .child-filter-field {
     display: flex !important;
-    flex: 0 1 auto !important;
+    flex: initial !important;
     flex-direction: column !important;
     align-self: stretch !important;
-    grid-column: auto !important;
-    grid-row: auto !important;
-    width: 100% !important;
+    grid-row: 1 !important;
+    width: auto !important;
     min-width: 0 !important;
     max-width: 100% !important;
-    overflow: hidden;
+    overflow: visible !important;
   }
 
   #mainContent .child-toolbar .child-date-row .child-mobile-clear-button {
     display: inline-flex !important;
     flex: 0 0 auto !important;
     align-self: flex-start !important;
-    grid-column: auto !important;
-    grid-row: auto !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    justify-self: start !important;
     width: auto !important;
     min-width: 0 !important;
     max-width: 100% !important;
     margin: 0 !important;
   }
 
-  /* Dialog field/grid wrappers must also shrink; otherwise their child date
-     controls can enlarge the entire edit/create popup. */
+  /* Create/edit popup grid and field wrappers must also stay inside the viewport. */
   .modal .form-grid {
     grid-template-columns: minmax(0, 1fr) !important;
     width: 100% !important;

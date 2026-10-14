@@ -127,14 +127,14 @@ assert.ok(
   mobileV2Style.includes('grid-template-columns: minmax(0, 1fr) !important;') &&
   mobileV2Style.includes('.date-filter input[type="date"]') &&
   mobileV2Style.includes('width: 100% !important;'),
-  'Mobile sidebar From/To filters use a single full-width column with intrinsic date-input overflow constrained.'
+  'The legacy mobile date-filter fallback remains covered; the final override defines the effective paired layout.'
 );
 assert.ok(
   mobileV2Style.includes('#mainContent .child-toolbar .child-date-row') &&
   mobileV2Style.includes('#mainContent .child-toolbar .child-date-row > .child-filter-field') &&
   mobileV2Style.includes('.child-mobile-clear-button') &&
   mobileV2Style.includes('grid-row: auto !important;'),
-  'Mobile child-item From/To filters use separate full-width rows and the Clear button moves below them.'
+  'The legacy child-filter fallback remains covered; the final override defines the effective paired layout.'
 );
 
 
@@ -146,32 +146,36 @@ const mobileV3Style = mobileV3Start >= 0 && mobileV3End > mobileV3Start
 assert.ok(
   mobileV3Start > html.indexOf('<style id="mixed-script-content-direction-fix">') &&
   mobileV3Start < html.lastIndexOf('</body>'),
-  'Final date-overflow overrides load after every existing responsive stylesheet.'
+  'Final date-layout overrides load after the legacy responsive styles.'
 );
 assert.ok(
   mobileV3Style.includes('.sidebar-content > .date-filter > .field') &&
-  mobileV3Style.includes('flex-direction: column !important;') &&
-  mobileV3Style.includes('max-width: 100% !important;'),
-  'Sidebar From/To fields and their wrappers remain constrained to one full-width mobile column.'
+  mobileV3Style.includes('display: grid !important;') &&
+  mobileV3Style.includes('grid-template-columns: repeat(2, minmax(0, 1fr)) !important;') &&
+  mobileV3Style.includes('width: auto !important;') &&
+  mobileV3Style.includes('overflow: visible !important;'),
+  'Sidebar From/To fields use equal, shrinkable columns instead of oversized full-width rows.'
 );
 assert.ok(
   mobileV3Style.includes('input[type="date"]') &&
   mobileV3Style.includes('min-inline-size: 0 !important;') &&
   mobileV3Style.includes('max-inline-size: 100% !important;') &&
   mobileV3Style.includes('box-sizing: border-box !important;'),
-  'Every native date input is width-constrained, including controls inside popups.'
+  'Native date controls stay within their available width, including popup date controls.'
 );
 assert.ok(
   mobileV3Style.includes('#mainContent .child-toolbar .child-date-row') &&
-  mobileV3Style.includes('display: flex !important;') &&
+  mobileV3Style.includes('display: grid !important;') &&
   mobileV3Style.includes('grid-template-columns: repeat(2, minmax(0, 1fr)) !important;') &&
+  mobileV3Style.includes('grid-column: 1 / -1 !important;') &&
+  mobileV3Style.includes('grid-row: 2 !important;') &&
   mobileV3Style.includes('.child-mobile-clear-button'),
-  'Child From/To date fields override the old narrow grid and keep Clear below both fields.'
+  'Child From/To filters use two equal columns and Clear occupies the row below, not a third column.'
 );
 assert.ok(
   mobileV3Style.includes('.modal .form-grid > .field') &&
   mobileV3Style.includes('grid-template-columns: minmax(0, 1fr) !important;'),
-  'Create/edit popup date fields cannot expand their grid or modal beyond the viewport.'
+  'Create/edit popup fields cannot expand the form grid or date input beyond the viewport.'
 );
 
 console.log('UI refinement tests passed: history widths/action labels, bilingual helper removal, concise sidebar cards, labeled child assignees, modal focus/layout and English/Arabic normalization across history views.');

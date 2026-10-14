@@ -160,12 +160,10 @@
       ]
     }
   ],
-  "defaultMode": "builtin",
   "actualAwsResourcesCreated": false,
   "defaultTableNamePrefix": "TeamFollowUp",
   "notes": [
     "Infrastructure in backend/template.yaml creates the real tables when explicitly deployed.",
-    "Built-in mode emulates the four tables and their materialized indexes in browser storage.",
-    "The WorkItems API maps DynamoDB user IDs to the dashboard fields ownerId, createdBy and updatedBy at the API boundary."
+    "The frontend has no local database or demo adapter; all application data is read and written through the Cognito-authenticated API."
   ]
 }

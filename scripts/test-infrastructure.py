@@ -358,7 +358,7 @@ def main():
     if app_properties.get("Repository") != {"Ref": "RepositoryUrl"} or app_properties.get("AccessToken") != {"Ref": "GitHubAccessToken"}:
         fail("Amplify app must connect to the configurable GitHub repository using the private token parameter.")
     branch_properties = resources["FrontendBranch"]["Properties"]
-    if branch_properties.get("AppId") != {"Fn::GetAtt": ["FrontendApp", "AppId"]}:
+    if branch_properties.get("AppId") != {"GetAtt": "FrontendApp.AppId"}:
         fail("Amplify branch must belong to the app created by the template.")
     branch_vars = {row.get("Name"): row.get("Value") for row in branch_properties.get("EnvironmentVariables", [])}
     expected_branch_vars = {

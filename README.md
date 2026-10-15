@@ -4,7 +4,7 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 
 > **Current AWS status (15 October 2026):** the Cognito pool and four DynamoDB tables—**Items**, **Activity**, **Users**, and **Archive**—have been created manually in **us-east-1**. Amplify Hosting and the API/Lambda backend have not yet been deployed. See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the exact console settings.
 >
-> **Deployment safety:** do not run the current SAM deployment step yet. The manually created `TeamFollowUp-Archive` table has the target Archive key/index schema, but its provisioned billing mode differs from the template and the default SAM prefix would collide with this existing table. The template also provisions a separate Cognito pool and WorkItems/ActivityEvents/UserProfiles tables that do not match the current Items/Activity/Users resources. Reconcile resource ownership, billing, and the other schemas before deployment.
+> **Deployment status:** the handler, schema reference, and SAM template now target the four manually created DynamoDB tables and the existing Cognito pool/app client. SAM creates only the API, Lambda, IAM, and CloudWatch resources; it does not create duplicate tables or a new user pool. Before deploying, verify that `custom:teamUserId` exists and is readable in the existing Cognito pool/client, and supply the final Amplify HTTPS origin.
 
 ## Start here
 
@@ -21,7 +21,7 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 - **DynamoDB** is the shared source of truth for work items, activity history, team profiles, and archived items.
 - **CloudWatch** collects logs, metrics, alarms, and dashboard data.
 
-The intended backend is defined in `backend/template.yaml` and deployed with AWS SAM; Amplify will deploy the frontend separately. The SAM template currently describes a different resource schema from the console bootstrap recorded in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md). A successful build or GitHub Actions run validates the package; it does **not** deploy the backend or prove that an AWS environment is configured. Do not deploy that template until the schema and existing Cognito pool are reconciled.
+The backend is defined in `backend/template.yaml` and deployed with AWS SAM; Amplify deploys the frontend separately. The template accepts the existing Cognito pool/client and table names as parameters and does not own the existing data resources. `backend/src/handler.py` uses the indexes and primary keys already configured in the console. A successful build or GitHub Actions run validates the package; it does **not** deploy the backend or verify the live Cognito/table settings.
 
 ## Repository guide
 

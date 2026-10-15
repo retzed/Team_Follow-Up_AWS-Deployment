@@ -12,7 +12,7 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 
 ## Start here
 
-- **[Console deployment guide](docs/DEPLOYMENT.md)** — primary creation/configuration workflow, team mapping, API/Lambda configuration and acceptance tests.
+- **[AWS Console deployment guide](docs/DEPLOYMENT.md)** — primary creation/configuration workflow, team mapping, API/Lambda configuration and acceptance tests.
 - **[Automated deployment runbook](docs/AUTOMATED_DEPLOYMENT.md)** — optional end-to-end SAM/CloudFormation deployment for a separate from-scratch environment.
 - **[AWS Console implementation record](docs/IMPLEMENTATION.md)** — dated record of resources reported as actually configured in the current AWS account.
 - **[Architecture reference](docs/ARCHITECTURE.md)** — whole-system architecture, trust boundaries, data model and monitoring.

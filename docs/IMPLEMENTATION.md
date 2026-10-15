@@ -122,16 +122,40 @@ As of the date above, these parts of the planned architecture have **not** been 
 
 No production or live shared-data deployment has been completed.
 
-## 6. Repository compatibility warning — do not deploy yet
+## 6. Backend integration contract
 
-The current repository's **backend/template.yaml** and **backend/src/handler.py** describe a more advanced target schema than the manually created tables:
+The repository has now been reconciled with the four manually created DynamoDB tables and the existing Cognito pool/client. The Lambda handler and table-schema reference use the current keys and indexes; the SAM template does **not** create new Cognito or DynamoDB data resources.
 
-- The SAM template creates its own Cognito User Pool and client instead of using the existing pool/client above.
-- The SAM template's default prefix produces **WorkItems**, **ActivityEvents**, **UserProfiles**, and **Archive** tables, while the manually created application tables are **Items**, **Activity**, and **Users**, plus the already-created **Archive** table.
-- The existing **TeamFollowUp-Archive** primary key and both GSIs match the Archive key/index contract in the SAM template and handler. However, the console table uses **Provisioned 1 RCU / 1 WCU** on the base table and each GSI, while the target template uses **on-demand** billing; the console table is also not currently managed by the SAM CloudFormation stack. The default SAM prefix would therefore collide with the existing physical table name.
-- The handler expects indexes such as **GSI_ListUpdated**, **GSI_ItemTimeline**, and **GSI_CognitoSub** on the other target tables. Those differ from the manually created Items indexes; the current Activity and Users tables have no GSIs. The Activity table primary key is **itemId + activityKey**, whereas the target ActivityEvents table uses **eventId** as its partition key.
+### Table access contract
 
-Therefore **do not run `sam deploy` or point the existing Lambda handler at the console-created tables yet**. The Archive table now exists and its key/index schema is verified from the repository's archive implementation, but resource ownership, billing mode, the other table names/keys/indexes, and Cognito integration still need to be reconciled. Deploying now would cause at least a physical-name collision for Archive or create duplicate parallel resources, and runtime query/write failures would remain possible.
+- **Items:** top-level project/job listing uses `WorkspaceIndex` (`workspaceKey` / `createdAt`); child listing and hierarchy traversal use `ParentIdIndex` (`parentId` / `createdAt`); assigned work uses `AssignedToIndex` (`assignedTo` / `updatedAt`). The API keeps `ownerId` as the UI field and materializes `assignedTo` for the existing index. Only top-level records receive `workspaceKey=WORKSPACE`.
+- **Activity:** event rows use the actual `itemId` partition key and `activityKey` sort key, where `activityKey` is the UTC event timestamp plus `#` plus the event ID. `eventId` is a regular attribute, not the primary key. There are no Activity GSIs, so single-item history uses Query while application-wide history uses Scan.
+- **Users:** the primary key remains `userId`. Cognito `sub` values are stored in `cognitoSub`; because this table has no Cognito-subject GSI, Lambda scans this deliberately small six-user table and denies missing, duplicate, or disabled mappings.
+- **Archive:** the existing `archiveId` key, `GSI_ArchiveIndex`, and `GSI_ArchiveRoot` remain unchanged. Archiving/restore uses the existing table and transaction logic.
+
+### SAM ownership and parameters
+
+The SAM stack provisions API Gateway HTTP API, Lambda, its scoped IAM policy, log groups, dashboard, and alarms only. It passes existing resources to the handler with these parameters, whose defaults match the current console bootstrap:
+
+| Parameter | Default |
+|---|---|
+| `ExistingCognitoUserPoolId` | `us-east-1_7dYZw2Is6` |
+| `ExistingCognitoAppClientId` | `7id8c2g27fvbh365atqntqurir` |
+| `ExistingItemsTableName` | `TeamFollowUp-Items` |
+| `ExistingActivityTableName` | `TeamFollowUp-Activity` |
+| `ExistingUsersTableName` | `TeamFollowUp-Users` |
+| `ExistingArchiveTableName` | `TeamFollowUp-Archive` |
+
+`TableNamePrefix` now names only the API, Lambda, logs, dashboard, and alarms. It does not rename or provision the existing tables. The SAM stack does not import, replace, or manage those data resources; stack deletion will not delete them.
+
+### Required pre-deployment verification
+
+1. In the existing Cognito pool, verify that `custom:teamUserId` exists and that the `Team_FollowUp` browser app client can read it. Confirm the app client has **no client secret** and supports the frontend's sign-in flow. The attribute/app-client configuration was not independently verified during the console bootstrap.
+2. Confirm that the four tables are `ACTIVE`, and that the three Items indexes plus the two Archive indexes are `ACTIVE`.
+3. Confirm the six Cognito accounts exist, have unique `custom:teamUserId` values `u1`–`u6`, and that the matching `cognitoSub` profile records have been seeded into `TeamFollowUp-Users`.
+4. Use the final Amplify HTTPS origin for `AllowedOrigin`, and review the CloudFormation change set. The stack must create only API/backend/monitoring resources, not a second user pool or DynamoDB tables.
+
+The deliberate Scan operations work with the current no-GSI Activity and Users tables and avoid requiring new billable index capacity. Application-wide activity history will read the full Activity table, so its read cost/latency will grow with history volume. Consider a purpose-built timeline GSI only if future scale justifies adding and maintaining it.
 
 ## 7. Cost-conscious settings used
 

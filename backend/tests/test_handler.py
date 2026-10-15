@@ -245,6 +245,70 @@ class HandlerHelperTests(unittest.TestCase):
         scan_users.assert_called_once_with(handler.USERS)
         query_activity.assert_not_called()
 
+    def test_item_history_reads_archived_descendant_events_only_on_popup_request(self):
+        event = {
+            "rawPath": "/items/project-1/activity",
+            "queryStringParameters": {"scope": "all"},
+            "requestContext": {
+                "http": {"method": "GET"},
+                "authorizer": {"jwt": {"claims": {"sub": "mapped-sub"}}},
+            },
+        }
+        root = {"itemId": "project-1", "type": "project"}
+        active_task = {"itemId": "task-active", "type": "task", "rootParentId": "project-1"}
+        archived_task = {"itemId": "task-archived", "archiveId": "task-archived", "archiveRootId": "project-1"}
+        archived_event = {
+            "eventId": "evt-archived-delete",
+            "itemId": "task-archived",
+            "at": "2026-10-15T12:00:00.000Z",
+            "action": "Deleted task",
+            "kind": "delete",
+        }
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": root}),
+            patch.object(handler, "query_root_rows", return_value=[root, active_task]),
+            patch.object(handler, "query_archived_history_rows", return_value=[archived_task]) as query_archived,
+            patch.object(handler, "query_events_for_items", return_value=[archived_event]) as query_events,
+        ):
+            result = handler.lambda_handler(
+                event, SimpleNamespace(aws_request_id="on-demand-history-test")
+            )
+
+        self.assertEqual(result["statusCode"], 200)
+        query_archived.assert_called_once_with(root_id="project-1")
+        query_events.assert_called_once_with(["project-1", "task-active", "task-archived"])
+        payload = json.loads(result["body"])
+        self.assertEqual(payload["count"], 1)
+        self.assertEqual(payload["events"][0]["id"], "evt-archived-delete")
+
+    def test_task_history_includes_archived_direct_followups_on_popup_request(self):
+        event = {
+            "rawPath": "/items/task-1/activity",
+            "queryStringParameters": {"scope": "all"},
+            "requestContext": {
+                "http": {"method": "GET"},
+                "authorizer": {"jwt": {"claims": {"sub": "mapped-sub"}}},
+            },
+        }
+        task = {"itemId": "task-1", "type": "task", "rootParentId": "project-1"}
+        active_followup = {"itemId": "followup-active", "type": "followup", "parentId": "task-1"}
+        archived_followup = {"itemId": "followup-archived", "archiveId": "followup-archived", "archiveParentId": "task-1"}
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": task}),
+            patch.object(handler, "query_children_rows", return_value=[active_followup]),
+            patch.object(handler, "query_archived_history_rows", return_value=[archived_followup]) as query_archived,
+            patch.object(handler, "query_events_for_items", return_value=[]) as query_events,
+        ):
+            result = handler.lambda_handler(
+                event, SimpleNamespace(aws_request_id="on-demand-task-history-test")
+            )
+
+        self.assertEqual(result["statusCode"], 200)
+        query_archived.assert_called_once_with(parent_id="task-1")
+        query_events.assert_called_once_with(["task-1", "followup-active", "followup-archived"])
+
     def test_unhandled_exception_does_not_leak_exception_text(self):
         event = {
             "rawPath": "/bootstrap",

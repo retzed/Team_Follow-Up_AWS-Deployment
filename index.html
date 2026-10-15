@@ -1999,7 +1999,7 @@ function inlineSpinnerMarkup(){return `<span class="loading-count" role="status"
 function loadErrorMarkup(message=''){return `<div class="data-loading-error" role="alert"><span>${esc(message||tr('loadFailed'))}</span><button class="btn btn-small" type="button" data-action="retry-data-load">${esc(tr('retry'))}</button></div>`;}
 function rootChildrenReady(rootId){return dataLoadState.childrenLoaded.has(String(rootId));}
 function rootActivityReady(itemId,scope='all'){return dataLoadState.activityLoaded.has(`${String(itemId)}:${scope}`);}
-function rootLoadingError(rootId,part){return dataLoadState.rootErrors.get(`${part}:${rootId}`)||'';}
+function rootLoadingError(rootId,part){return (part==='activity'?dataLoadState.rootErrors.get(`${part}:${rootId}:all`):null)||dataLoadState.rootErrors.get(`${part}:${rootId}`)||'';}
 function rootPendingMarkup(rootId,part,label){const message=rootLoadingError(rootId,part);return message?loadErrorMarkup(message):spinnerMarkup(label,true);}
 function countValueMarkup(value,ready,rootId=null,part='children'){if(ready)return String(value);const error=(rootId?rootLoadingError(rootId,part):'')||dataLoadState.initialError||'';if(error)return `<button class="loading-inline-retry" type="button" data-action="retry-data-load" title="${esc(error)}">${icon('refresh-cw',12)} ${esc(tr('retry'))}</button>`;return `<span class="metric-loading-value">${inlineSpinnerMarkup()}</span>`;}
 function itemCountText(n){return `${n} ${n===1?tr('item'):tr('items')}`;}

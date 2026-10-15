@@ -404,6 +404,30 @@ def main():
     if "TeamFollowUp-Users" in str(console_transact.get("Resource", [])):
         fail("Console Lambda policy must not grant transaction-write access to Users.")
 
+    # The console policy and template policy must grant the same actions and conditions;
+    # only resource references differ (literal ARNs versus CloudFormation resource ARNs).
+    template_by_sid = {statement.get("Sid"): statement for statement in statements if statement.get("Sid")}
+    console_by_sid = {statement.get("Sid"): statement for statement in console_statements if statement.get("Sid")}
+    expected_sids = {
+        "ReadApplicationTables",
+        "AllowPartialRestoreActivitySummaries",
+        "AllowTransactionalItemOperationsOnly",
+        "AllowAtomicWorkItemArchiveAndAuditTransactions",
+    }
+    if set(template_by_sid) != expected_sids or set(console_by_sid) != expected_sids:
+        fail("Console and template IAM policies must contain the same four narrowly scoped statement IDs.")
+    for sid in sorted(expected_sids):
+        template_statement = template_by_sid[sid]
+        console_statement = console_by_sid[sid]
+        template_actions = template_statement.get("Action", [])
+        console_actions = console_statement.get("Action", [])
+        template_actions = [template_actions] if isinstance(template_actions, str) else template_actions
+        console_actions = [console_actions] if isinstance(console_actions, str) else console_actions
+        if sorted(template_actions) != sorted(console_actions):
+            fail(f"Console and template IAM action sets diverge for {sid}.")
+        if template_statement.get("Condition") != console_statement.get("Condition"):
+            fail(f"Console and template IAM conditions diverge for {sid}.")
+
     # The generated web origin and frontend settings are wired together without a dependency cycle.
     app_properties = resources["FrontendApp"]["Properties"]
     if app_properties.get("Repository") != {"Ref": "RepositoryUrl"} or app_properties.get("AccessToken") != {"Ref": "GitHubAccessToken"}:

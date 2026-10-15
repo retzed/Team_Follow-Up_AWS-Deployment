@@ -100,12 +100,35 @@ assert.ok(!('dataMode' in config), 'runtime config must not contain a database-m
 assert.ok(!('identityMap' in config.cognito), 'team identity must not be overridable by a browser-side map');
 
 const template = await readFile('backend/template.yaml', 'utf8');
-assert.doesNotMatch(template, /Type:\s*AWS::DynamoDB::Table/, 'SAM must reuse existing DynamoDB tables, not create duplicates');
-assert.doesNotMatch(template, /Type:\s*AWS::Cognito::UserPool(?:Client)?/, 'SAM must reuse the existing Cognito pool/client, not create duplicates');
-assert.match(template, /ARCHIVE_TABLE:\s*!Ref ExistingArchiveTableName/, 'Lambda must receive the existing Archive table name');
-assert.match(template, /ExistingArchiveTableName:\s*\n\s+Type: String\s*\n\s+Default: TeamFollowUp-Archive/, 'SAM must default to the manually created Archive table');
-assert.match(template, /ExistingCognitoUserPoolId:\s*\n\s+Type: String\s*\n\s+Default: us-east-1_7dYZw2Is6/, 'SAM must reuse the existing Cognito pool');
-assert.match(template, /ExistingCognitoAppClientId:\s*\n\s+Type: String\s*\n\s+Default: 7id8c2g27fvbh365atqntqurir/, 'SAM must reuse the existing public app client');
+// SAM is optional, but its template must be a complete from-scratch automation reference.
+// The normal deployment method is manual AWS Console creation/configuration.
+for (const resourceType of [
+  'AWS::Cognito::UserPool',
+  'AWS::Cognito::UserPoolClient',
+  'AWS::DynamoDB::Table',
+  'AWS::Amplify::App',
+  'AWS::Amplify::Branch',
+  'AWS::Budgets::Budget',
+  'AWS::Logs::LogGroup',
+  'AWS::CloudWatch::Dashboard',
+  'AWS::CloudWatch::Alarm',
+  'AWS::Serverless::HttpApi',
+  'AWS::Serverless::Function'
+]) {
+  assert.ok(template.includes(`Type: ${resourceType}`), `Full-stack automation template must create ${resourceType}`);
+}
+assert.match(template, /ITEMS_TABLE:\s*!Ref ItemsTable/, 'Lambda must receive the Items table created by the template');
+assert.match(template, /ACTIVITY_TABLE:\s*!Ref ActivityTable/, 'Lambda must receive the Activity table created by the template');
+assert.match(template, /USERS_TABLE:\s*!Ref UsersTable/, 'Lambda must receive the Users table created by the template');
+assert.match(template, /ARCHIVE_TABLE:\s*!Ref ArchiveTable/, 'Lambda must receive the Archive table created by the template');
+assert.match(template, /ResourceNamePrefix:\s*\n\s+Type: String\s*\n\s+Default: TeamFollowUp/, 'Template must default to the console workflow's physical resource naming contract');
+assert.doesNotMatch(template, /ExistingCognitoUserPoolId|ExistingCognitoAppClientId|ExistingItemsTableName|ExistingActivityTableName|ExistingUsersTableName|ExistingArchiveTableName|AllowedOrigin:/, 'Full-stack template must not depend on pre-created resources or a pre-known website origin');
+assert.match(template, /Name: custom:teamUserId|Name: teamUserId/, 'Template must create the custom team identity schema attribute');
+assert.match(template, /ReadAttributes:[\s\S]*custom:teamUserId/, 'Browser client must read the team ID attribute');
+assert.match(template, /WriteAttributes:[\s\S]*\n\s+- email\n/, 'Browser client write attributes must be explicitly limited');
+assert.doesNotMatch(template, /WriteAttributes:[\s\S]*custom:teamUserId/, 'Browser client must not write its authorization-relevant team ID');
+assert.match(template, /DeletionPolicy: Retain/, 'Table data must be retained on stack deletion');
+assert.match(template, /RetentionInDays: 30/, 'CloudWatch logs must have explicit 30-day retention');
 
 const schema = JSON.parse(await readFile('backend/table-schema.json', 'utf8'));
 assert.equal(schema.thisFileProvisionsAwsResources, false, 'table-schema.json is documentation, not infrastructure');

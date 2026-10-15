@@ -359,5 +359,5 @@
       "explanation": "Four base tables at 1 RCU/1 WCU each, plus three Items GSIs and two Archive GSIs at 1 RCU/1 WCU each."
     }
   },
-  "actualAwsResourcesCreated": false
+  "thisFileProvisionsAwsResources": false
 }

@@ -43,7 +43,7 @@ def validate_console_bootstrap():
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"Could not load backend/table-schema.json current bootstrap record: {exc}")
 
-    if schema.get("actualAwsResourcesCreated") is not False:
+    if schema.get("thisFileProvisionsAwsResources") is not False:
         fail("table-schema.json is a documentation/schema reference, not an AWS provisioning mechanism.")
 
     bootstrap = schema.get("currentConsoleBootstrap")

@@ -106,7 +106,7 @@ assert.match(template, /GSI_ArchiveIndex/, 'Archive table must define its archiv
 assert.match(template, /GSI_ArchiveRoot/, 'Archive table must define its hierarchy index');
 
 const schema = JSON.parse(await readFile('backend/table-schema.json', 'utf8'));
-assert.equal(schema.actualAwsResourcesCreated, false, 'table-schema.json is documentation, not infrastructure');
+assert.equal(schema.thisFileProvisionsAwsResources, false, 'table-schema.json is documentation, not infrastructure');
 assert.ok(schema.tables.some(table => table.name === 'TeamFollowUp-Archive'), 'schema must document Archive table');
 assert.ok(!('defaultMode' in schema), 'schema must not describe a built-in runtime database');
 

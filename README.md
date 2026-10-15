@@ -43,6 +43,27 @@ The implementation is described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md
 - `backend/scripts/`: trusted administration scripts for profile seeding and legacy migration diagnostics.
 - `docs/`: architecture, deployment, implementation snapshot and complete documentation.
 
+## Test progressive loading with synthetic data
+
+The AWS app intentionally does not insert browser-side or hard-coded sample records at startup. To exercise the lazy child-item queries and the on-demand item/application-wide Activity popups with a larger workspace, use the removable DynamoDB seeder at `backend/scripts/seed_load_test_data.py`.
+
+Install the backend's Python dependencies and configure AWS CLI credentials for a test account/region first:
+
+```powershell
+python -m pip install -r backend/src/requirements.txt
+python backend/scripts/seed_load_test_data.py --region us-east-1
+```
+
+The first command is a **dry run** and makes no changes. It prints the number of synthetic Projects, Jobs, Tasks, Follow-ups, and Activity events, plus an exact command using the displayed run ID. Review the count, then run that printed command to insert the data. The default workload creates multiple root items, several levels of children, and four history events per item; the counts can be adjusted with `--projects`, `--jobs`, `--tasks-per-project`, `--followups-per-task`, `--direct-followups-per-root`, and `--events-per-item`.
+
+All generated item names start with **[LOAD TEST]**, and every ID is scoped to one unique run ID. Use the cleanup command printed after seeding to remove only that run:
+
+```powershell
+python backend/scripts/seed_load_test_data.py --region us-east-1 --cleanup-run-id <run-id> --apply
+```
+
+The seeder scans the active Items/Activity/Archive tables for cleanup and requires permission to read Users and write/delete matching records. It defaults to the current console table names, which can be overridden with the corresponding `--items-table`, `--activity-table`, `--users-table`, and `--archive-table` options. **Use a test account or test tables only.** With low provisioned write capacity, creating a larger dataset can take several minutes; the script does not alter table capacity or create extra indexes.
+
 ## System requirements and development setup
 
 ### Hardware recommendations

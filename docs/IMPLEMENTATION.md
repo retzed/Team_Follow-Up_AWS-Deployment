@@ -1,9 +1,9 @@
 # AWS Console Implementation Record
 
 **Last updated:** 15 October 2026  
-**Status:** Initial Cognito, DynamoDB, and budget setup completed manually. The operator confirmed that `custom:teamUserId` was added to the existing Cognito pool, with Read enabled and Write disabled for the `Team_FollowUp` app client on 15 October 2026. Permission checks on other app clients, team account setup, website hosting, and backend deployment remain pending.
+**Status:** Account-specific implementation snapshot. The Cognito pool/client, four DynamoDB tables, and budget were created manually. The operator confirmed that `custom:teamUserId` was added to the pool, with Read enabled and Write disabled for the `Team_FollowUp` app client on 15 October 2026. Permission checks on other app clients, team accounts/profile mappings, Amplify Hosting, API Gateway/Lambda, and CloudWatch observability remained pending at the time of this snapshot.
 
-This document records the AWS configuration actually created in the console. It intentionally does not store account IDs, email addresses, passwords, access keys, or other private credentials.
+This document records the configuration reported as actually created in the user's current AWS account; it is not the target architecture or a prerequisite for other environments. The primary deployment method is the AWS Management Console. `backend/template.yaml` is separately maintained as an optional full-stack automation template that creates all resources from scratch. This record intentionally does not store account IDs, email addresses, passwords, GitHub tokens, access keys, or other private credentials.
 
 ## 1. Account and Region
 
@@ -29,7 +29,7 @@ The JavaScript Quick setup guide was selected for reference. The app client ID i
 
 ### Cognito items still pending
 
-- Cognito managed-login domain, callback URL, and sign-out URL have not been configured because Amplify Hosting has not been created and no website origin exists yet.
+- No Cognito managed-login domain, callback URL, or sign-out URL is configured. The current frontend uses direct SRP sign-in, so a hosted-login domain is not required.
 - The six team accounts have not been created, and their `custom:teamUserId` values have not been assigned.
 - The operator confirmed that the custom attribute was added, Read is enabled, and Write is disabled for the `Team_FollowUp` app client. Write permission must also be verified as disabled on **every other** app client in the pool. The repository has not queried the live AWS configuration to verify those settings.
 - The Quick setup language selector reverting to Angular is only a guide display preference; it does not change the pool configuration.
@@ -103,7 +103,7 @@ All four tables were created manually in **us-east-1**. Each uses the **Standard
 | **GSI_ArchiveIndex** | **archivePK** | **archiveSort** | All | 1 RCU / 1 WCU |
 | **GSI_ArchiveRoot** | **archiveRootPK** | **archiveRootSort** | All | 1 RCU / 1 WCU |
 
-This table stores archived copies while retaining the original item IDs and hierarchy relationships. `GSI_ArchiveIndex` supports the archive listing; `GSI_ArchiveRoot` indexes rows by their root project/job. The table was created manually, not by CloudFormation/SAM.
+This table stores archived copies while retaining the original item IDs and hierarchy relationships. `GSI_ArchiveIndex` supports the archive listing; `GSI_ArchiveRoot` indexes rows by their root project/job. The table in this account snapshot was created manually through the AWS Console.
 
 ### Capacity summary
 
@@ -139,7 +139,7 @@ No production or live shared-data deployment has been completed.
 
 ## 6. Backend integration contract
 
-The repository has now been reconciled with the four manually created DynamoDB tables and the existing Cognito pool/client. The Lambda handler and table-schema reference use the current keys and indexes; the SAM template does **not** create new Cognito or DynamoDB data resources.
+The handler and `backend/table-schema.json` use the physical table keys and indexes recorded above. That physical schema is the shared contract for the primary Console deployment and the optional from-scratch automation template. The template now creates its own Cognito pool/client and all four tables/indexes; it does **not** take the current pool/table IDs as parameters or adopt existing resources. This account snapshot remains factual, but it is not a deployment dependency.
 
 ### Table access contract
 
@@ -148,29 +148,31 @@ The repository has now been reconciled with the four manually created DynamoDB t
 - **Users:** the primary key remains `userId`. Cognito `sub` values are stored in `cognitoSub`; because this table has no Cognito-subject GSI, Lambda scans this deliberately small six-user table and denies missing, duplicate, or disabled mappings.
 - **Archive:** the existing `archiveId` key, `GSI_ArchiveIndex`, and `GSI_ArchiveRoot` remain unchanged. Archiving/restore uses the existing table and transaction logic.
 
-### SAM ownership and parameters
+### Optional full-stack automation template
 
-The SAM stack provisions API Gateway HTTP API, Lambda, its scoped IAM policy, log groups, dashboard, and alarms only. It passes existing resources to the handler with these parameters, whose defaults match the current console bootstrap:
+The console-first deployment does not use SAM to create AWS resources. The optional `backend/template.yaml` is a full-stack CloudFormation/SAM template for a separate fresh environment. It creates the Cognito pool/client, Items/Activity/Users/Archive tables and their five GSIs, API Gateway HTTP API, Lambda/IAM, CloudWatch logs/dashboard/alarms, Amplify app/branch and monthly cost budget. Its default `ResourceNamePrefix=TeamFollowUp` reproduces the physical table names used in this account, so **do not deploy it with that default prefix into this same account/Region** while the console-created tables and budget with those names remain. CloudFormation will not automatically adopt them. Use a clean environment or a deliberately unique prefix for automation experiments.
 
-| Parameter | Default |
+The template's deployment-time parameters are:
+
+| Parameter | Purpose |
 |---|---|
-| `ExistingCognitoUserPoolId` | `us-east-1_7dYZw2Is6` |
-| `ExistingCognitoAppClientId` | `7id8c2g27fvbh365atqntqurir` |
-| `ExistingItemsTableName` | `TeamFollowUp-Items` |
-| `ExistingActivityTableName` | `TeamFollowUp-Activity` |
-| `ExistingUsersTableName` | `TeamFollowUp-Users` |
-| `ExistingArchiveTableName` | `TeamFollowUp-Archive` |
+| `ResourceNamePrefix` | Resource-name prefix; defaults to `TeamFollowUp` to match the console runbook. |
+| `RepositoryUrl` | GitHub URL connected to Amplify Hosting. |
+| `GitHubAccessToken` | Private deployment-time token used to authorize Amplify's GitHub connection. Never commit it or store it in `samconfig.toml`. |
+| `FrontendBranchName` | Branch Amplify should publish; defaults to `main`. |
+| `BudgetNotificationEmail` | Private recipient for the $1 monthly budget's email alerts. |
 
-`TableNamePrefix` now names only the API, Lambda, logs, dashboard, and alarms. It does not rename or provision the existing tables. The SAM stack does not import, replace, or manage those data resources; stack deletion will not delete them.
+The template calculates the exact branch origin from Amplify's generated app domain for API CORS and supplies the generated API URL and Cognito IDs to the Amplify branch. It does not need the current account's resource IDs as inputs. DynamoDB data resources have `DeletionPolicy: Retain` and `UpdateReplacePolicy: Retain`, so stack deletion/replacement does not automatically erase table data.
 
-### Required pre-deployment verification
+### Required console-first checks
 
-1. Verify that `custom:teamUserId` exists. The operator confirmed Read is enabled and Write is disabled for the `Team_FollowUp` browser app client; verify Write is disabled for every other app client too. Confirm the app client has **no client secret** and supports the frontend's sign-in flow.
-2. Confirm that the four tables are `ACTIVE`, and that the three Items indexes plus the two Archive indexes are `ACTIVE`.
-3. Confirm the six Cognito accounts exist, have unique `custom:teamUserId` values `u1`–`u6`, and that the matching `cognitoSub` profile records have been seeded into `TeamFollowUp-Users`.
-4. Use the final Amplify HTTPS origin for `AllowedOrigin`, and review the CloudFormation change set. The stack must create only API/backend/monitoring resources, not a second user pool or DynamoDB tables.
+1. In the current account, verify the operator-confirmed `custom:teamUserId` schema settings (String, length 1–32, mutable), Read enabled / Write disabled for `Team_FollowUp`, and Write disabled for every other app client. Confirm this app client has no client secret and supports SRP sign-in.
+2. Verify all four DynamoDB tables and their GSIs match the tables above and are `ACTIVE`. Do not recreate or replace tables which already contain application data.
+3. Create the six administrator-managed Cognito accounts and assign unique `custom:teamUserId` values `u1`–`u6`. Seed the matching `cognitoSub` values to the Users table with the trusted seeding script after a dry run.
+4. Create Amplify Hosting, Lambda, API Gateway and CloudWatch resources manually using [`DEPLOYMENT.md`](DEPLOYMENT.md). Apply the exact branch HTTPS URL to API CORS and configure the four public Amplify environment variables.
+5. If testing the optional template, use a separate clean environment or a different resource prefix and review the changeset before approval. A successful validation/build or CI run does not deploy resources or verify the live AWS account.
 
-The deliberate Scan operations work with the current no-GSI Activity and Users tables and avoid requiring new billable index capacity. Application-wide activity history will read the full Activity table, so its read cost/latency will grow with history volume. Consider a purpose-built timeline GSI only if future scale justifies adding and maintaining it.
+The deliberate Scan operations work with the current no-GSI Activity and Users tables and avoid requiring new index capacity. Application-wide activity history reads the full Activity table, so its read cost and latency grow with history volume. Consider a purpose-built timeline GSI only if future scale justifies adding and maintaining it.
 
 ## 7. Cost-conscious settings used
 
@@ -178,6 +180,6 @@ The deliberate Scan operations work with the current no-GSI Activity and Users t
 - Left point-in-time recovery, optional backups, deletion protection, and Streams disabled.
 - Used the Standard table class and default AWS-owned encryption.
 - Configured a $1 monthly budget with actual and forecast email alerts.
-- Left Amplify/API/backend deployment for a later step; new resources and their pricing must be checked before creation.
+- Amplify/API/backend deployment remained pending in this dated account snapshot; those resources are to be created manually through the console in the primary workflow.
 
 These settings reduce avoidable optional features but do not guarantee that all future AWS services or request usage will always cost $0. Review the Free account plan status, credit balance, budget notifications, and current service pricing as the implementation progresses.

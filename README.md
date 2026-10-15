@@ -184,7 +184,7 @@ The AWS-backed application uses a JSON HTTP API. The frontend sends authenticate
 
 | Method | Route | Purpose and key parameters |
 |---|---|---|
-| `GET` | `/bootstrap` | Returns the initial workspace payload: items, activity events, and enabled team profiles. |
+| `GET` | `/bootstrap` | Returns only top-level Projects/Jobs and enabled team profiles for a lightweight startup snapshot; descendants and Activity history are loaded on demand. |
 | `GET` | `/users` | Lists enabled team profiles for assignee selectors. |
 | `GET` | `/items` | Lists work items. Query parameters include scope=top-level, parentId, rootParentId, assigneeUserId, type, status, priority, q, dateMode, from, to, direction, limit, and offset. |
 | `GET` | `/items/assigned-to-me` | Lists items assigned to the authenticated mapped team member. Accepts the normal item filters and paging options. |

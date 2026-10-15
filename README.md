@@ -43,6 +43,60 @@ The implementation is described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md
 - `backend/scripts/`: trusted administration scripts for profile seeding and legacy migration diagnostics.
 - `docs/`: architecture, deployment, implementation snapshot and complete documentation.
 
+## System requirements and development setup
+
+### Hardware recommendations
+
+A normal modern development computer is sufficient. As a practical starting point, use at least 2 CPU cores, 4 GB RAM, and 1 GB of free disk space for the repository, Python environment, test outputs, and SAM build artifacts. These are recommendations, not enforced minimums. No GPU is required.
+
+### Required and optional software
+
+- **Git** — clone the repository and manage source changes.
+- **Node.js 24.x and npm** — run JavaScript syntax, API, UI regression, and build scripts. The project currently declares no third-party npm dependencies, so `npm install` is not required.
+- **Python 3.12** — run backend unit tests, infrastructure-contract checks, and trusted administration scripts.
+- **Modern browser** — verify the responsive frontend and Cognito sign-in experience.
+- **AWS account and suitable IAM permissions** — required for real AWS resources, with the project configured for `us-east-1`. The console-first deployment procedure itself is performed in the AWS Management Console.
+- **AWS CLI v2** — useful for reading stack outputs and running trusted profile-seeding / administration scripts from a local terminal. The console-only resource-creation path does not require the CLI for every step.
+- **AWS SAM CLI** — optional. Install it only to validate/build the optional full-stack CloudFormation/SAM template or to follow the automated deployment runbook. GitHub Actions validates and builds templates but does not deploy resources into your account.
+- **Docker** — optional; only needed for workflows that choose a Docker-based SAM build.
+
+Install the AWS CLI from the [official AWS CLI installation guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and the SAM CLI from the [official SAM CLI installation guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html).
+
+### Clone and prepare the local development environment
+
+```bash
+git clone https://github.com/retzed/Team_Follow-Up_AWS-Deployment.git
+cd Team_Follow-Up_AWS-Deployment
+python -m venv .venv
+```
+
+Activate the virtual environment, then install the development/test dependencies.
+
+**Windows PowerShell**
+```powershell
+.\\.venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r backend/requirements-dev.txt
+```
+
+**macOS / Linux**
+```bash
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r backend/requirements-dev.txt
+```
+
+Run the repository's full local validation suite:
+
+```bash
+npm run test:all
+```
+
+This verifies the frontend, backend helper tests, infrastructure contract, Python compilation, and related checks. The AWS frontend build additionally requires the public Cognito/API runtime settings listed in the following section. Those browser-visible values are configuration, not credentials; never place AWS access keys, private tokens, client secrets, real Cognito subject mappings, or the budget-recipient email in frontend configuration or source control.
+
+**Related project:** [Team Follow-Up browser-local demo](https://github.com/retzed/Team_Follow-Up) is a separate static demonstration. It does not use this repository's Cognito/API/DynamoDB runtime.
+
+
 ## Local validation
 
 Requirements: Node.js 24 and Python 3.12. Install backend test dependencies, then run the regression and infrastructure-contract checks:
@@ -70,7 +124,7 @@ sam validate --lint --template-file backend/template.yaml
 sam build --template-file backend/template.yaml
 ```
 
-**These commands validate/build artifacts only; they do not create AWS resources.** GitHub Actions follows the same principle and never deploys to an AWS account. To use the optional full-stack template as an automation method, follow its section in [the runbook](docs/DEPLOYMENT.md), supply GitHub-token and budget-email parameters privately, and use a clean environment or a distinct resource prefix. Never save those sensitive parameter values in `samconfig.toml` or commit credentials.
+**These commands validate/build artifacts only; they do not create AWS resources.** GitHub Actions follows the same principle and never deploys to an AWS account. To use the optional full-stack template as an automation method, follow [the automated deployment runbook](docs/AUTOMATED_DEPLOYMENT.md), supply GitHub-token and budget-email parameters privately, and use a clean environment or a distinct resource prefix. Never save those sensitive parameter values in `samconfig.toml` or commit credentials.
 
 ## Amplify public environment variables
 

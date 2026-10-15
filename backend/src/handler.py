@@ -87,6 +87,7 @@ def body_of(event):
 def query(event):
     return event.get("queryStringParameters") or {}
 def all_pages(table, **kwargs):
+    """Query every DynamoDB page for the supplied key/index request."""
     items=[]
     result=table.query(**kwargs)
     items.extend(result.get('Items',[]))
@@ -96,6 +97,7 @@ def all_pages(table, **kwargs):
         items.extend(result.get('Items',[]))
     return items
 def scan_pages(table, **kwargs):
+    """Scan through all pages using DynamoDB continuation keys."""
     items=[]
     result=table.scan(**kwargs)
     items.extend(result.get('Items',[]))
@@ -107,6 +109,7 @@ def scan_pages(table, **kwargs):
 
 
 def get_identity(event):
+    """Return JWT claims attached by API Gateway's JWT authorizer."""
     try:
         return event['requestContext']['authorizer']['jwt']['claims']
     except Exception:
@@ -280,6 +283,7 @@ def public_event(x):
 # Server-side business validation and audit construction
 # ---------------------------------------------------------------------------
 def validate_item(event, item, previous=None):
+    """Validate client input and derive trusted identity and index metadata."""
     profile=current_profile(event)
     if not profile:
         raise PermissionError('Authenticated Cognito user is not mapped to an enabled team profile.')

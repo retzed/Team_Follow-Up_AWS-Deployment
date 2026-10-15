@@ -1550,11 +1550,13 @@ $('signInForm').addEventListener('submit',handleSubmit);
 
 <div id="modalRoot"></div><div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 <script type="text/plain" id="application-bootstrap">
+/* Main UI controller for the Cognito-backed browser app. Keep remote reads/writes behind TeamFollowUpDataApi, and route user/API text through esc() before HTML interpolation. */
 (async () => {
 'use strict';
 try {
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+/* Central HTML-escaping boundary. Escape untrusted work-item, user, and API values before interpolating them into HTML; use textContent when markup is unnecessary. */
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const uid = prefix => `${prefix}_${Math.random().toString(36).slice(2,8)}${Date.now().toString(36).slice(-4)}`;
 const nowISO = () => new Date().toISOString();

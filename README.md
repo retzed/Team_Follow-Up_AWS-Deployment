@@ -74,7 +74,7 @@ Activate the virtual environment, then install the development/test dependencies
 
 **Windows PowerShell**
 ```powershell
-.\\.venv\\Scripts\\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r backend/requirements-dev.txt
 ```

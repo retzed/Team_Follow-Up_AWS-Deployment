@@ -1,54 +1,83 @@
 # Team Follow-Up Application
 
-An English/Arabic workspace for a team to manage projects, temporary jobs, tasks, and follow-ups. **This repository is AWS-only:** users sign in with Amazon Cognito and all application data is read from and written to DynamoDB through the authenticated API. There is no local authentication, demo database, or offline data store.
+An English/Arabic workspace for a team to manage projects, temporary jobs, tasks, and follow-ups. **This repository is AWS-only:** users sign in with Amazon Cognito and all application data is read from and written to DynamoDB through an authenticated API. There is no local authentication, demo database, offline data store, or browser-side work-data persistence.
 
-> **Current AWS status (15 October 2026):** the Cognito pool and four DynamoDB tables—**Items**, **Activity**, **Users**, and **Archive**—have been created manually in **us-east-1**. Amplify Hosting and the API/Lambda backend have not yet been deployed. See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the exact console settings.
->
-> **Deployment status:** the handler, schema reference, and SAM template now target the four manually created DynamoDB tables and the existing Cognito pool/app client. SAM creates only the API, Lambda, IAM, and CloudWatch resources; it does not create duplicate tables or a new user pool. `custom:teamUserId` was added to the existing pool and the `Team_FollowUp` app client has Read enabled and Write disabled. Before deploying, assign unique `u1`–`u6` values to the team accounts and supply the final Amplify HTTPS origin.
+> **Current account checkpoint (15 October 2026):** The Cognito pool/client, four DynamoDB tables (Items, Activity, Users and Archive), and monthly cost budget were reported as created manually in `us-east-1`. Amplify Hosting, API Gateway/Lambda and CloudWatch operational resources remained pending in the dated implementation snapshot. See [the implementation record](docs/IMPLEMENTATION.md) for current-account details. This status is a snapshot, not a prerequisite assumed by the architecture or automation template.
+
+## Deployment approach
+
+**Primary method: AWS Management Console.** Create and configure project AWS resources manually in the console. Do not use SAM to deploy resources as part of the normal project workflow. The [console-first deployment runbook](docs/DEPLOYMENT.md) is the operational guide.
+
+**Optional automation reference: full-stack CloudFormation/SAM.** [`backend/template.yaml`](backend/template.yaml) is kept as an alternative way to provision a new environment from scratch. It creates a Cognito pool/client, all four DynamoDB tables and five GSIs, API Gateway HTTP API, Lambda and scoped IAM, CloudWatch log groups/dashboard/alarms, Amplify Hosting app/branch, and the $1 monthly cost budget. It no longer expects pre-existing Cognito IDs, DynamoDB tables, or a pre-known Amplify origin. The default prefix matches the console table names, so do **not** deploy it into the current account/Region while those manually created resources still exist. Use a fresh environment or a different prefix for template experiments.
 
 ## Start here
 
-- **[AWS console implementation record](docs/IMPLEMENTATION.md)** — actual resources and settings currently configured in AWS.
-- **[Deployment guide](docs/DEPLOYMENT.md)** — target deployment workflow, Cognito team mapping, and pre-deployment verification.
-- **[Architecture guide](docs/ARCHITECTURE.md)** — request flow, security boundaries, data model, and operational design.
-- **[Complete project documentation](docs/DOCUMENTATION.md)** — system analysis/design, diagrams, data model, UI/UX, API, testing, and deployment.
+- **[Console-first deployment guide](docs/DEPLOYMENT.md)** — primary creation/configuration workflow, team mapping, API/Lambda configuration and acceptance tests.
+- **[AWS Console implementation record](docs/IMPLEMENTATION.md)** — dated record of resources reported as actually configured in the current AWS account.
+- **[Architecture reference](docs/ARCHITECTURE.md)** — whole-system architecture, trust boundaries, data model and monitoring; does not assume resources already exist.
+- **[Complete project documentation](docs/DOCUMENTATION.md)** — system analysis/design, diagrams, schema, UI/UX, API, testing, security and operations.
+- **[DynamoDB schema reference](backend/table-schema.json)** — target physical keys, index names, capacity settings and separate current-account snapshot.
+- **[Console Lambda IAM policy](backend/console-lambda-policy.json)** — least-privilege policy template to adapt for manual Lambda setup.
 - **[Release notes](RELEASE_NOTES.md)** — implementation and validation notes.
 
-## Target architecture (not yet fully deployed)
+## Target architecture
 
-- **Amplify Hosting** builds and serves the frontend.
-- **Cognito** authenticates team members and issues tokens.
-- **API Gateway and Python Lambda** authorize and process application requests.
-- **DynamoDB** is the shared source of truth for work items, activity history, team profiles, and archived items.
-- **CloudWatch** collects logs, metrics, alarms, and dashboard data.
+- **Amplify Hosting** builds and serves the frontend from the GitHub branch using `amplify.yml`.
+- **Cognito** authenticates members; a public app client reads but cannot write `custom:teamUserId`.
+- **API Gateway HTTP API** validates the Cognito JWT issuer/audience, enforces exact-origin CORS and forwards JSON requests to Lambda.
+- **Python 3.12 Lambda** validates hierarchy and caller identity, maintains server-owned index keys, writes audit history and implements archive/restore.
+- **DynamoDB** stores active items, activity, team profiles and archived snapshots across four deliberately small, provisioned tables.
+- **CloudWatch** collects API/Lambda logs and exposes a dashboard and alarms; **AWS Budgets** sends monthly cost-threshold notifications without stopping spend.
 
-The backend is defined in `backend/template.yaml` and deployed with AWS SAM; Amplify deploys the frontend separately. The template accepts the existing Cognito pool/client and table names as parameters and does not own the existing data resources. `backend/src/handler.py` uses the indexes and primary keys already configured in the console. A successful build or GitHub Actions run validates the package; it does **not** deploy the backend or verify the live Cognito/table settings.
+The implementation is described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The schema/access contract shared by the console procedure and full-stack template is in [`backend/table-schema.json`](backend/table-schema.json). In the target schema, Activity uses `itemId + activityKey`; Users uses `userId`; the handler scans Activity for application-wide history and Users for the matching Cognito subject because neither table has a GSI.
 
 ## Repository guide
 
-`index.html` contains the frontend. `scripts/build.mjs` generates `dist/index.html` and refuses to build unless real Cognito IDs and an HTTPS API base URL are configured. The `backend/` directory contains the SAM template, Lambda handler, DynamoDB schema reference, administrative seeding/migration scripts, and tests. The `docs/` directory contains the detailed architecture and deployment runbooks.
+- `index.html`: frontend source.
+- `scripts/build.mjs`: generates `dist/index.html` and rejects missing/placeholder Cognito/API settings.
+- `backend/src/handler.py`: Lambda request handling, identity mapping and DynamoDB access.
+- `backend/template.yaml`: optional full-stack CloudFormation/SAM automation reference; it is not the primary console deployment path.
+- `backend/table-schema.json`: shared schema contract and separate record of the current account's reported console state.
+- `backend/console-lambda-policy.json`: policy template for manually creating the Lambda execution role.
+- `backend/scripts/`: trusted administration scripts for profile seeding and legacy migration diagnostics.
+- `docs/`: architecture, deployment, implementation snapshot and complete documentation.
 
 ## Local validation
 
-Requirements: Node.js 24, Python 3.12, and AWS SAM CLI for infrastructure validation. These commands test/build the package only; they do not run an alternative local database or local sign-in mode.
+Requirements: Node.js 24 and Python 3.12. Install backend test dependencies, then run the regression and infrastructure-contract checks:
 
 ```bash
 python -m pip install -r backend/requirements-dev.txt
 npm run test:all
 npm run build
+```
+
+The frontend build requires public runtime settings. On Windows PowerShell:
+
+```powershell
+$env:TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID = "<actual-pool-id>"
+$env:TEAM_FOLLOW_UP_COGNITO_CLIENT_ID = "<actual-public-client-id>"
+$env:TEAM_FOLLOW_UP_API_BASE_URL = "https://<actual-api-id>.execute-api.us-east-1.amazonaws.com"
+$env:TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE = "custom:teamUserId"
+npm run build
+```
+
+For optional template validation only, install the AWS SAM CLI and run:
+
+```bash
 sam validate --lint --template-file backend/template.yaml
 sam build --template-file backend/template.yaml
 ```
 
-A build requires AWS configuration values even when it is run from a workstation. Use the non-secret Cognito User Pool ID, public app-client ID, and HTTPS API Gateway base URL from the deployed stack. Never invent placeholder values for a release build or commit credentials.
+**These commands validate/build artifacts only; they do not create AWS resources.** GitHub Actions follows the same principle and never deploys to an AWS account. To use the optional full-stack template as an automation method, follow its section in [the runbook](docs/DEPLOYMENT.md), supply GitHub-token and budget-email parameters privately, and use a clean environment or a distinct resource prefix. Never save those sensitive parameter values in `samconfig.toml` or commit credentials.
 
-## Deployment configuration
+## Amplify public environment variables
 
-Amplify must have these environment variables populated before its frontend build can succeed:
+The console-first Amplify branch needs these values before a successful frontend build:
 
 - `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`
 - `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`
 - `TEAM_FOLLOW_UP_API_BASE_URL`
-- `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE=custom:teamUserId` (optional; this is the default)
+- `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE=custom:teamUserId` (the default)
 
-These are public browser configuration values, not secrets. Do not add AWS access keys, Cognito client secrets, or real Cognito-subject mappings to the frontend or Amplify configuration. The complete setup and first-deployment order are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+They are public browser configuration values, not secrets. Do not add AWS credentials, GitHub access tokens, Cognito client secrets, real Cognito `sub` values, or billing-recipient email addresses to source files or Amplify environment variables. A passing CI run is evidence of code/build-contract validation only, not proof of a live AWS deployment.

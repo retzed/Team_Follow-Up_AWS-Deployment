@@ -314,5 +314,6 @@
       "Archive table required by the current SAM target contract"
     ],
     "compatibilityWarning": "This is the actual console bootstrap, not the current SAM target schema. The SAM template provisions a separate Cognito pool and four differently named DynamoDB tables with incompatible key/index definitions. Do not deploy the target template or connect the current handler to these tables until the schema and resource ownership have been reconciled."
-  }
+  },
+  "actualAwsResourcesCreated": false
 }

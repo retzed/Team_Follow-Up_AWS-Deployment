@@ -84,7 +84,7 @@ const readinessContext = {
   applicationHistoryReady: true
 };
 vm.runInNewContext(
-  html.slice(readinessStart, readinessEnd) + '\\nthis.rootActivityReady = rootActivityReady; this.historyPopupReady = historyPopupReady;',
+  html.slice(readinessStart, readinessEnd) + '\nthis.rootActivityReady = rootActivityReady; this.historyPopupReady = historyPopupReady;',
   readinessContext
 );
 assert.equal(readinessContext.rootActivityReady('project-2', 'all'), true,

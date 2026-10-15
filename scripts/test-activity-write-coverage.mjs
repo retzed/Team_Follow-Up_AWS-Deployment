@@ -40,8 +40,12 @@ assert.match(backend, /x\['activityKey'\]=event_at\+'#'\+event_id/, 'Every audit
 assert.match(backend, /def current_profile\(event\):[\s\S]*?matches=\[row for row in scan_pages\(USERS\)[\s\S]*?cognitoSub[\s\S]*?if len\(matches\)!=1/, 'Cognito subjects must be resolved from Users without assuming a Cognito-subject GSI.');
 assert.match(backend, /if item_type in \('project','job'\):[\s\S]*?candidate_rows=query_descendant_rows\(root_id\)[\s\S]*?elif item_type=='task':[\s\S]*?candidate_rows=query_children_rows\(item_id\)[\s\S]*?else:[\s\S]*?candidate_rows=\[\]/, 'Cascade traversal must use only the existing ParentIdIndex; leaf follow-up deletion needs no child query.');
 const template = await readFile('backend/template.yaml', 'utf8');
-assert.doesNotMatch(backend, /IndexName=['\"]GSI_(?:ApplicationTimeline|ItemTimeline|RootTimeline|ParentTimeline|ListUpdated|ListCreated|RootUpdated|AssignedUpdated|AssignedCreated|CognitoSub)['\"]/, 'Lambda must not assume GSIs absent from the current tables.');
-assert.doesNotMatch(template, /Type:\s*AWS::DynamoDB::Table/, 'SAM must reuse existing tables instead of creating new tables with a conflicting schema.');
+assert.doesNotMatch(backend, /IndexName=['\"]GSI_(?:ApplicationTimeline|ItemTimeline|RootTimeline|ParentTimeline|ListUpdated|ListCreated|RootUpdated|AssignedUpdated|AssignedCreated|CognitoSub)['\"]/, 'Lambda must not assume GSIs absent from the target physical schema.');
+assert.match(template, /Type:\s*AWS::DynamoDB::Table/, 'The optional full-stack SAM template must create DynamoDB tables in a fresh environment.');
+assert.match(template, /Type:\s*AWS::Cognito::UserPool\n/, 'The optional full-stack template must create its own Cognito pool.');
+assert.match(template, /Type:\s*AWS::Cognito::UserPoolClient\n/, 'The optional full-stack template must create its own public app client.');
+assert.match(template, /ITEMS_TABLE:\s*!Ref ItemsTable[\s\S]*ACTIVITY_TABLE:\s*!Ref ActivityTable[\s\S]*USERS_TABLE:\s*!Ref UsersTable[\s\S]*ARCHIVE_TABLE:\s*!Ref ArchiveTable/, 'The template must wire Lambda to the exact four tables it creates.');
+assert.doesNotMatch(template, /ExistingCognitoUserPoolId|ExistingCognitoAppClientId|ExistingItemsTableName|ExistingActivityTableName|ExistingUsersTableName|ExistingArchiveTableName|AllowedOrigin:/, 'The optional full-stack template must not assume pre-created resources or origin configuration.');
 assert.match(html, /id="applicationHistoryButton" data-action="global-history"/, 'Application-wide history must have a distinct entry point beside Archive.');
 assert.doesNotMatch(html, /historyItemQuery/, 'History uses one unified search control rather than a second item-only search.');
 assert.equal((html.match(/id="historyQuery" type="search"/g)||[]).length, 2, 'The same single query field is rendered by the mutually exclusive project and application history dialogs.');

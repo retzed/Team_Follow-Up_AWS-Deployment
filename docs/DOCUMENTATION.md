@@ -1189,7 +1189,7 @@ The cost budget's email alerts are distinct from CloudWatch alarms. CloudWatch a
 
 ### 11.5 Optional full-stack CloudFormation/SAM automation
 
-This is an **alternative**, not the normal deployment procedure. The complete template in `backend/template.yaml` creates:
+This is an **alternative**, not the normal deployment procedure. The step-by-step execution guide—including account/Region checks, GitHub access setup, SAM prompts, output handling, team-user seeding, smoke tests, updates and cleanup—is in the repository-root [`AUTOMATED_DEPLOYMENT.md`](../AUTOMATED_DEPLOYMENT.md). The complete template in `backend/template.yaml` creates:
 - Cognito pool and public app client with `custom:teamUserId` and limited client attribute write permissions.
 - Four DynamoDB tables and five GSIs matching Section 4.2, with 1 RCU / 1 WCU for each table/index.
 - API Gateway HTTP API/JWT authorizer, Lambda and scoped execution permissions.

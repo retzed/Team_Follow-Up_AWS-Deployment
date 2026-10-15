@@ -501,23 +501,46 @@ sequenceDiagram
     participant API as API Gateway
     participant Lambda as Lambda handler
     participant Users as Users table
-    participant DB as Items / Activity tables
+    participant Items as Items table
+    participant Activity as Activity table
+    participant Users as Users table
 
     User->>UI: Submit sign-in form
     UI->>Cognito: Sign in with configured auth flow
     Cognito-->>UI: Auth session and user attributes
-    UI->>UI: Validate custom:teamUserId is one of u1-u6
-    UI->>API: GET /bootstrap + Bearer token
+    UI->>UI: Validate team-user mapping attributes
+    UI->>API: GET /users + Bearer token
     API->>Cognito: Validate JWT issuer and audience
     API->>Lambda: Forward authenticated request
-    Lambda->>Users: Scan profiles for matching token sub
-    Users-->>Lambda: Exactly one enabled profile
-    Lambda->>DB: Query top-level items and descendants
-    Lambda->>DB: Query history for loaded items
-    Lambda->>Users: Read enabled team profiles
-    Lambda-->>API: JSON bootstrap payload
-    API-->>UI: Items, activity, users
-    UI-->>User: Render shared workspace
+    Lambda->>Users: Resolve caller and list enabled profiles
+    Users-->>Lambda: Enabled team profiles
+    Lambda-->>API: Users JSON
+    UI->>API: GET /items?scope=top-level
+    API->>Lambda: Forward authenticated request
+    Lambda->>Items: Query top-level Projects/Jobs only
+    Items-->>Lambda: Top-level items
+    Lambda-->>API: Items JSON
+    API-->>UI: Return each response without waiting for history
+    UI-->>User: Render dashboard and sidebar
+    UI->>API: GET /items?rootParentId=selected-id
+    API->>Lambda: Load selected hierarchy on demand
+    Lambda->>Items: Query selected Project/Job descendants
+    Items-->>Lambda: Descendant items
+    Lambda-->>UI: Selected hierarchy data
+    opt User opens an item Activity History popup
+        UI->>API: GET /items/{itemId}/activity?scope=all
+        API->>Lambda: Request item-scoped Activity
+        Lambda->>Activity: Query only the requested item hierarchy
+        Activity-->>Lambda: Matching events
+        Lambda-->>UI: Item history events
+    end
+    opt User opens Application-wide Activity History
+        UI->>API: GET /activity?scope=application
+        API->>Lambda: Request application Activity
+        Lambda->>Activity: Scan Activity history
+        Activity-->>Lambda: Application-wide events
+        Lambda-->>UI: Activity history
+    end
 ~~~
 
 If the frontend attribute is missing or invalid, or the backend cannot map the authenticated subject to one enabled profile, the application denies entry/data access instead of falling back to a local identity.
@@ -926,7 +949,7 @@ The Lambda receives the proxy path and dispatches based on HTTP method and route
 
 | Method and route | Purpose | Body / query | Success response |
 |---|---|---|---|
-| **GET /bootstrap** | Load initial workspace data. | None. | Items, activity events, and enabled team users. |
+| **GET /bootstrap** | Lightweight startup snapshot for compatible clients. | None. | Top-level Projects/Jobs and enabled team users only; descendants and Activity history are loaded on demand. |
 | **GET /users** | List enabled team profiles. | None. | users array with id, name, role. |
 | **GET /items** | Query top-level items, children under a parent, root hierarchy, or items assigned to a user. | Supply one supported selector and optional filters/pagination. | items, count, nextOffset. |
 | **GET /items/assigned-to-me** | Query items assigned to the authenticated profile. | Optional filters/pagination. | items, count, nextOffset. |

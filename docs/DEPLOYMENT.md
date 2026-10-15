@@ -40,7 +40,7 @@ In **Amazon Cognito → User pools**, create a user pool with these target setti
 | MFA | Off for the current low-cost lab configuration |
 | Custom schema attribute | `teamUserId`, type String, minimum length 1, maximum length 32, Mutable enabled |
 
-Cognito APIs and the application refer to that custom attribute as `custom:teamUserId`. Creating the schema attribute does **not** assign values to users. There is no requirement to configure Cognito managed login/hosted UI or hosted-login callback URLs for this app; the frontend uses direct SRP sign-in through the Cognito client SDK.
+For a completely new manual environment, use `TeamFollowUp-Cognito` as the pool display name so it matches the optional template's default. The current-account snapshot records the already-created pool display name as `User pool - fnzspt`; keep and configure that pool by its actual pool ID rather than replacing it just to change its display name. Pool display names do not affect frontend integration. Cognito APIs and the application refer to the custom attribute as `custom:teamUserId`. Creating the schema attribute does **not** assign values to users. There is no requirement to configure Cognito managed login/hosted UI or hosted-login callback URLs for this app; the frontend uses direct SRP sign-in through the Cognito client SDK.
 
 ### Public app client
 

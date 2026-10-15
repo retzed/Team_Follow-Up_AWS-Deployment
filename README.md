@@ -4,7 +4,7 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 
 > **Current AWS status (15 October 2026):** the Cognito pool and four DynamoDB tables—**Items**, **Activity**, **Users**, and **Archive**—have been created manually in **us-east-1**. Amplify Hosting and the API/Lambda backend have not yet been deployed. See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the exact console settings.
 >
-> **Deployment status:** the handler, schema reference, and SAM template now target the four manually created DynamoDB tables and the existing Cognito pool/app client. SAM creates only the API, Lambda, IAM, and CloudWatch resources; it does not create duplicate tables or a new user pool. The operator confirmed that `custom:teamUserId` was added to the existing pool and that the `Team_FollowUp` app client has Read enabled and Write disabled. Before deploying, verify that Write is disabled for every other app client too; then assign unique `u1`–`u6` values to the team accounts and supply the final Amplify HTTPS origin.
+> **Deployment status:** the handler, schema reference, and SAM template now target the four manually created DynamoDB tables and the existing Cognito pool/app client. SAM creates only the API, Lambda, IAM, and CloudWatch resources; it does not create duplicate tables or a new user pool. `custom:teamUserId` was added to the existing pool and the `Team_FollowUp` app client has Read enabled and Write disabled. Before deploying, assign unique `u1`–`u6` values to the team accounts and supply the final Amplify HTTPS origin.
 
 ## Start here
 

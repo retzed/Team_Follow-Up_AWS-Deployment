@@ -311,59 +311,22 @@ This is the **target deployment layout**, not proof that every component current
 
 ### 4.1 Data model overview (ERD)
 
-The following ERD describes the logical relationships. DynamoDB does **not** enforce relational foreign keys; the links are represented by item attributes and validated by Lambda.
+The following logical data-model diagram describes the entities and relationships. DynamoDB does **not** enforce relational foreign keys; the links are represented by item attributes and validated by Lambda.
 
 ~~~mermaid
-erDiagram
-    COGNITO_ACCOUNT ||--|| TEAM_PROFILE : "subject maps to"
-    TEAM_PROFILE ||--o{ WORK_ITEM : "creates or updates"
-    TEAM_PROFILE |o--o{ WORK_ITEM : "is assigned"
-    WORK_ITEM |o--o{ WORK_ITEM : "parent-child"
-    WORK_ITEM ||--o{ ACTIVITY_EVENT : "has history"
-    WORK_ITEM ||--o| ARCHIVE_SNAPSHOT : "may be archived as"
+flowchart LR
+    COGNITO["Cognito Account<br/>sub<br/>custom:teamUserId<br/>username<br/>enabled"]
+    TEAM["Team Profile<br/>userId (PK)<br/>displayName<br/>role<br/>cognitoSub<br/>enabled"]
+    ITEM["Work Item<br/>itemId (PK)<br/>type, name<br/>parentId, rootParentId<br/>ownerId, status, priority<br/>createdAt, updatedAt, version"]
+    ACTIVITY["Activity Event<br/>itemId (PK)<br/>activityKey (SK)<br/>eventId, actorUserId<br/>action, kind, at"]
+    ARCHIVE["Archive Snapshot<br/>archiveId (PK)<br/>itemId, archiveRootId<br/>archiveParentId<br/>archivedAt, archivedByUserId"]
 
-    COGNITO_ACCOUNT {
-        string sub "Cognito subject"
-        string custom_teamUserId "custom:teamUserId"
-        string username
-        boolean enabled
-    }
-    TEAM_PROFILE {
-        string userId PK "u1 to u6"
-        string displayName
-        string role
-        string cognitoSub "maps to Cognito sub"
-        boolean enabled
-    }
-    WORK_ITEM {
-        string itemId PK
-        string type
-        string name
-        string parentId
-        string rootParentId
-        string ownerId
-        string status
-        string priority
-        string createdAt
-        string updatedAt
-        int version
-    }
-    ACTIVITY_EVENT {
-        string itemId PK
-        string activityKey SK
-        string eventId
-        string actorUserId
-        string action
-        string kind
-    }
-    ARCHIVE_SNAPSHOT {
-        string archiveId PK
-        string itemId
-        string archiveRootId
-        string archiveParentId
-        string archivedAt
-        string archivedByUserId
-    }
+    COGNITO -->|"1:1 subject mapping"| TEAM
+    TEAM -->|"1:N creates or updates"| ITEM
+    TEAM -->|"optional assignee; many items"| ITEM
+    ITEM -->|"parent-child (1:N)"| ITEM
+    ITEM -->|"1:N activity history"| ACTIVITY
+    ITEM -->|"zero-or-one archive snapshot"| ARCHIVE
 ~~~
 
 The ERD focuses on entity relationships; the activity event timestamp's physical DynamoDB attribute name is `at`, as documented in the Activity events attribute table below. The **Team Profile** table and the Cognito identity are separate records joined by identity values. WorkItem attribution fields also reference team IDs. Activity rows point to an item ID and preserve snapshots of item/root names and types so history remains understandable when active items are renamed or archived. Archive rows retain item IDs and hierarchy metadata to support restore.

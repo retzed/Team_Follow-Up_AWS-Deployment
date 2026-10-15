@@ -1,6 +1,6 @@
-# Deployment runbook — AWS Console first
+# Deployment runbook — AWS Console
 
-This is the primary deployment guide. **Create and configure AWS resources through the AWS Management Console. Do not use `sam deploy` for the project’s normal deployment workflow.** The repository retains `backend/template.yaml` as an optional full-stack CloudFormation/SAM automation reference for a fresh environment. The template now creates resources from scratch; it no longer accepts existing Cognito IDs or table names.
+This is the primary deployment guide. **Create and configure AWS resources through the AWS Management Console. Do not use `sam deploy` for the project’s normal deployment workflow.** The repository retains `backend/template.yaml` as an optional full-stack CloudFormation/SAM automation reference for a fresh environment. The template creates resources from scratch.
 
 This runbook documents both the complete target configuration and the current account checkpoint. The current account record says a Cognito pool/client, four DynamoDB tables, and the monthly cost budget have already been created manually in `us-east-1`. For that account, **inspect and reuse matching resources—do not create duplicates**. When setting up another environment from zero, follow the creation steps below.
 

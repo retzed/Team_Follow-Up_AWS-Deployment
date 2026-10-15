@@ -159,12 +159,21 @@ def validate_console_bootstrap():
 
 def main():
     validate_console_bootstrap()
+    schema_path = ROOT / "backend" / "table-schema.json"
+    with schema_path.open(encoding="utf-8") as stream:
+        schema = json.load(stream)
     with TEMPLATE_PATH.open(encoding="utf-8") as stream:
         template = yaml.load(stream, Loader=CloudFormationLoader)
 
     resources = template.get("Resources", {})
     parameters = template.get("Parameters", {})
     required = {
+        "TeamFollowUpUserPool": "AWS::Cognito::UserPool",
+        "TeamFollowUpAppClient": "AWS::Cognito::UserPoolClient",
+        "ItemsTable": "AWS::DynamoDB::Table",
+        "ActivityTable": "AWS::DynamoDB::Table",
+        "UsersTable": "AWS::DynamoDB::Table",
+        "ArchiveTable": "AWS::DynamoDB::Table",
         "TeamFollowUpApi": "AWS::Serverless::HttpApi",
         "ApiFunction": "AWS::Serverless::Function",
         "ApiAccessLogGroup": "AWS::Logs::LogGroup",
@@ -173,83 +182,145 @@ def main():
         "ApiLambdaErrorsAlarm": "AWS::CloudWatch::Alarm",
         "ApiLambdaThrottlesAlarm": "AWS::CloudWatch::Alarm",
         "ApiGateway5xxAlarm": "AWS::CloudWatch::Alarm",
+        "FrontendApp": "AWS::Amplify::App",
+        "FrontendBranch": "AWS::Amplify::Branch",
+        "MonthlyCostBudget": "AWS::Budgets::Budget",
     }
     for logical_id, expected_type in required.items():
         if resources.get(logical_id, {}).get("Type") != expected_type:
-            fail(f"Missing or wrong resource type for {logical_id}.")
+            fail(f"Missing or wrong resource type for {logical_id}: expected {expected_type}.")
 
-    resource_types = [resource.get("Type") for resource in resources.values()]
-    if any(resource_type == "AWS::DynamoDB::Table" for resource_type in resource_types):
-        fail("SAM must reuse the manually created DynamoDB tables, not create conflicting copies.")
-    if any(resource_type in ("AWS::Cognito::UserPool", "AWS::Cognito::UserPoolClient") for resource_type in resource_types):
-        fail("SAM must reuse the existing Cognito pool/client, not create another identity source.")
-
-    origin = parameters.get("AllowedOrigin", {})
-    if "Default" in origin:
-        fail("AllowedOrigin must be explicit, not a public placeholder default.")
-    if not origin.get("AllowedPattern", "").startswith("^https://"):
-        fail("AllowedOrigin must enforce HTTPS.")
-    prefix_pattern = parameters.get("TableNamePrefix", {}).get("AllowedPattern", "")
-    if not prefix_pattern.startswith("^[A-Za-z0-9]"):
-        fail("TableNamePrefix must start with a letter or number for API/log/dashboard resource names.")
-
-    schema_path = ROOT / "backend" / "table-schema.json"
-    with schema_path.open(encoding="utf-8") as stream:
-        schema = json.load(stream)
-    bootstrap = schema["currentConsoleBootstrap"]
-    cognito = bootstrap["cognito"]
-    expected_parameters = {
-        "ExistingCognitoUserPoolId": cognito["userPoolId"],
-        "ExistingCognitoAppClientId": cognito["appClientId"],
-        "ExistingItemsTableName": "TeamFollowUp-Items",
-        "ExistingActivityTableName": "TeamFollowUp-Activity",
-        "ExistingUsersTableName": "TeamFollowUp-Users",
-        "ExistingArchiveTableName": "TeamFollowUp-Archive",
+    forbidden_parameters = {
+        "ExistingCognitoUserPoolId", "ExistingCognitoAppClientId",
+        "ExistingItemsTableName", "ExistingActivityTableName",
+        "ExistingUsersTableName", "ExistingArchiveTableName", "AllowedOrigin",
     }
-    for parameter_name, expected_default in expected_parameters.items():
-        parameter = parameters.get(parameter_name)
-        if not parameter:
-            fail(f"SAM is missing the required existing-resource parameter {parameter_name}.")
-        if parameter.get("Default") != expected_default:
-            fail(f"{parameter_name} default differs from the current console bootstrap; update both deliberately.")
+    if forbidden_parameters.intersection(parameters):
+        fail("The from-scratch automation template must not require pre-existing Cognito/table IDs or a pre-created Amplify origin.")
+    prefix = parameters.get("ResourceNamePrefix", {})
+    if prefix.get("Default") != "TeamFollowUp" or not prefix.get("AllowedPattern", "").startswith("^[A-Za-z0-9]"):
+        fail("ResourceNamePrefix must default to TeamFollowUp and enforce safe resource-name characters.")
+    for sensitive_parameter in ("GitHubAccessToken", "BudgetNotificationEmail"):
+        if parameters.get(sensitive_parameter, {}).get("NoEcho") is not True:
+            fail(f"{sensitive_parameter} must be marked NoEcho.")
+    if parameters.get("GitHubAccessToken", {}).get("Default") or parameters.get("BudgetNotificationEmail", {}).get("Default"):
+        fail("The template must not contain a GitHub token or billing-notification email default.")
+
+    # The template creates its own Cognito pool and client with the same public-client trust boundary.
+    pool_properties = resources["TeamFollowUpUserPool"]["Properties"]
+    if pool_properties.get("UsernameAttributes") != ["email"]:
+        fail("The Cognito pool must support email sign-in.")
+    if pool_properties.get("AdminCreateUserConfig", {}).get("AllowAdminCreateUserOnly") is not True:
+        fail("Cognito self-registration must be disabled; accounts are administrator managed.")
+    if pool_properties.get("MfaConfiguration") != "OFF":
+        fail("Cognito MFA setting must match the documented OFF configuration.")
+    custom_attribute = next((row for row in pool_properties.get("Schema", []) if row.get("Name") == "teamUserId"), None)
+    constraints = (custom_attribute or {}).get("StringAttributeConstraints", {})
+    if not custom_attribute or custom_attribute.get("AttributeDataType") != "String" or custom_attribute.get("Mutable") is not True:
+        fail("Cognito must create mutable String custom attribute teamUserId.")
+    if (constraints.get("MinLength"), constraints.get("MaxLength")) != ("1", "32"):
+        fail("Cognito custom:teamUserId must use the String length range 1-32.")
+    client = resources["TeamFollowUpAppClient"]["Properties"]
+    if client.get("UserPoolId") != {"Ref": "TeamFollowUpUserPool"} or client.get("GenerateSecret") is not False:
+        fail("Cognito app client must belong to the template pool and must not have a client secret.")
+    if not {"ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"}.issubset(set(client.get("ExplicitAuthFlows", []))):
+        fail("Cognito app client must support the frontend SRP sign-in and token refresh flows.")
+    if "custom:teamUserId" not in client.get("ReadAttributes", []):
+        fail("The browser app client must be allowed to read custom:teamUserId.")
+    if "custom:teamUserId" in client.get("WriteAttributes", []):
+        fail("The browser app client must not be allowed to write custom:teamUserId.")
+
+    # Target table names, primary keys, GSIs, projections, capacity, and Lambda references.
+    table_resources = {
+        "TeamFollowUp-Items": ("ItemsTable", "Items"),
+        "TeamFollowUp-Activity": ("ActivityTable", "Activity"),
+        "TeamFollowUp-Users": ("UsersTable", "Users"),
+        "TeamFollowUp-Archive": ("ArchiveTable", "Archive"),
+    }
+    target_schema = {row.get("name"): row for row in schema.get("tables", [])}
+    if set(target_schema) != set(table_resources):
+        fail("table-schema.json must define the same four target physical tables as the template.")
+    capacity_total = 0
+    for physical_name, (logical_id, suffix) in table_resources.items():
+        resource = resources[logical_id]
+        props = resource.get("Properties", {})
+        expected_name = {"Sub": f"${{ResourceNamePrefix}}-{suffix}"}
+        if props.get("TableName") != expected_name:
+            fail(f"{logical_id} must create the expected physical name pattern {physical_name}.")
+        if props.get("BillingMode") != "PROVISIONED" or props.get("TableClass") != "STANDARD":
+            fail(f"{logical_id} must use Standard table class with provisioned capacity.")
+        if props.get("ProvisionedThroughput") != {"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}:
+            fail(f"{logical_id} must use 1 RCU / 1 WCU for the base table.")
+        if props.get("PointInTimeRecoverySpecification", {}).get("PointInTimeRecoveryEnabled") is not False:
+            fail(f"{logical_id} must match the documented low-cost PITR-off setting.")
+        if props.get("DeletionProtectionEnabled") is not False:
+            fail(f"{logical_id} must have DynamoDB deletion protection disabled to match the console configuration.")
+        if resource.get("DeletionPolicy") != "Retain" or resource.get("UpdateReplacePolicy") != "Retain":
+            fail(f"{logical_id} must retain data if its CloudFormation stack is deleted or the table is replaced.")
+        schema_row = target_schema[physical_name]
+        if schema_row.get("physicalNameTemplate") != f"${{ResourceNamePrefix}}-{suffix}":
+            fail(f"{physical_name} schema reference has the wrong physical-name template.")
+        physical_indexes = {
+            gsi.get("IndexName"): (
+                next((key.get("AttributeName") for key in gsi.get("KeySchema", []) if key.get("KeyType") == "HASH"), None),
+                next((key.get("AttributeName") for key in gsi.get("KeySchema", []) if key.get("KeyType") == "RANGE"), None),
+            )
+            for gsi in props.get("GlobalSecondaryIndexes", [])
+        }
+        documented_indexes = {gsi.get("name"): (gsi.get("pk"), gsi.get("sk")) for gsi in schema_row.get("gsis", [])}
+        if physical_indexes != documented_indexes:
+            fail(f"{logical_id} Global Secondary Indexes do not match table-schema.json.")
+        for gsi in props.get("GlobalSecondaryIndexes", []):
+            if gsi.get("Projection", {}).get("ProjectionType") != "ALL":
+                fail(f"{logical_id}/{gsi.get('IndexName')} must use an All projection.")
+            if gsi.get("ProvisionedThroughput") != {"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}:
+                fail(f"{logical_id}/{gsi.get('IndexName')} must use 1 RCU / 1 WCU.")
+            capacity_total += 2
+        capacity_total += 2
+    if capacity_total != 18:
+        fail("Four base tables and five GSIs should total 9 RCUs and 9 WCUs each.")
+
+    # Serialize table creation to avoid creating multiple indexed tables concurrently.
+    for child, parent in (("ActivityTable", "ItemsTable"), ("UsersTable", "ActivityTable"), ("ArchiveTable", "UsersTable")):
+        if resources[child].get("DependsOn") != parent:
+            fail(f"{child} must depend on {parent} so indexed table creation is staged.")
+
     variables = template.get("Globals", {}).get("Function", {}).get("Environment", {}).get("Variables", {})
     expected_variables = {
-        "ITEMS_TABLE": "ExistingItemsTableName",
-        "ACTIVITY_TABLE": "ExistingActivityTableName",
-        "USERS_TABLE": "ExistingUsersTableName",
-        "ARCHIVE_TABLE": "ExistingArchiveTableName",
+        "ITEMS_TABLE": "ItemsTable",
+        "ACTIVITY_TABLE": "ActivityTable",
+        "USERS_TABLE": "UsersTable",
+        "ARCHIVE_TABLE": "ArchiveTable",
     }
-    for variable, parameter_name in expected_variables.items():
-        if variables.get(variable) != {"Ref": parameter_name}:
-            fail(f"Lambda environment variable {variable} must point to {parameter_name}.")
+    for variable, logical_id in expected_variables.items():
+        if variables.get(variable) != {"Ref": logical_id}:
+            fail(f"Lambda environment variable {variable} must reference the created {logical_id} resource.")
 
     api_properties = resources["TeamFollowUpApi"]["Properties"]
     authorizers = api_properties.get("Auth", {}).get("Authorizers", {})
     jwt = authorizers.get("CognitoJwt", {}).get("JwtConfiguration", {})
-    if "ExistingCognitoUserPoolId" not in str(jwt.get("issuer")):
-        fail("API JWT issuer must use the existing Cognito User Pool parameter.")
-    if "ExistingCognitoAppClientId" not in str(jwt.get("audience")):
-        fail("API JWT audience must use the existing public app client parameter.")
-    if api_properties.get("Name") and api_properties.get("DefinitionBody", {}).get("info", {}).get("title"):
-        fail("SAM HttpApi Name and inline OpenAPI info.title conflict; keep the title unset when Name is configured.")
-    if not api_properties.get("AccessLogSettings"):
-        fail("API Gateway access logging is not configured.")
+    if "TeamFollowUpUserPool" not in str(jwt.get("issuer")):
+        fail("API JWT issuer must reference the User Pool created by this template.")
+    if "TeamFollowUpAppClient" not in str(jwt.get("audience")):
+        fail("API JWT audience must reference the public app client created by this template.")
     if api_properties.get("Auth", {}).get("DefaultAuthorizer") != "CognitoJwt":
         fail("The API must use CognitoJwt as its default route authorizer.")
+    if not api_properties.get("AccessLogSettings"):
+        fail("API Gateway access logging must be configured.")
     cors = api_properties.get("CorsConfiguration", {})
-    if "*" in str(cors) or "AllowedOrigin" not in str(cors.get("AllowOrigins", [])):
-        fail("CORS must be restricted to the explicit AllowedOrigin parameter.")
-
-    log_group = resources["ApiFunctionLogGroup"]["Properties"]
-    if log_group.get("RetentionInDays") != {"Ref": "LogRetentionDays"}:
-        fail("Lambda log retention must be controlled by LogRetentionDays.")
+    origins = cors.get("AllowOrigins", [])
+    if len(origins) != 1 or "FrontendBranchName" not in str(origins[0]) or "FrontendApp.DefaultDomain" not in str(origins[0]) or "*" in str(origins[0]):
+        fail("CORS must derive one exact branch HTTPS origin from the Amplify app, without a wildcard.")
+    if cors.get("AllowHeaders") != ["authorization", "content-type"]:
+        fail("CORS must allow only the frontend's Authorization and JSON headers.")
+    if "OPTIONS" not in cors.get("AllowMethods", []):
+        fail("CORS must support preflight OPTIONS.")
 
     function = resources["ApiFunction"]["Properties"]
     if function.get("CodeUri") != "backend/src/":
         fail("Lambda CodeUri must remain backend/src/ so handler and dependency manifest package together.")
     if not (ROOT / "backend" / "src" / "requirements.txt").exists():
         fail("SAM CodeUri must include requirements.txt so backend dependencies are reproducible.")
-
     policies = function.get("Policies", [])
     if "DynamoDBCrudPolicy" in str(policies):
         fail("Lambda must not receive broad DynamoDB CRUD permissions.")
@@ -260,63 +331,102 @@ def main():
         if isinstance(statement, dict)
     ]
     policy_text = str(policies)
-    for parameter_name in ("ExistingItemsTableName", "ExistingActivityTableName", "ExistingUsersTableName", "ExistingArchiveTableName"):
-        if parameter_name not in policy_text:
-            fail(f"Lambda IAM must scope reads to the configured table name parameter {parameter_name}.")
+    for logical_id in ("ItemsTable", "ActivityTable", "UsersTable", "ArchiveTable"):
+        if logical_id not in policy_text:
+            fail(f"Lambda IAM must scope access to {logical_id} created by the template.")
     if "/index/*" not in policy_text:
-        fail("Lambda IAM must allow reads on the existing Items and Archive secondary indexes.")
-    read_statement = next((statement for statement in statements if "dynamodb:Scan" in str(statement.get("Action", []))), None)
-    if not read_statement:
-        fail("Lambda must have explicit read/scan access for the existing no-GSI Users table and Activity timeline.")
-    if not all(action in str(read_statement.get("Action", [])) for action in ("dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan")):
-        fail("Read policy must support existing table lookups, queries, and scans.")
-
-    transaction_resources = next(
-        (statement.get("Resource") for statement in statements
-         if "dynamodb:TransactWriteItems" in str(statement.get("Action", []))),
-        None,
-    )
-    if transaction_resources is None or not all(
-        parameter_name in str(transaction_resources)
-        for parameter_name in ("ExistingItemsTableName", "ExistingActivityTableName", "ExistingArchiveTableName")
-    ):
-        fail("Transactional write permission must be scoped to the existing Items, Activity, and Archive tables.")
+        fail("Lambda IAM must include the secondary-index ARNs.")
+    read_statement = next((s for s in statements if "dynamodb:Scan" in str(s.get("Action", []))), None)
+    if not read_statement or not all(a in str(read_statement.get("Action", [])) for a in (
+        "dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan"
+    )):
+        fail("Lambda must have explicit, table-scoped read/query/scan permissions.")
     if "dynamodb:EnclosingOperation" not in policy_text or "ConditionCheckItem" not in policy_text:
-        fail("Transactional item permissions must be restricted to operations inside TransactWriteItems.")
+        fail("Transactional item permissions must be restricted to TransactWriteItems.")
     for required_action in ("dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"):
         if required_action not in policy_text:
             fail(f"Missing transactional item permission: {required_action}.")
-    if not any(
-        "dynamodb:BatchWriteItem" in str(statement.get("Action", []))
-        and "ExistingActivityTableName" in str(statement.get("Resource"))
-        for statement in statements
-    ):
-        fail("Partial restore activity summaries require BatchWriteItem only on the existing Activity table.")
+    transact = next((s for s in statements if "dynamodb:TransactWriteItems" in str(s.get("Action", []))), None)
+    if not transact or not all(name in str(transact.get("Resource")) for name in ("ItemsTable", "ActivityTable", "ArchiveTable")):
+        fail("Transaction writes must be scoped to Items, Activity, and Archive tables.")
+    batch_write = next((s for s in statements if "dynamodb:BatchWriteItem" in str(s.get("Action", []))), None)
+    if not batch_write or "ActivityTable" not in str(batch_write.get("Resource")) or "ItemsTable" in str(batch_write.get("Resource")):
+        fail("BatchWriteItem is only allowed on Activity for partial-restore summaries.")
+
+    # The generated web origin and frontend settings are wired together without a dependency cycle.
+    app_properties = resources["FrontendApp"]["Properties"]
+    if app_properties.get("Repository") != {"Ref": "RepositoryUrl"} or app_properties.get("AccessToken") != {"Ref": "GitHubAccessToken"}:
+        fail("Amplify app must connect to the configurable GitHub repository using the private token parameter.")
+    branch_properties = resources["FrontendBranch"]["Properties"]
+    if branch_properties.get("AppId") != {"Fn::GetAtt": ["FrontendApp", "AppId"]}:
+        fail("Amplify branch must belong to the app created by the template.")
+    branch_vars = {row.get("Name"): row.get("Value") for row in branch_properties.get("EnvironmentVariables", [])}
+    expected_branch_vars = {
+        "TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID": {"Ref": "TeamFollowUpUserPool"},
+        "TEAM_FOLLOW_UP_COGNITO_CLIENT_ID": {"Ref": "TeamFollowUpAppClient"},
+        "TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE": "custom:teamUserId",
+    }
+    for name, value in expected_branch_vars.items():
+        if branch_vars.get(name) != value:
+            fail(f"Amplify branch must set {name} to the matching Cognito configuration.")
+    api_env_value = branch_vars.get("TEAM_FOLLOW_UP_API_BASE_URL", {})
+    if not isinstance(api_env_value, dict) or "TeamFollowUpApi" not in str(api_env_value.get("Sub", "")):
+        fail("Amplify branch must receive the API URL generated by this template.")
+    if resources["TeamFollowUpApi"]["Properties"]["CorsConfiguration"]["AllowOrigins"][0].get("Sub") != "https://${FrontendBranchName}.${FrontendApp.DefaultDomain}":
+        fail("The API CORS origin must match the branch URL pattern used by the outputs.")
+
+    # Cost alerts match the console setup; the recipient is injected at deploy time.
+    budget = resources["MonthlyCostBudget"]["Properties"]["Budget"]
+    if budget.get("BudgetLimit") != {"Amount": 1, "Unit": "USD"} or budget.get("TimeUnit") != "MONTHLY" or budget.get("BudgetType") != "COST":
+        fail("The cost budget must be a $1 monthly cost budget.")
+    notifications = resources["MonthlyCostBudget"]["Properties"].get("NotificationsWithSubscribers", [])
+    actual_thresholds = sorted(
+        n.get("Notification", {}).get("Threshold")
+        for n in notifications if n.get("Notification", {}).get("NotificationType") == "ACTUAL"
+    )
+    forecast_thresholds = [
+        n.get("Notification", {}).get("Threshold")
+        for n in notifications if n.get("Notification", {}).get("NotificationType") == "FORECASTED"
+    ]
+    if actual_thresholds != [50, 80, 100] or forecast_thresholds != [100] or len(notifications) != 4:
+        fail("Budget notifications must be actual 50/80/100 percent plus forecasted 100 percent.")
+    if any(n.get("Notification", {}).get("ThresholdType") != "PERCENTAGE" for n in notifications):
+        fail("Budget thresholds must be percentages.")
+    if any(n.get("Subscribers", [{}])[0].get("Address") != {"Ref": "BudgetNotificationEmail"} for n in notifications):
+        fail("All budget alerts must use the required deployment-time email parameter.")
 
     table_schema = {row["name"]: row for row in schema["tables"]}
-    defined_indexes = {
-        index["name"]
-        for table in table_schema.values()
-        for index in table.get("gsis", [])
-    }
+    defined_indexes = {index["name"] for table in table_schema.values() for index in table.get("gsis", [])}
     handler = (ROOT / "backend" / "src" / "handler.py").read_text(encoding="utf-8")
     used_indexes = set(re.findall(r"IndexName=['\"]([A-Za-z0-9_]+)['\"]", handler))
     missing_indexes = used_indexes - defined_indexes
     if missing_indexes:
-        fail("Handler references indexes not present in the current table schema: " + ", ".join(sorted(missing_indexes)))
+        fail("Handler references indexes not present in the physical schema contract: " + ", ".join(sorted(missing_indexes)))
     if not {"ParentIdIndex", "AssignedToIndex", "WorkspaceIndex", "GSI_ArchiveIndex"}.issubset(used_indexes):
-        fail("Handler must exercise the current Items and Archive indexes instead of the superseded SAM-only indexes.")
+        fail("Handler must exercise the documented Items and Archive access indexes.")
     if re.search(r"IndexName=['\"]GSI_(?:CognitoSub|ItemTimeline|ApplicationTimeline|RootTimeline|ParentTimeline|ListUpdated|ListCreated|RootUpdated|AssignedUpdated|AssignedCreated)['\"]", handler):
-        fail("Handler still references an index that does not exist on the manually created tables.")
+        fail("Handler still references a legacy index not created by either documented deployment path.")
 
     outputs = template.get("Outputs", {})
-    if outputs.get("CognitoUserPoolId", {}).get("Value") != {"Ref": "ExistingCognitoUserPoolId"}:
-        fail("CognitoUserPoolId output must expose the existing pool ID.")
-    if outputs.get("CognitoUserPoolClientId", {}).get("Value") != {"Ref": "ExistingCognitoAppClientId"}:
-        fail("CognitoUserPoolClientId output must expose the existing app client ID.")
+    expected_outputs = {
+        "CognitoUserPoolId": {"Ref": "TeamFollowUpUserPool"},
+        "CognitoUserPoolClientId": {"Ref": "TeamFollowUpAppClient"},
+        "ItemsTableName": {"Ref": "ItemsTable"},
+        "ActivityTableName": {"Ref": "ActivityTable"},
+        "UsersTableName": {"Ref": "UsersTable"},
+        "ArchiveTableName": {"Ref": "ArchiveTable"},
+        "CloudWatchDashboardName": {"Ref": "TeamFollowUpDashboard"},
+        "MonthlyCostBudgetName": {"Ref": "MonthlyCostBudget"},
+    }
+    for name, value in expected_outputs.items():
+        if outputs.get(name, {}).get("Value") != value:
+            fail(f"Output {name} must expose the resource created by this template.")
+    if not isinstance(outputs.get("ApiBaseUrl", {}).get("Value"), dict) or "TeamFollowUpApi" not in str(outputs["ApiBaseUrl"]["Value"]):
+        fail("ApiBaseUrl output must point to the created HTTP API.")
+    if not isinstance(outputs.get("FrontendUrl", {}).get("Value"), dict) or "FrontendApp.DefaultDomain" not in str(outputs["FrontendUrl"]["Value"]):
+        fail("FrontendUrl output must identify the generated Amplify branch URL.")
 
-    print("Infrastructure checks passed: existing Cognito/table parameters, current DynamoDB key/index contracts, scoped IAM, HTTP API/JWT/CORS, Lambda, and CloudWatch resources.")
-
+    print("Infrastructure checks passed: full from-scratch Cognito/DynamoDB/API/Lambda/IAM/CloudWatch/Amplify/Budget template, exact HTTPS CORS, matching schema/index contracts, and current console-state record.")
 
 if __name__ == "__main__":
     main()

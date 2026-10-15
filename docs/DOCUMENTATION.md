@@ -766,6 +766,9 @@ These are structural wireframes rather than pixel-perfect screenshots. The curre
 +-------------------------------+--------------------------------------------------+
 ~~~
 
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/80065fa4-f379-41c7-858b-34267e5c0957" />
+
+
 #### Mobile workspace
 
 ~~~text
@@ -787,7 +790,10 @@ These are structural wireframes rather than pixel-perfect screenshots. The curre
 +-----------------------------------+
 ~~~
 
-#### Item editor (conceptual)
+<img width="924" height="1600" alt="WhatsApp Image 2026-10-15 at 7 26 49 AM" src="https://github.com/user-attachments/assets/949f8e86-2de5-4984-8d3e-750357d751d4" />
+
+
+#### Item editor
 
 ~~~text
 +-------------------------------------------+
@@ -808,9 +814,12 @@ These are structural wireframes rather than pixel-perfect screenshots. The curre
 +-------------------------------------------+
 ~~~
 
+<img width="928" height="776" alt="image" src="https://github.com/user-attachments/assets/b3c34d26-4e02-4989-8e8d-141a134906fd" />
+
+
 Editor fields and available controls depend on item type. Projects/jobs are top-level; tasks and follow-ups require parents. Parent type controls which child types are allowed. Delete in the application is implemented as archive, preserving the ability to restore.
 
-#### Activity-history view (conceptual)
+#### Activity-history view
 
 ~~~text
 +-----------------------------------------------------------+
@@ -824,6 +833,10 @@ Editor fields and available controls depend on item type. Projects/jobs are top-
 | 14 Oct 16:15  Omar   Created follow-up                    |
 +-----------------------------------------------------------+
 ~~~
+
+<img width="1468" height="846" alt="image" src="https://github.com/user-attachments/assets/2f3abb9a-8fc1-4c24-b138-e8b66530544d" />
+
+
 
 The exact available scope depends on the screen: item history can be limited to the selected item or expanded to relevant descendants; application history spans the application. The implementation sorts events newest first. Activity records are append-only through the API.
 

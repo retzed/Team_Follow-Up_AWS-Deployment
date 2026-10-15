@@ -218,7 +218,7 @@
       "signIn": "email",
       "selfRegistration": "disabled",
       "mfa": "off",
-      "domainAndCallbackUrls": "not configured yet",
+      "domainAndCallbackUrls": "not required for the current direct USER_SRP_AUTH frontend; no Cognito managed-login domain/hosted-UI callback URLs are configured",
       "teamAccountsCreated": false,
       "teamUserIdAttribute": "custom:teamUserId",
       "teamUserIdAttributeStatus": "added per operator confirmation on 2026-10-15; Team_FollowUp Read enabled and Write disabled per operator confirmation; other app-client permissions pending verification",

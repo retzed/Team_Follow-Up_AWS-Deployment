@@ -298,8 +298,5 @@ def main():
     print("Infrastructure checks passed: existing Cognito/table parameters, current DynamoDB key/index contracts, scoped IAM, HTTP API/JWT/CORS, Lambda, and CloudWatch resources.")
 
 
-if mainStart if False else False:
-    pass
-
 if __name__ == "__main__":
     main()

@@ -231,6 +231,40 @@ def main():
     if "custom:teamUserId" in client.get("WriteAttributes", []):
         fail("The browser app client must not be allowed to write custom:teamUserId.")
 
+    # Verify default display/physical names shared by the console runbook and template.
+    if pool_properties.get("UserPoolName") != {"Sub": "${ResourceNamePrefix}-Cognito"}:
+        fail("Default Cognito pool name must match the new-environment console instructions.")
+    if client.get("ClientName") != "Team_FollowUp":
+        fail("Cognito browser app-client name must match the console runbook.")
+    expected_sub_names = {
+        ("ApiExecutionRole", "RoleName"): "${ResourceNamePrefix}-Api-ExecutionRole",
+        ("ApiFunction", "FunctionName"): "${ResourceNamePrefix}-Api",
+        ("ApiAccessLogGroup", "LogGroupName"): "/${ResourceNamePrefix}/apigateway/access",
+        ("ApiFunctionLogGroup", "LogGroupName"): "/aws/lambda/${ResourceNamePrefix}-Api",
+        ("TeamFollowUpDashboard", "DashboardName"): "${ResourceNamePrefix}-Operations",
+        ("ApiLambdaErrorsAlarm", "AlarmName"): "${ResourceNamePrefix}-Lambda-Errors",
+        ("ApiLambdaThrottlesAlarm", "AlarmName"): "${ResourceNamePrefix}-Lambda-Throttles",
+        ("ApiGateway5xxAlarm", "AlarmName"): "${ResourceNamePrefix}-ApiGateway-5xx",
+        ("MonthlyCostBudget", "BudgetName"): "${ResourceNamePrefix}-Monthly-Cost",
+        ("FrontendApp", "Name"): "${ResourceNamePrefix}-frontend",
+    }
+    for (logical_id, property_name), expected_suffix in expected_sub_names.items():
+        props = resources[logical_id]["Properties"]
+        actual_value = props.get(property_name)
+        if logical_id == "MonthlyCostBudget":
+            actual_value = props.get("Budget", {}).get("BudgetName")
+        if actual_value != {"Sub": expected_suffix}:
+            fail(f"{logical_id}.{property_name} must use the console-aligned default name {expected_suffix}.")
+    api_title = resources["TeamFollowUpApi"]["Properties"].get("DefinitionBody", {}).get("info", {}).get("title")
+    if api_title != {"Sub": "${ResourceNamePrefix} API"}:
+        fail("HTTP API title/name must match the console runbook default.")
+    branch_properties_for_name = resources["FrontendBranch"]["Properties"]
+    if branch_properties_for_name.get("BranchName") != {"Ref": "FrontendBranchName"}:
+        fail("Amplify branch must use the configured branch name.")
+    for logical_id in ("ApiAccessLogGroup", "ApiFunctionLogGroup"):
+        if resources[logical_id]["Properties"].get("RetentionInDays") != 30:
+            fail(f"{logical_id} must retain logs for 30 days to match the runbook.")
+
     # Target table names, primary keys, GSIs, projections, capacity, and Lambda references.
     table_resources = {
         "TeamFollowUp-Items": ("ItemsTable", "Items"),

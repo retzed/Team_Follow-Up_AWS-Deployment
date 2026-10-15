@@ -3,7 +3,7 @@
 **Last updated:** 15 October 2026  
 **Status:** Account-specific implementation snapshot. The Cognito pool/client, four DynamoDB tables, and budget were created manually. The operator confirmed that `custom:teamUserId` was added to the pool, with Read enabled and Write disabled for the `Team_FollowUp` app client on 15 October 2026. Permission checks on other app clients, team accounts/profile mappings, Amplify Hosting, API Gateway/Lambda, and CloudWatch observability remained pending at the time of this snapshot.
 
-This document records the configuration reported as actually created in the user's current AWS account; it is not the target architecture or a prerequisite for other environments. The primary deployment method is the AWS Management Console. `backend/template.yaml` is separately maintained as an optional full-stack automation template that creates all resources from scratch. This record intentionally does not store account IDs, email addresses, passwords, GitHub tokens, access keys, or other private credentials.
+This document records the configuration reported as actually created in the user's current AWS account; it is not the target architecture or a prerequisite for other environments. The primary deployment method is the AWS Management Console. `backend/template.yaml` is separately maintained as an optional full-stack automation template that creates all resources from scratch. This record includes the public Cognito User Pool and app-client identifiers needed for integration, but does not store the AWS account ID, email addresses, passwords, GitHub tokens, access keys, real per-user Cognito `sub` values, or other private credentials.
 
 ## 1. Account and Region
 
@@ -131,7 +131,6 @@ As of the date above, these parts of the planned architecture have **not** been 
 - Amplify Hosting app, GitHub branch connection, and final HTTPS website URL.
 - API Gateway HTTP API and the Lambda function.
 - CloudWatch log groups, dashboard, and alarms.
-- Cognito hosted-login domain and callback/sign-out URLs.
 - Team Cognito accounts and corresponding DynamoDB profile mappings.
 
 

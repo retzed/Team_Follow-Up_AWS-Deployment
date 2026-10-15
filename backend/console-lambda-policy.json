@@ -1,0 +1,67 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadApplicationTables",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Items",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Items/index/*",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Activity",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Activity/index/*",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Users",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Users/index/*",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Archive",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Archive/index/*"
+      ]
+    },
+    {
+      "Sid": "AllowPartialRestoreActivitySummaries",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:BatchWriteItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Activity"
+    },
+    {
+      "Sid": "AllowTransactionalItemOperationsOnly",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:ConditionCheckItem"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Items",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Activity",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Archive"
+      ],
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "dynamodb:EnclosingOperation": [
+            "TransactWriteItems"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "AllowAtomicWorkItemArchiveAndAuditTransactions",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:TransactWriteItems"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Items",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Activity",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Archive"
+      ]
+    }
+  ]
+}

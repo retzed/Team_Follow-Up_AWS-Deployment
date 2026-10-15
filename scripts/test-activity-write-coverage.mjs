@@ -11,12 +11,12 @@ const fn = (name, next) => {
 
 const persistence = fn('persist', 'person');
 assert.match(persistence, /commitSnapshot\(lastApiSnapshot,desired\)/, 'All UI mutations must go through the API commit layer.');
-assert.match(persistence, /refreshActivityFor\(rootId,'all'\)/, 'New and changed activity must refresh the active root timeline after writes complete.');
+assert.doesNotMatch(persistence, /refreshActivityFor\(|changedActivityRoots/, 'Writes must not trigger Activity reads; the history popup is the read boundary.');
 assert.match(persistence, /mergeActivityEventsIntoWorkspace\(desired\.activity\|\|\[\]\)/, 'Server-normalized activity events must be merged into the app model.');
 assert.match(html, /async function refreshActivityFor\(itemId,scope='all'\)/, 'Activity history has a data-API refresh path.');
 assert.match(html, /queryActivity\(String\(itemId\),scope\)/, 'Activity refresh must query the selected item/root from the data API.');
 assert.match(fn('openHistory', 'openEdit'), /refreshActivityFor\(/, 'Opening history must refresh from the API.');
-assert.match(html, /case 'detail-tab':ui\.tab=actionEl\.dataset\.tab;renderDetail\(\);if\(ui\.tab==='activity'&&ui\.selectedParentId\)void refreshActivityFor\(ui\.selectedParentId,'all'\)/, 'The Activity History tab must refresh the current root timeline.');
+assert.ok(html.includes("case 'detail-tab':ui.tab=actionEl.dataset.tab;renderDetail();break;"), 'Switching the dashboard Activity tab must not load Activity history.');
 assert.match(html, /result\?\.activityEvents\|\|\[\]/, 'Archive restore response events must be retained even while a DynamoDB GSI is catching up.');
 
 const createEdit = fn('handleItemSubmit', 'clearParentFilters');

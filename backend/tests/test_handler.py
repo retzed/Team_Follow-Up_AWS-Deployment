@@ -60,9 +60,10 @@ class HandlerHelperTests(unittest.TestCase):
         )
         self.assertEqual(row["itemId"], "project-1")
         self.assertNotIn("id", row)
-        self.assertEqual(row["listPK"], "TOP_LEVEL")
-        self.assertEqual(row["rootPK"], "ROOT#project-1")
-        self.assertTrue(row["updatedSort"].startswith("2026-10-14T11:00:00.000Z#"))
+        self.assertEqual(row["workspaceKey"], "WORKSPACE")
+        self.assertEqual(row["rootParentId"], "project-1")
+        self.assertNotIn("listPK", row)
+        self.assertNotIn("rootPK", row)
 
     def test_index_work_item_materializes_assignee_and_parent_keys(self):
         row = handler.index_work_item(
@@ -76,10 +77,11 @@ class HandlerHelperTests(unittest.TestCase):
                 "updatedAt": "2026-10-14T11:00:00.000Z",
             }
         )
-        self.assertEqual(row["listPK"], "PARENT#project-1")
-        self.assertEqual(row["rootPK"], "ROOT#project-1")
-        self.assertEqual(row["assigneePK"], "USER#u2")
-        self.assertIn("assigneeCreatedSort", row)
+        self.assertEqual(row["parentId"], "project-1")
+        self.assertEqual(row["assignedTo"], "u2")
+        self.assertEqual(row["ownerId"], "u2")
+        self.assertNotIn("listPK", row)
+        self.assertNotIn("assigneePK", row)
 
     def test_activity_item_populates_all_timeline_indexes(self):
         row = handler.activity_item(
@@ -92,11 +94,22 @@ class HandlerHelperTests(unittest.TestCase):
                 "action": "Updated Status",
             }
         )
-        self.assertEqual(row["itemPK"], "ITEM#task-1")
-        self.assertEqual(row["applicationPK"], "APPLICATION")
-        self.assertEqual(row["rootPK"], "ROOT#project-1")
-        self.assertEqual(row["parentPK"], "PARENT#project-1")
-        self.assertTrue(row["applicationSort"].endswith("#evt-1"))
+        self.assertEqual(row["itemId"], "task-1")
+        self.assertEqual(row["activityKey"], "2026-10-14T11:00:00.000Z#evt-1")
+        self.assertEqual(row["eventId"], "evt-1")
+        self.assertNotIn("applicationPK", row)
+        self.assertNotIn("itemPK", row)
+
+    def test_activity_event_is_keyed_by_item_and_timestamped_activity_key(self):
+        row = handler.activity_item({
+            "eventId": "evt-two",
+            "itemId": "item-1",
+            "at": "2026-10-14T12:00:00.000Z",
+            "action": "Updated item",
+        })
+        self.assertEqual(row["itemId"], "item-1")
+        self.assertEqual(row["activityKey"], "2026-10-14T12:00:00.000Z#evt-two")
+        self.assertNotIn("applicationSort", row)
 
     def test_public_item_does_not_leak_index_attributes(self):
         row = handler.public_item(
@@ -108,12 +121,14 @@ class HandlerHelperTests(unittest.TestCase):
                 "updatedSort": "sort",
                 "rootPK": "ROOT#project-1",
                 "assigneePK": "USER#u2",
+                "workspaceKey": "WORKSPACE",
+                "assignedTo": "u2",
             }
         )
         self.assertEqual(row["id"], "task-1")
         self.assertEqual(row["createdBy"], "u1")
         self.assertEqual(row["updatedBy"], "u2")
-        for key in ("itemId", "listPK", "updatedSort", "rootPK", "assigneePK"):
+        for key in ("itemId", "listPK", "updatedSort", "rootPK", "assigneePK", "workspaceKey", "assignedTo"):
             self.assertNotIn(key, row)
 
     def test_body_of_decodes_base64_json(self):

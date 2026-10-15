@@ -1,8 +1,8 @@
 # Automated Deployment Runbook — AWS SAM / CloudFormation
 
-This runbook explains how to deploy the **entire Team Follow-Up stack from scratch** using AWS SAM CLI and AWS CloudFormation. It is the optional automation path; the project's primary deployment instructions remain in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), which uses the AWS Management Console.
+This runbook explains how to deploy the **entire Team Follow-Up stack from scratch** using AWS SAM CLI and AWS CloudFormation. It is the optional automation path; the project's primary deployment instructions remain in [`docs/DEPLOYMENT.md`](DEPLOYMENT.md), which uses the AWS Management Console.
 
-**Template:** [`backend/template.yaml`](backend/template.yaml)  
+**Template:** [`backend/template.yaml`](../backend/template.yaml)  
 **Target Region:** `us-east-1` (US East, N. Virginia)  
 **Default stack prefix:** `TeamFollowUp`  
 **Expected result:** Cognito + DynamoDB + API Gateway + Lambda/IAM + CloudWatch + Amplify Hosting + AWS Budgets.

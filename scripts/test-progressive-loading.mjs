@@ -113,4 +113,16 @@ if (html.includes('async function mockRoute(method,path,body)')) {
   check(html.includes("await new Promise(resolve=>{if(typeof setTimeout==='function')setTimeout(resolve,0);else resolve();})"),
     'The local demo API must yield before table work so the loading indicator can paint.');
 }
+
+// Item history must not build/index any cached timeline before the exact item/scope request succeeds.
+const historyBranchStart=html.indexOf("} else if(m.kind==='history'){" );
+const historyBranchEnd=html.indexOf("} else if(m.kind==='global-history')",historyBranchStart);
+check(historyBranchStart>=0&&historyBranchEnd>historyBranchStart,'Item and global history modal branches must remain separate.');
+const itemHistoryMarkup=html.slice(historyBranchStart,historyBranchEnd);
+check(itemHistoryMarkup.includes('const historyReady=historyPopupReady(m.itemId,historyScope);')&&itemHistoryMarkup.includes('let events=historyReady?activitiesFor(m.itemId,historyScope):[]'),'Item history must render its loader before building events and wait for its exact item/scope response.');
+const globalHistoryMarkup=html.slice(historyBranchEnd,html.indexOf("} else if(m.kind==='archive')",historyBranchEnd));
+check(globalHistoryMarkup.includes('let events=pending?[]:')&&globalHistoryMarkup.includes('const visibleEvents=events.slice(0,visibleLimit);'),'Global history must avoid processing cached rows while pending and limit synchronous DOM generation.');
+check(globalHistoryMarkup.includes('data-action="history-load-more"')&&html.includes("case 'history-load-more':"),'Global history must expose incremental rendering for additional events.');
+check(html.includes('.data-loading-state.compact { justify-content:center;')&&html.includes('.history-card-list > .data-loading-state'),'Loading indicators in popup/card areas must be centered.');
+
 console.log('Progressive-loading tests passed: lean bootstrap, selected-root child hydration, popup-only activity reads, retry safety, accessible spinners, archive pagination, and mobile history controls.');

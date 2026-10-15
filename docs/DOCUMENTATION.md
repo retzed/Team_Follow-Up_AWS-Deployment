@@ -865,7 +865,7 @@ Design guidance for continued UI work:
 |---|---|---|
 | Frontend | HTML, CSS, JavaScript in **index.html** | UI and responsive presentation. |
 | Browser authentication | AWS Amplify Auth modules loaded by the frontend build/runtime | Cognito sign-in, session/token handling, supported challenges and reset flow. |
-| Static hosting | AWS Amplify Hosting (planned) | Builds and serves generated **dist/** website assets. |
+| Static hosting | AWS Amplify Hosting | Builds and serves generated **dist/** website assets; deployment status for the current account is recorded separately. |
 | Identity | Amazon Cognito User Pools | Authentication, public app client, and **custom:teamUserId** mapping attribute. |
 | API | Amazon API Gateway HTTP API | HTTPS routes, Cognito JWT authorizer, CORS, access logging. |
 | Backend | AWS Lambda, Python 3.12, boto3 | Business validation, authorization profile resolution, DynamoDB transactions and audit logic. |
@@ -901,7 +901,7 @@ These values do not grant AWS account access. Never put AWS access keys, Cognito
 
 ### 8.1 Common request rules
 
-- Base URL: the **ApiBaseUrl** output of the SAM stack.
+- Base URL: the API Gateway HTTPS invoke URL captured during the console workflow, or the **ApiBaseUrl** output when using the optional full-stack template.
 - Transport: HTTPS.
 - Authentication: **Authorization: Bearer <Cognito access token>**.
 - Request/response format: JSON.

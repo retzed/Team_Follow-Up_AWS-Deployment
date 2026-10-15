@@ -15,6 +15,11 @@ The project's primary AWS resource-creation method is the AWS Management Console
 - **Data behavior:** every read/write remains on the Cognito-authenticated API backed by API Gateway, Lambda and DynamoDB. The browser has no local/demo database fallback. User/Activity Scan operations intentionally support the current no-GSI table design.
 - **Manual Lambda policy:** added `backend/console-lambda-policy.json` as an adaptation-ready least-privilege policy for creating the Lambda execution role through the AWS Console.
 
+### Automated deployment documentation
+
+- Added root-level [`AUTOMATED_DEPLOYMENT.md`](AUTOMATED_DEPLOYMENT.md), a full step-by-step runbook for the optional SAM/CloudFormation path. It covers tool/credential prerequisites, Amplify GitHub App/token setup, name-collision safeguards, validation/build, guided deployment and changeset review, outputs, creation/seeding of the six team profiles, acceptance tests, updates, troubleshooting and stack cleanup.
+- Linked the runbook from the README, console deployment guide, architecture reference, complete project documentation and current-account implementation record.
+
 ### Validation
 
 GitHub Actions runs frontend regression tests/build checks, backend unit tests, the infrastructure-contract checks, Python compilation, `sam validate --lint`, and `sam build`. These steps validate repository artifacts but never deploy resources or verify the live AWS account. Manual resource creation/configuration is documented in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md); the complete target architecture is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

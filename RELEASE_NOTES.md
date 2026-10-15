@@ -17,7 +17,7 @@ The project's primary AWS resource-creation method is the AWS Management Console
 
 ### Automated deployment documentation
 
-- Added root-level [`AUTOMATED_DEPLOYMENT.md`](AUTOMATED_DEPLOYMENT.md), a full step-by-step runbook for the optional SAM/CloudFormation path. It covers tool/credential prerequisites, Amplify GitHub App/token setup, name-collision safeguards, validation/build, guided deployment and changeset review, outputs, creation/seeding of the six team profiles, acceptance tests, updates, troubleshooting and stack cleanup.
+- Moved the automated deployment runbook to [`docs/AUTOMATED_DEPLOYMENT.md`](docs/AUTOMATED_DEPLOYMENT.md), a full step-by-step runbook for the optional SAM/CloudFormation path. It covers tool/credential prerequisites, Amplify GitHub App/token setup, name-collision safeguards, validation/build, guided deployment and changeset review, outputs, creation/seeding of the six team profiles, acceptance tests, updates, troubleshooting and stack cleanup.
 - Linked the runbook from the README, console deployment guide, architecture reference, complete project documentation and current-account implementation record.
 
 ### Validation

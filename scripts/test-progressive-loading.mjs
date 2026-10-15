@@ -32,8 +32,10 @@ const editPopupStart = html.indexOf('function openEdit(', appPopupStart);
 check(itemPopupStart >= 0 && appPopupStart > itemPopupStart, 'The item and application-wide history popup openers must exist.');
 const itemPopup = html.slice(itemPopupStart, appPopupStart);
 const appPopup = html.slice(appPopupStart, editPopupStart);
-check(itemPopup.includes('renderModal();void refreshActivityFor(itemId,historyScope)'),
+check(itemPopup.includes('renderModal();void refreshActivityFor(key,historyScope)'),
   'An item history request must start only after its history popup has opened.');
+check(itemPopup.includes('const item=loadedItem||{id:key,type:\'task\',name:key'),
+  'An item history popup must still open with a safe fallback snapshot when the local hierarchy has not hydrated that item.');
 check(appPopup.includes('renderModal();void refreshApplicationHistory()'),
   'Application-wide Activity must be requested only when its popup opens.');
 check(!appPopup.includes('refreshActivityFor('), 'The application-wide popup opener must not trigger unrelated item history.');
@@ -61,6 +63,17 @@ check(html.includes("ev.target.id==='historyScopeFilter'") && html.includes('voi
   'Changing item-history scope inside the popup must fetch the newly selected scope.');
 check(html.includes('function rootActivityReady(') && html.includes('||applicationHistoryReady'),
   'Activity loaded by the application-wide popup should be reusable by the already-open dashboard.');
+const popupReadyStart=html.indexOf('function historyPopupReady(');
+const popupReadyEnd=html.indexOf('function rootLoadingError(',popupReadyStart);
+check(popupReadyStart>=0&&popupReadyEnd>popupReadyStart&&!html.slice(popupReadyStart,popupReadyEnd).includes('applicationHistoryReady'),
+  'An application-wide Activity load must never mark every item-specific history popup as loaded.');
+const itemHistoryBranch=html.slice(html.indexOf("} else if(m.kind==='history'){"),html.indexOf("} else if(m.kind==='global-history')"));
+check(itemHistoryBranch.includes('const historyReady=historyPopupReady(m.itemId,historyScope);'),
+  'The item popup must use exact item-and-scope readiness, independently of application-wide history.');
+check(itemHistoryBranch.includes('spinnerMarkup(tr(\'loadingActivity\'),true)'),
+  'A pending item-specific history request must display an accessible loading indicator.');
+check(html.includes('ui.modal.historyScope===scope')&&html.includes('ui.modal.historyRefreshError=message;renderModal();'),
+  'A failure must be shown only for the still-open item-history scope, not hidden by a different history request.');
 check(html.includes("activityNotLoaded:'Open Activity History to load events.'") &&
       html.includes("activityNotLoaded:'افتح سجل النشاط لتحميل الأحداث.'"),
   'The dashboard Activity tab must show a translated unloaded state instead of an indefinite spinner.');

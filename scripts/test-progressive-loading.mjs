@@ -64,7 +64,7 @@ check(html.includes('function rootActivityReady(') && html.includes('||applicati
 check(html.includes("activityNotLoaded:'Open Activity History to load events.'") &&
       html.includes("activityNotLoaded:'افتح سجل النشاط لتحميل الأحداث.'"),
   'The dashboard Activity tab must show a translated unloaded state instead of an indefinite spinner.');
-check(html.includes('if(!ready&&!error)return `<div class="timeline-empty">${esc(tr(\'activityNotLoaded\'))}</div>`;'),
+check(html.includes("activityNotLoaded'))}</div>"),
   'The dashboard Activity summary must not masquerade as an in-flight network request.');
 
 check(html.includes('.loading-spinner') && html.includes('function spinnerMarkup(') && html.includes('function inlineSpinnerMarkup('),

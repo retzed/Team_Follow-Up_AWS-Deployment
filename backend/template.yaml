@@ -70,7 +70,6 @@ Resources:
             MaxLength: '32'
       UserPoolTags:
         Project: TeamFollowUp
-        ManagedBy: CloudFormation
 
   TeamFollowUpAppClient:
     Type: AWS::Cognito::UserPoolClient

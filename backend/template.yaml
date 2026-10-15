@@ -270,13 +270,13 @@ Outputs:
   ApiBaseUrl:
     Description: API Gateway HTTPS base URL; configure dataMode='api' and apiBaseUrl in index.html to use the real backend.
     Value: !Sub 'https://${TeamFollowUpApi}.execute-api.${AWS::Region}.amazonaws.com'
-  WorkItemsTableName:
+  ItemsTableName:
     Description: Existing Items table name; not created or managed by this stack.
     Value: !Ref ExistingItemsTableName
-  ActivityEventsTableName:
+  ActivityTableName:
     Description: Existing Activity table name; retains its itemId + activityKey primary key.
     Value: !Ref ExistingActivityTableName
-  UserProfilesTableName:
+  UsersTableName:
     Description: Existing Users table name; profile lookup scans this small table because it has no Cognito-subject GSI.
     Value: !Ref ExistingUsersTableName
   ArchiveTableName:

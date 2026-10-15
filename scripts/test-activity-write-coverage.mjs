@@ -35,11 +35,13 @@ assert.match(backend, /fields=\[\('name','name'\),\('description','description'\
 assert.match(backend, /Status changed from \{labels\.get\(old_status,old_status\)\} to \{labels\.get\(new_status,new_status\)\}/, 'Lambda records status changes independently.');
 assert.ok(backend.includes('def commit_item_with_events(item, events, condition=None, expected_version=None):') && backend.includes('for event in events:') && backend.includes('ddb.meta.client.transact_write_items(TransactItems=writes)'), 'Activity events must be stored transactionally with backend writes.');
 
-assert.match(backend, /GSI_ApplicationTimeline[\s\S]*?applicationPK[\s\S]*?APPLICATION/, 'Application history must query the dedicated indexed timeline rather than scan all events.');
-assert.match(backend, /if item_type in \('project','job'\):[\s\S]*?GSI_RootUpdated[\s\S]*?elif item_type=='task':[\s\S]*?GSI_ListUpdated[\s\S]*?else:[\s\S]*?candidate_rows=\[\]/, 'Leaf follow-up deletion avoids a root-wide query and task deletion uses its direct child index.');
-assert.match(backend, /x\['applicationPK'\]='APPLICATION'[\s\S]*?x\['applicationSort'\]=stamp/, 'Every new audit event must receive application timeline keys.');
+assert.match(backend, /if qs\.get\('scope'\) in \('application','global'\):[\s\S]*?rows=scan_pages\(ACTIVITY\)/, 'Application-wide history must use Scan because the existing Activity table has no GSIs.');
+assert.match(backend, /x\['activityKey'\]=event_at\+'#'\+event_id/, 'Every audit event must use the real itemId + activityKey composite primary key.');
+assert.match(backend, /def current_profile\(event\):[\s\S]*?matches=\[row for row in scan_pages\(USERS\)[\s\S]*?cognitoSub[\s\S]*?if len\(matches\)!=1/, 'Cognito subjects must be resolved from Users without assuming a Cognito-subject GSI.');
+assert.match(backend, /if item_type in \('project','job'\):[\s\S]*?candidate_rows=query_descendant_rows\(root_id\)[\s\S]*?elif item_type=='task':[\s\S]*?candidate_rows=query_children_rows\(item_id\)[\s\S]*?else:[\s\S]*?candidate_rows=\[\]/, 'Cascade traversal must use only the existing ParentIdIndex; leaf follow-up deletion needs no child query.');
 const template = await readFile('backend/template.yaml', 'utf8');
-assert.match(template, /IndexName: GSI_ApplicationTimeline[\s\S]*?AttributeName: applicationPK[\s\S]*?AttributeName: applicationSort/, 'CloudFormation must deploy the application history index.');
+assert.doesNotMatch(backend, /IndexName=['\"]GSI_(?:ApplicationTimeline|ItemTimeline|RootTimeline|ParentTimeline|ListUpdated|ListCreated|RootUpdated|AssignedUpdated|AssignedCreated|CognitoSub)['\"]/, 'Lambda must not assume GSIs absent from the current tables.');
+assert.doesNotMatch(template, /Type:\\s*AWS::DynamoDB::Table/, 'SAM must reuse existing tables instead of creating new tables with a conflicting schema.');
 assert.match(html, /id="applicationHistoryButton" data-action="global-history"/, 'Application-wide history must have a distinct entry point beside Archive.');
 assert.doesNotMatch(html, /historyItemQuery/, 'History uses one unified search control rather than a second item-only search.');
 assert.equal((html.match(/id="historyQuery" type="search"/g)||[]).length, 2, 'The same single query field is rendered by the mutually exclusive project and application history dialogs.');

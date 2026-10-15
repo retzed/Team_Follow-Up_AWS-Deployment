@@ -1627,6 +1627,7 @@ const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCol
 const activityRefreshRequests=new Map();
 const rootChildrenRequests=new Map();
 const assignedItemCache=new Map();
+let skipNextSidebarApiRefresh=false;
 let activityIndexRevision=0;
 let activityIndexCache={source:null,length:-1,revision:-1,byId:new Map(),byRoot:new Map(),all:[]};
 let hierarchyIndexCache={childrenSource:null,childrenLength:-1,parentsSource:null,parentsLength:-1,revision:-1,byParent:new Map(),byId:new Map()};
@@ -2029,11 +2030,13 @@ function renderParentSearchList(list){
  $('#parentList').innerHTML=cards+(pending||error||(!cards?`<div class="empty-state">${esc(tr('noFilterResults'))}</div>`:''));
 }
 function sidebarQueryOptions(includeText=true){return {type:ui.parentType,status:ui.parentStatus,dateMode:ui.parentDateMode,direction:ui.parentDateMode==='created'?'asc':'desc',from:'',to:'',query:includeText?ui.parentQuery:'',limit:250};}
-function renderParentList(){
+function renderParentList({skipRemote=false}={}){
  const modeAtRender=ui.sidebarMode;
  if(modeAtRender==='assigned')renderAssignedList(filteredAssignedItems());else renderParentSearchList(filteredParents());
  if(sidebarQueryTimer)clearTimeout(sidebarQueryTimer);
  if(!dataLoadState.initialComplete)return;
+ if(skipRemote)return;
+ if(skipNextSidebarApiRefresh){skipNextSidebarApiRefresh=false;return;}
  const token=++sidebarQuerySequence;
  // Render the current AWS-sourced workspace snapshot, then refresh visible rows through the API.
  sidebarQueryTimer=setTimeout(async()=>{
@@ -2371,7 +2374,7 @@ function handleItemSubmit(form){const fd=new FormData(form);const kind=form.data
 function clearParentFilters(){ui.parentQuery='';ui.parentType='all';ui.parentStatus='all';ui.parentDateMode='updated';ui.parentDateFrom='';ui.parentDateTo='';$('#parentQuery').value='';$('#parentDateFrom').value='';$('#parentDateTo').value='';render();toast(tr('filtersCleared'));}
 function clearChildFilters(){ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';renderDetail();}
 function handleAction(target){const actionEl=target.closest('[data-action]');if(!actionEl)return;const action=actionEl.dataset.action;const id=actionEl.dataset.id;const parentId=actionEl.dataset.parentId;if(!dataLoadState.initialComplete&&['new-parent','edit-item','new-child','delete-item','delete-from-modal','confirm-delete','archive-restore-selected'].includes(action)){toast(tr('loadingData'),true);return;}switch(action){
- case 'select-parent':{ui.selectedParentId=id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();renderParentList();renderDetail();void ensureRootChildrenLoaded(id);break;}
+ case 'select-parent':{ui.selectedParentId=id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();renderParentList({skipRemote:true});renderDetail();void ensureRootChildrenLoaded(id);break;}
  case 'sidebar-mode':{const requestedMode=actionEl.dataset.mode==='assigned'?'assigned':'search';if(isMobileSidebarViewport()){if(ui.sidebarMode===requestedMode&&!ui.sidebarCollapsed){ui.sidebarCollapsed=true;}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}if(ui.sidebarMode==='search'&&!['all','project','job'].includes(ui.parentType))ui.parentType='all';applyTranslations();renderParentList();break;}
  case 'select-assigned':{
   const item=allItem(id)||assignedItemCache.get(String(id));
@@ -2380,7 +2383,7 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
   if(!item||!root)break;
   ui.selectedAssignedItemId=item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();
   let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}
-  renderParentList();renderDetail();
+  renderParentList({skipRemote:true});renderDetail();
   void ensureRootChildrenLoaded(root.id).then(()=>{if(String(ui.selectedParentId)===String(root.id)&&!['project','job'].includes(item.type)){document.getElementById(`card-${item.id}`)?.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}});
   break;
  }
@@ -2485,7 +2488,7 @@ async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
  const api=window.TeamFollowUpDataApi;if(!api||typeof api.queryRootItems!=='function')return;
  dataLoadState.rootErrors.delete(`children:${rootId}`);
  const hydrationRun=workspaceHydrationGeneration;
- if(String(ui.selectedParentId)===rootId){renderParentList();renderDetail();}
+ if(String(ui.selectedParentId)===rootId){renderParentList({skipRemote:true});renderDetail();}
  let promise;
  promise=(async()=>{
   try{
@@ -2534,7 +2537,7 @@ async function startWorkspaceHydration(){
   data=loaded;invalidateHierarchyIndex();lastApiSnapshot=copyWorkspace(data);
   dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;
   if(!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0]?.id||'';
-  invalidateActivityIndexes();render();
+  invalidateActivityIndexes();skipNextSidebarApiRefresh=true;render();
   if(ui.selectedParentId)void ensureRootChildrenLoaded(ui.selectedParentId);
  }catch(error){
   if(hydrationRun!==workspaceHydrationGeneration)return;

@@ -629,20 +629,12 @@ def lambda_handler(event, context):
         if not profile:
             return response(403,{'message':'Cognito identity is not mapped to an enabled team profile.'})
         if method=='GET' and path=='/bootstrap':
+            # Keep startup lightweight: return only top-level Projects/Jobs and team
+            # profiles. Descendant items and Activity history are fetched on demand.
             parents=query_work_items_all({'scope':'top-level','dateMode':'updated','direction':'desc'})
-            items=list(parents)
-            for p in parents:
-                items.extend(query_work_items_all({'rootParentId':p['id'],'dateMode':'updated','direction':'desc'}))
-            # De-duplicate by ID after root and parent indexed queries.
-            by_id={x['id']:x for x in items}
-            items=list(by_id.values())
-            activities=[]
-            for item in items:
-                activities.extend(public_event(e) for e in query_events_for_item(item['id']))
-            activities=sorted({e['id']:e for e in activities}.values(),key=lambda e:(str(e.get('at') or ''),str(e.get('id') or '')),reverse=True)
             user_rows=scan_pages(USERS)
             users=[{'id':u['userId'],'name':u.get('displayName',''),'role':u.get('role','AWS Engineer')} for u in user_rows if u.get('enabled',True)]
-            return response(200,{'items':items,'activity':activities,'users':users})
+            return response(200,{'items':parents,'users':users})
         if method=='GET' and path=='/users':
             rows=scan_pages(USERS)
             return response(200,{'users':[{'id':u['userId'],'name':u.get('displayName',''),'role':u.get('role','AWS Engineer')} for u in rows if u.get('enabled',True)]})

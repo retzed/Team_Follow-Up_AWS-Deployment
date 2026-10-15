@@ -106,6 +106,7 @@ for (const resourceType of [
   'AWS::Cognito::UserPool',
   'AWS::Cognito::UserPoolClient',
   'AWS::DynamoDB::Table',
+  'AWS::IAM::Role',
   'AWS::Amplify::App',
   'AWS::Amplify::Branch',
   'AWS::Budgets::Budget',
@@ -131,6 +132,9 @@ assert.match(clientBlock, /WriteAttributes:[\s\S]*\n\s+- email\n/, 'Browser clie
 assert.doesNotMatch(clientBlock, /WriteAttributes:[\s\S]*custom:teamUserId/, 'Browser client must not write its authorization-relevant team ID');
 assert.match(template, /DeletionPolicy: Retain/, 'Table data must be retained on stack deletion');
 assert.match(template, /RetentionInDays: 30/, 'CloudWatch logs must have explicit 30-day retention');
+assert.match(template, /RoleName: !Sub '\${ResourceNamePrefix}-Api-ExecutionRole'/, 'Automation execution-role name must match the console runbook default');
+assert.match(template, /Role: !GetAtt ApiExecutionRole\.Arn/, 'Lambda must be attached to the explicitly defined execution role');
+assert.match(template, /AWSLambdaBasicExecutionRole/, 'The explicit execution role must provide standard CloudWatch logging permissions');
 
 const schema = JSON.parse(await readFile('backend/table-schema.json', 'utf8'));
 assert.equal(schema.thisFileProvisionsAwsResources, false, 'table-schema.json is documentation, not infrastructure');

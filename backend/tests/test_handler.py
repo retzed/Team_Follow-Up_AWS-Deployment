@@ -48,6 +48,45 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(first_chunk, ["root-b"])
         self.assertEqual(second_chunk, ["root-a"])
 
+    def test_current_profile_resolves_a_single_enabled_cognito_subject_without_gsi(self):
+        event = {
+            "requestContext": {
+                "authorizer": {
+                    "jwt": {"claims": {"sub": "cognito-sub-u2"}}
+                }
+            }
+        }
+        profile = {
+            "userId": "u2",
+            "displayName": "Zyad",
+            "cognitoSub": "cognito-sub-u2",
+            "enabled": True,
+        }
+        with patch.object(handler, "scan_pages", return_value=[profile]) as scan:
+            result = handler.current_profile(event)
+        self.assertEqual(result, profile)
+        scan.assert_called_once_with(handler.USERS)
+
+    def test_current_profile_fails_closed_for_missing_duplicate_or_disabled_subject(self):
+        event = {
+            "requestContext": {
+                "authorizer": {
+                    "jwt": {"claims": {"sub": "cognito-sub-u2"}}
+                }
+            }
+        }
+        enabled = {"userId": "u2", "cognitoSub": "cognito-sub-u2", "enabled": True}
+        disabled = {**enabled, "enabled": False}
+        cases = [
+            [],
+            [enabled, {**enabled, "userId": "u3"}],
+            [disabled],
+        ]
+        for rows in cases:
+            with self.subTest(rows=rows):
+                with patch.object(handler, "scan_pages", return_value=rows):
+                    self.assertIsNone(handler.current_profile(event))
+
     def test_index_work_item_materializes_project_keys(self):
         row = handler.index_work_item(
             {

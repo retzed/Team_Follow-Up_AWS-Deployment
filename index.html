@@ -1226,42 +1226,17 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function bootstrap(onProgress){
   const notify=(snapshot,stage,extra={})=>{if(typeof onProgress==='function'){try{onProgress(clone(snapshot),{stage:stage,...extra});}catch(error){console.warn('AWS data loading progress callback failed.',error);}}};
   const snapshot={schema:4,users:[],parents:[],children:[],activity:[]};
-  const mergeUnique=(target,rows,key='id')=>{const map=new Map(target.map(row=>[String(row[key]),row]));for(const row of rows||[]){const id=String(row[key]||'');if(id)map.set(id,row);}return [...map.values()];};
-  const mergeActivityUnique=(target,rows)=>{
-   const map=new Map();
-   const signature=e=>JSON.stringify([String(e.itemId||''),String(e.rootParentId||''),String(e.parentId||''),String(e.action||e.summary||''),String(e.kind||''),String(e.userId||e.actorUserId||'')]);
-   const hash=value=>{let n=2166136261;for(let i=0;i<value.length;i++){n^=value.charCodeAt(i);n=Math.imul(n,16777619);}return (n>>>0).toString(36);};
-   for(const row of [...(target||[]),...(rows||[])]){
-    const id=String(row.id||row.eventId||'');if(!id)continue;
-    let key=id;const prior=map.get(key);
-    if(prior&&signature(prior)!==signature(row)){const base=id+'~'+hash(signature(row));key=base;let suffix=1;while(map.has(key)&&signature(map.get(key))!==signature(row))key=base+'_'+suffix++;}
-    const old=map.get(key);map.set(key,old?{...old,...row,id:key}:{...row,id:key});
-   }
-   return [...map.values()];
-  };
   const profiles=await request('GET','/users');
-  snapshot.users=(profiles.users||profiles.items||[]).map(user=>user.id?user:toAppUser(user));notify(snapshot,'users',{done:true});
+  const userRows=Array.isArray(profiles)?profiles:(profiles?.users||profiles?.items||[]);
+  snapshot.users=userRows.map(user=>user?.id?user:toAppUser(user));
+  notify(snapshot,'users',{done:true});
   await fetchPagedItems('/items?scope=top-level&dateMode=updated&direction=desc',(page,result,total)=>{
-   snapshot.parents=mergeUnique(snapshot.parents,page);
+   snapshot.parents=[...new Map([...snapshot.parents,...page].map(row=>[String(row.id),row])).values()];
    notify(snapshot,'parents-page',{done:result.nextOffset===undefined||result.nextOffset===null,count:total,nextOffset:result.nextOffset??null});
   },100);
   notify(snapshot,'parents-complete',{done:true,count:snapshot.parents.length});
-  let nextRoot=0;const roots=[...snapshot.parents];
-  const loadRoot=async parent=>{
-   const rootId=String(parent.id);
-   const childTask=(async()=>{await fetchPagedItems('/items?rootParentId='+encodeURIComponent(rootId)+'&dateMode=updated&direction=desc',(page,result,total)=>{
-    const descendants=page.filter(item=>String(item.id)!==rootId&&item.type!=='project'&&item.type!=='job');
-    snapshot.children=mergeUnique(snapshot.children,descendants);const done=result.nextOffset===undefined||result.nextOffset===null;
-    notify(snapshot,done?'root-children-complete':'root-children-page',{rootId:rootId,done:done,count:total});
-   },100);})().catch(error=>notify(snapshot,'root-children-error',{rootId:rootId,message:String(error?.message||error)}));
-   const activityTask=(async()=>{const result=await request('GET','/items/'+encodeURIComponent(rootId)+'/activity?scope=all');
-    const rows=(result.events||result.activity||[]).map(event=>event.id?event:toAppEvent(event));
-    snapshot.activity=mergeActivityUnique(snapshot.activity,rows);notify(snapshot,'root-activity-complete',{rootId:rootId,done:true,count:rows.length});
-   })().catch(error=>notify(snapshot,'root-activity-error',{rootId:rootId,message:String(error?.message||error)}));
-   await Promise.all([childTask,activityTask]);
-  };
-  const workers=Array.from({length:Math.min(3,Math.max(1,roots.length))},async()=>{while(nextRoot<roots.length){const parent=roots[nextRoot++];await loadRoot(parent);}});
-  await Promise.all(workers);notify(snapshot,'complete',{done:true,count:snapshot.parents.length});return snapshot;
+  notify(snapshot,'complete',{done:true,count:snapshot.parents.length});
+  return snapshot;
  }
  function sameRecordFields(a,b){
   if(a===b)return true;if(!a||!b)return false;
@@ -1307,6 +1282,15 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
   return request('GET','/items/'+encodeURIComponent(parentId)+'/children?'+params.toString());
  }
+ async function queryRootItems(rootParentId,options={}){
+  const rootId=String(rootParentId||'');if(!rootId)throw new Error('A Project or Job ID is required to load its items.');
+  const dateMode=options.dateMode||'updated';
+  const params=new URLSearchParams({rootParentId:rootId,dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
+  for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
+  const rows=await fetchPagedItems('/items?'+params.toString(),typeof options.onPage==='function'?options.onPage:null,100);
+  const items=rows.filter(item=>String(item.id)!==rootId&&item.type!=='project'&&item.type!=='job');
+  return {items,count:items.length,nextOffset:null};
+ }
  async function queryAssigned(userId,options={}){
   const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
@@ -1331,7 +1315,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   return {...(result||{}),items:all,count:result?.count??all.length,nextOffset:null};
  }
  async function restoreArchive(itemIds){return request('POST','/archive/restore',{itemIds:[...new Set((itemIds||[]).map(String))]});}
- window.TeamFollowUpDataApi=Object.freeze({request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive});
+ window.TeamFollowUpDataApi=Object.freeze({request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryRootItems,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive});
 })();
 </script>
 
@@ -1641,6 +1625,7 @@ function isMobileSidebarViewport(){try{return typeof window.matchMedia==='functi
 let previousMobileSidebarViewport=isMobileSidebarViewport();
 const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:isMobileSidebarViewport(),selectedParentId:'',tab:'overview',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||''),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all'};
 const activityRefreshRequests=new Map();
+const rootChildrenRequests=new Map();
 let activityIndexRevision=0;
 let activityIndexCache={source:null,length:-1,revision:-1,byId:new Map(),byRoot:new Map(),all:[]};
 let hierarchyIndexCache={childrenSource:null,childrenLength:-1,parentsSource:null,parentsLength:-1,revision:-1,byParent:new Map(),byId:new Map()};
@@ -1790,13 +1775,14 @@ async function refreshActivityFor(itemId,scope='all'){
   const incoming=result?.events||result?.activity||[];
   const changed=mergeActivityEventsIntoWorkspace(incoming);
   if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],incoming);lastApiSnapshot.activity=merged.rows;}
+  dataLoadState.activityLoaded.add(key);dataLoadState.rootErrors.delete(`activity:${String(itemId)}:${scope}`);
   if(ui.modal?.kind==='history'&&String(ui.modal.itemId)===String(itemId))ui.modal.historyRefreshError='';
   
   renderAfterActivityRefresh(String(itemId),scope);
  }catch(error){
   console.warn('Could not refresh activity history from the data API.',error);
   const viewed=ui.modal?.kind==='history'&&String(ui.modal.itemId)===String(itemId);
-  if(viewed){ui.modal.historyRefreshError=String(error?.message||tr('loadFailed'));renderModal();}
+  if(viewed){const message=String(error?.message||tr('loadFailed'));dataLoadState.rootErrors.set(`activity:${String(itemId)}:${scope}`,message);ui.modal.historyRefreshError=message;renderModal();}
  }
 }
 async function refreshApplicationHistory(silent=false){
@@ -2011,7 +1997,7 @@ function spinnerMarkup(label=tr('loadingData'),compact=false){return `<div class
 function inlineSpinnerMarkup(){return `<span class="loading-count" role="status" aria-label="${esc(tr('loadingData'))}"><span class="loading-spinner inline" aria-hidden="true"></span></span>`;}
 function loadErrorMarkup(message=''){return `<div class="data-loading-error" role="alert"><span>${esc(message||tr('loadFailed'))}</span><button class="btn btn-small" type="button" data-action="retry-data-load">${esc(tr('retry'))}</button></div>`;}
 function rootChildrenReady(rootId){return dataLoadState.childrenLoaded.has(String(rootId));}
-function rootActivityReady(rootId){return dataLoadState.activityLoaded.has(String(rootId));}
+function rootActivityReady(itemId,scope='all'){return dataLoadState.activityLoaded.has(`${String(itemId)}:${scope}`);}
 function rootLoadingError(rootId,part){return dataLoadState.rootErrors.get(`${part}:${rootId}`)||'';}
 function rootPendingMarkup(rootId,part,label){const message=rootLoadingError(rootId,part);return message?loadErrorMarkup(message):spinnerMarkup(label,true);}
 function countValueMarkup(value,ready,rootId=null,part='children'){if(ready)return String(value);const error=(rootId?rootLoadingError(rootId,part):'')||dataLoadState.initialError||'';if(error)return `<button class="loading-inline-retry" type="button" data-action="retry-data-load" title="${esc(error)}">${icon('refresh-cw',12)} ${esc(tr('retry'))}</button>`;return `<span class="metric-loading-value">${inlineSpinnerMarkup()}</span>`;}
@@ -2036,7 +2022,7 @@ function renderAssignedList(listOverride=null){
 function renderParentSearchList(list){
  const isPending=!dataLoadState.parentsReady&&!dataLoadState.initialError;
  $('#parentCount').innerHTML=`${list.length} ${esc(tr('items'))}${isPending?` ${inlineSpinnerMarkup()}`:''}`;
- const cards=list.map(p=>{const selected=p.id===ui.selectedParentId;const childReady=rootChildrenReady(p.id);const itemCount=getItemSummary(p).all.length;return `<article class="parent-card ${selected?'selected':''}" data-action="select-parent" data-id="${esc(p.id)}" tabindex="0" aria-current="${selected?'true':'false'}"><span class="card-topline"><span class="type-icon">${typeIcon(p.type)}</span><span class="parent-card-copy"><span class="parent-card-title" dir="auto">${esc(p.name)}</span><span class="parent-card-type parent-card-meta"><span>${esc(typeName(p.type))}</span><span class="meta-dot">·</span>${childReady?`<span>${esc(itemCount+' '+tr('items'))}</span>`:(dataLoadState.initialError||dataLoadState.rootErrors.has(`children:${p.id}`))?countValueMarkup(itemCount,false,p.id,'children'):inlineSpinnerMarkup()}</span></span></span><span class="parent-card-bottom">${statusPill(p.status)}</span><button class="mini-updated" data-action="history" data-item-id="${esc(p.id)}" type="button" aria-label="${esc(tr('activityHistory'))}" title="${esc(`${tr('lastUpdatedLabel')}: ${fmtDateTime(p.updatedAt)} · ${person(p.updatedBy).name}`)}">${icon('clock',11)} <span>${esc(tr('lastUpdatedLabel'))}: ${esc(fmtDateTime(p.updatedAt))} · ${esc(person(p.updatedBy).name)}</span></button></article>`;}).join('');
+ const cards=list.map(p=>{const selected=p.id===ui.selectedParentId;const childReady=rootChildrenReady(p.id);const itemCount=getItemSummary(p).all.length;return `<article class="parent-card ${selected?'selected':''}" data-action="select-parent" data-id="${esc(p.id)}" tabindex="0" aria-current="${selected?'true':'false'}"><span class="card-topline"><span class="type-icon">${typeIcon(p.type)}</span><span class="parent-card-copy"><span class="parent-card-title" dir="auto">${esc(p.name)}</span><span class="parent-card-type parent-card-meta"><span>${esc(typeName(p.type))}</span><span class="meta-dot">·</span>${childReady?`<span>${esc(itemCount+' '+tr('items'))}</span>`:(dataLoadState.initialError||dataLoadState.rootErrors.has(`children:${p.id}`))?countValueMarkup(itemCount,false,p.id,'children'):(selected||rootChildrenRequests.has(String(p.id)))?inlineSpinnerMarkup():''}</span></span></span><span class="parent-card-bottom">${statusPill(p.status)}</span><button class="mini-updated" data-action="history" data-item-id="${esc(p.id)}" type="button" aria-label="${esc(tr('activityHistory'))}" title="${esc(`${tr('lastUpdatedLabel')}: ${fmtDateTime(p.updatedAt)} · ${person(p.updatedBy).name}`)}">${icon('clock',11)} <span>${esc(tr('lastUpdatedLabel'))}: ${esc(fmtDateTime(p.updatedAt))} · ${esc(person(p.updatedBy).name)}</span></button></article>`;}).join('');
  const pending=isPending?spinnerMarkup(tr('loadingItems'),true):'';
  const error=dataLoadState.initialError?loadErrorMarkup(dataLoadState.initialError):'';
  $('#parentList').innerHTML=cards+(pending||error||(!cards?`<div class="empty-state">${esc(tr('noFilterResults'))}</div>`:''));
@@ -2226,7 +2212,7 @@ function renderModal(){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='
   const historyScope=item?.type==='followup'?'item':(m.historyScope||'all');
   let events=activitiesFor(m.itemId,historyScope);
   if(m.historyQuery.trim())events=events.filter(e=>historyQueryMatches(e,m.historyQuery,false));
-  const historyRootId=String(rootParent(item)?.id||item?.id||'');const historyReady=rootActivityReady(historyRootId);const historyError=m.historyRefreshError||rootLoadingError(historyRootId,'activity');
+  const historyReady=rootActivityReady(m.itemId,historyScope);const historyError=m.historyRefreshError||dataLoadState.rootErrors.get(`activity:${String(m.itemId)}:${historyScope}`)||'';
   const historyPending=!historyReady&&!historyError&&!dataLoadState.initialError;
   const historyPendingMarkup=historyError?loadErrorMarkup(historyError):(historyReady?'':spinnerMarkup(tr('loadingActivity'),true));
   const scopeSelect=item&&item.type!=='followup'?`<select id="historyScopeFilter" aria-label="${esc(tr('allActivity'))}"><option value="all" ${historyScope==='all'?'selected':''}>${esc(tr('allActivity'))}</option><option value="item" ${historyScope==='item'?'selected':''}>${esc(tr('thisItemOnly'))}</option></select>`:'';
@@ -2245,7 +2231,7 @@ function renderModal(){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='
   if(query)events=events.filter(e=>historyQueryMatches(e,query,true));
   const error=m.historyRefreshError||applicationHistoryError;
   const pending=!applicationHistoryReady&&!error;
-  const tableMarkup=events.length?`<table class="history-table application-history-table"><colgroup><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:28%"><col style="width:28%"><col style="width:auto"></colgroup><thead><tr><th>${esc(tr('time'))}</th><th>${esc(tr('date'))}</th><th>${esc(tr('user'))}</th><th>${esc(tr('parentItem'))}</th><th>${esc(tr('childItem'))}</th><th>${esc(tr('action'))}</th></tr></thead><tbody>${events.map(e=>{const subject=historySubjectData(e);return `<tr><td class="history-time-cell">${esc(fmtTime(e.at))}</td><td class="history-date-cell">${esc(fmtDate(e.at,{year:'numeric',month:'short',day:'numeric'}))}</td><td>${historyUserMarkup(e)}</td><td>${historySubjectMarkup(subject.parentName,subject.parentType)}</td><td>${subject.isParent?'<span class="history-dash">—</span>':historySubjectMarkup(subject.childName,subject.childType)}</td><td class="history-action-cell"><div class="history-action">${esc(historyActionLabel(e))}</div></td></tr>`;}).join('')}</tbody></table>`:error?loadErrorMarkup(error):pending?spinnerMarkup(tr('loadingActivity')):`<div class="history-empty">${esc(tr('noActivity'))}</div>`;
+  const tableMarkup=error?loadErrorMarkup(error):pending?spinnerMarkup(tr('loadingActivity'),true):events.length?`<table class="history-table application-history-table"><colgroup><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:28%"><col style="width:28%"><col style="width:auto"></colgroup><thead><tr><th>${esc(tr('time'))}</th><th>${esc(tr('date'))}</th><th>${esc(tr('user'))}</th><th>${esc(tr('parentItem'))}</th><th>${esc(tr('childItem'))}</th><th>${esc(tr('action'))}</th></tr></thead><tbody>${events.map(e=>{const subject=historySubjectData(e);return `<tr><td class="history-time-cell">${esc(fmtTime(e.at))}</td><td class="history-date-cell">${esc(fmtDate(e.at,{year:'numeric',month:'short',day:'numeric'}))}</td><td>${historyUserMarkup(e)}</td><td>${historySubjectMarkup(subject.parentName,subject.parentType)}</td><td>${subject.isParent?'<span class="history-dash">—</span>':historySubjectMarkup(subject.childName,subject.childType)}</td><td class="history-action-cell"><div class="history-action">${esc(historyActionLabel(e))}</div></td></tr>`;}).join('')}</tbody></table>`:error?loadErrorMarkup(error):pending?spinnerMarkup(tr('loadingActivity')):`<div class="history-empty">${esc(tr('noActivity'))}</div>`;
   const cardsMarkup=events.length?events.map(e=>{const subject=historySubjectData(e);return `<article class="history-event-card"><div class="history-event-head"><span class="history-event-datetime"><span><b>${esc(tr('time'))}</b> ${esc(fmtTime(e.at))}</span><span><b>${esc(tr('date'))}</b> ${esc(fmtDate(e.at,{year:'numeric',month:'short',day:'numeric'}))}</span></span>${historyUserMarkup(e)}</div><div class="history-event-action"><b>${esc(tr('parentItem'))}</b> ${historySubjectMarkup(subject.parentName,subject.parentType)}</div><div class="history-event-action"><b>${esc(tr('childItem'))}</b> ${subject.isParent?'<span class="history-dash">—</span>':historySubjectMarkup(subject.childName,subject.childType)}</div><div class="history-event-subject"><b>${esc(tr('action'))}</b> ${esc(historyActionLabel(e))}</div></article>`;}).join(''):error?loadErrorMarkup(error):pending?spinnerMarkup(tr('loadingActivity')):`<div class="history-empty">${esc(tr('noActivity'))}</div>`;
   const selectedUser=String(m.historyUserFilter||'all');
   const userFilterOptions=`<select id="historyUserFilter" class="application-history-user-filter" aria-label="${esc(tr('user'))}"><option value="all" ${selectedUser==='all'?'selected':''}>${esc(tr('allUsers'))}</option>${data.users.map(raw=>{const u=person(raw.id);return `<option value="${esc(u.id)}" ${selectedUser===String(u.id)?'selected':''}>${esc(u.name)}</option>`;}).join('')}</select>`;
@@ -2381,12 +2367,12 @@ function handleItemSubmit(form){const fd=new FormData(form);const kind=form.data
 function clearParentFilters(){ui.parentQuery='';ui.parentType='all';ui.parentStatus='all';ui.parentDateMode='updated';ui.parentDateFrom='';ui.parentDateTo='';$('#parentQuery').value='';$('#parentDateFrom').value='';$('#parentDateTo').value='';render();toast(tr('filtersCleared'));}
 function clearChildFilters(){ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';renderDetail();}
 function handleAction(target){const actionEl=target.closest('[data-action]');if(!actionEl)return;const action=actionEl.dataset.action;const id=actionEl.dataset.id;const parentId=actionEl.dataset.parentId;if(!dataLoadState.initialComplete&&['new-parent','edit-item','new-child','delete-item','delete-from-modal','confirm-delete','archive-restore-selected'].includes(action)){toast(tr('loadingData'),true);return;}switch(action){
- case 'select-parent':{ui.selectedParentId=id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();renderParentList();renderDetail();break;}
+ case 'select-parent':{ui.selectedParentId=id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();renderParentList();renderDetail();void ensureRootChildrenLoaded(id);break;}
  case 'sidebar-mode':{const requestedMode=actionEl.dataset.mode==='assigned'?'assigned':'search';if(isMobileSidebarViewport()){if(ui.sidebarMode===requestedMode&&!ui.sidebarCollapsed){ui.sidebarCollapsed=true;}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}if(ui.sidebarMode==='search'&&!['all','project','job'].includes(ui.parentType))ui.parentType='all';applyTranslations();renderParentList();break;}
- case 'select-assigned':{const item=allItem(id);const root=rootParent(item);if(!item||!root)break;ui.selectedAssignedItemId=item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}renderParentList();renderDetail();if(!['project','job'].includes(item.type)){document.getElementById(`card-${item.id}`)?.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}break;}
+ case 'select-assigned':{const item=allItem(id);const root=rootParent(item);if(!item||!root)break;ui.selectedAssignedItemId=item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}renderParentList();renderDetail();void ensureRootChildrenLoaded(root.id);if(!['project','job'].includes(item.type)){document.getElementById(`card-${item.id}`)?.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}break;}
  case 'open-archive':openArchive();break;
  case 'global-history':openApplicationHistory();break;
- case 'retry-data-load':startWorkspaceHydration();break;
+ case 'retry-data-load':if(ui.modal?.kind==='history')void refreshActivityFor(ui.modal.itemId,allItem(ui.modal.itemId)?.type==='followup'?'item':(ui.modal.historyScope||'all'));else if(ui.modal?.kind==='global-history')void refreshApplicationHistory();else if(!dataLoadState.parentsReady||dataLoadState.initialError)void startWorkspaceHydration();else if(ui.selectedParentId)void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});break;
  case 'archive-toggle-group':toggleArchiveGroup(actionEl.dataset.rootId);break;
  case 'archive-select-parent':toggleArchiveParent(actionEl.dataset.id);break;
  case 'archive-restore-selected':restoreSelectedArchive();break;
@@ -2467,10 +2453,56 @@ function setSignInState(signedIn){
 }
 $('#signOutButton').addEventListener('click',async()=>{try{await window.TeamFollowUpAuth?.signOut();}catch(e){console.error('Sign-out failed',e);}});
 let workspaceHydrationGeneration=0;
+function mergeRootChildrenRows(existingRows,rootId,incomingRows){
+ const belongsToRoot=item=>{
+  const explicit=String(item?.rootParentId||'');if(explicit)return explicit===String(rootId);
+  const root=rootParent(item);return String(root?.id||'')===String(rootId);
+ };
+ const keep=(existingRows||[]).filter(item=>!belongsToRoot(item));
+ const rows=(incomingRows||[]).filter(item=>String(item.id)!==String(rootId)&&item.type!=='project'&&item.type!=='job');
+ const byId=new Map(keep.map(item=>[String(item.id),item]));
+ for(const item of rows)byId.set(String(item.id),item);
+ return [...byId.values()];
+}
+async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
+ const rootId=String(rootParentId||'');if(!rootId)return;
+ if(dataLoadState.childrenLoaded.has(rootId)&&!force)return;
+ if(rootChildrenRequests.has(rootId))return rootChildrenRequests.get(rootId);
+ const api=window.TeamFollowUpDataApi;if(!api||typeof api.queryRootItems!=='function')return;
+ dataLoadState.rootErrors.delete(`children:${rootId}`);
+ const hydrationRun=workspaceHydrationGeneration;
+ if(String(ui.selectedParentId)===rootId){renderParentList();renderDetail();}
+ let promise;
+ promise=(async()=>{
+  try{
+   await apiPersistQueue.catch(()=>{});
+   const result=await api.queryRootItems(rootId,{dateMode:'updated',direction:'desc'});
+   if(hydrationRun!==workspaceHydrationGeneration)return;
+   const incoming=(result?.items||[]).map(item=>item?.id?item:toAppItem(item));
+   data.children=mergeRootChildrenRows(data.children,rootId,incoming);
+   if(lastApiSnapshot)lastApiSnapshot.children=mergeRootChildrenRows(lastApiSnapshot.children,rootId,incoming);
+   invalidateHierarchyIndex();
+   dataLoadState.childrenLoaded.add(rootId);
+   dataLoadState.rootErrors.delete(`children:${rootId}`);
+   renderParentList();
+   if(String(ui.selectedParentId)===rootId)renderDetail();
+  }catch(error){
+   if(hydrationRun!==workspaceHydrationGeneration)return;
+   dataLoadState.rootErrors.set(`children:${rootId}`,String(error?.message||tr('loadFailed')));
+   renderParentList();
+   if(String(ui.selectedParentId)===rootId)renderDetail();
+  }finally{
+   if(rootChildrenRequests.get(rootId)===promise)rootChildrenRequests.delete(rootId);
+  }
+ })();
+ rootChildrenRequests.set(rootId,promise);
+ return promise;
+}
 async function startWorkspaceHydration(){
- 
  const hydrationRun=++workspaceHydrationGeneration;
- dataLoadState.initialComplete=false;dataLoadState.usersReady=false;dataLoadState.parentsReady=false;dataLoadState.childrenLoaded.clear();dataLoadState.activityLoaded.clear();dataLoadState.rootErrors.clear();dataLoadState.initialError='';
+ dataLoadState.initialComplete=false;dataLoadState.usersReady=false;dataLoadState.parentsReady=false;
+ dataLoadState.childrenLoaded.clear();dataLoadState.activityLoaded.clear();dataLoadState.rootErrors.clear();dataLoadState.initialError='';
+ rootChildrenRequests.clear();
  data={schema:4,users:[],parents:[],children:[],activity:[]};lastApiSnapshot=null;
  render();
  try{
@@ -2480,30 +2512,20 @@ async function startWorkspaceHydration(){
    if(meta.stage==='users')dataLoadState.usersReady=true;
    if(meta.stage==='parents-page')dataLoadState.parentsReady=Boolean(meta.done);
    if(meta.stage==='parents-complete')dataLoadState.parentsReady=true;
-   if(meta.stage==='root-children-complete')dataLoadState.childrenLoaded.add(String(meta.rootId));
-   if(meta.stage==='root-activity-complete')dataLoadState.activityLoaded.add(String(meta.rootId));
-   if(meta.stage==='root-children-error'){dataLoadState.childrenLoaded.add(String(meta.rootId));dataLoadState.rootErrors.set(`children:${meta.rootId}`,meta.message||tr('loadFailed'));}
-   if(meta.stage==='root-activity-error'){dataLoadState.activityLoaded.add(String(meta.rootId));dataLoadState.rootErrors.set(`activity:${meta.rootId}`,meta.message||tr('loadFailed'));}
-   if(meta.stage==='complete'){
-    dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;
-    for(const parent of data.parents){if(!dataLoadState.childrenLoaded.has(String(parent.id))&&!dataLoadState.rootErrors.has(`children:${parent.id}`))dataLoadState.childrenLoaded.add(String(parent.id));if(!dataLoadState.activityLoaded.has(String(parent.id))&&!dataLoadState.rootErrors.has(`activity:${parent.id}`))dataLoadState.activityLoaded.add(String(parent.id));}
-   }
-   if(data.parents.length&&!data.parents.some(p=>p.id===ui.selectedParentId))ui.selectedParentId=data.parents[0].id;
+   if(meta.stage==='complete'){dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;}
+   if(data.parents.length&&!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0].id;
    applyTranslations();renderParentList();renderDetail();
-   if(ui.modal?.kind==='history'){
-    const viewed=allItem(ui.modal.itemId);const rootId=String(rootParent(viewed)?.id||viewed?.id||'');
-    if(meta.rootId&&String(meta.rootId)===rootId || meta.stage==='users' || meta.stage==='parents-complete' || meta.stage==='complete')renderModal();
-   }
   });
   if(hydrationRun!==workspaceHydrationGeneration)return;
-  data=loaded;invalidateHierarchyIndex();lastApiSnapshot=copyWorkspace(data);dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;
-  if(!data.parents.some(p=>p.id===ui.selectedParentId))ui.selectedParentId=data.parents[0]?.id||'';
-  invalidateActivityIndexes();
-  for(const parent of data.parents){if(!dataLoadState.childrenLoaded.has(String(parent.id))&&!dataLoadState.rootErrors.has(`children:${parent.id}`))dataLoadState.childrenLoaded.add(String(parent.id));if(!dataLoadState.activityLoaded.has(String(parent.id))&&!dataLoadState.rootErrors.has(`activity:${parent.id}`))dataLoadState.activityLoaded.add(String(parent.id));}
-  render();void refreshApplicationHistory(true);
+  data=loaded;invalidateHierarchyIndex();lastApiSnapshot=copyWorkspace(data);
+  dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;
+  if(!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0]?.id||'';
+  invalidateActivityIndexes();render();
+  if(ui.selectedParentId)void ensureRootChildrenLoaded(ui.selectedParentId);
  }catch(error){
   if(hydrationRun!==workspaceHydrationGeneration)return;
-  dataLoadState.initialComplete=true;dataLoadState.initialError=String(error?.message||tr('loadFailed'));renderParentList();renderDetail();if(ui.modal)renderModal();
+  dataLoadState.initialComplete=true;dataLoadState.initialError=String(error?.message||tr('loadFailed'));
+  renderParentList();renderDetail();if(ui.modal)renderModal();
  }
 }
 // Start with an empty workspace and populate it exclusively from the AWS API.

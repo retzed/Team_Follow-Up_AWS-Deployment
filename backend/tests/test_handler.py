@@ -216,6 +216,35 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(result["statusCode"], 403)
         self.assertIn("not mapped", json.loads(result["body"])["message"])
 
+    def test_bootstrap_returns_only_top_level_items_and_profiles(self):
+        event = {
+            "rawPath": "/bootstrap",
+            "requestContext": {
+                "http": {"method": "GET"},
+                "authorizer": {"jwt": {"claims": {"sub": "mapped-sub"}}},
+            },
+        }
+        parents = [{"id": "project-1", "type": "project", "name": "Project Alpha"}]
+        profiles = [{"userId": "u1", "displayName": "Marwa", "role": "Team Leader", "enabled": True}]
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler, "query_work_items_all", return_value=parents) as query_items,
+            patch.object(handler, "scan_pages", return_value=profiles) as scan_users,
+            patch.object(handler, "query_events_for_item") as query_activity,
+        ):
+            result = handler.lambda_handler(
+                event, SimpleNamespace(aws_request_id="bootstrap-lazy-load-test")
+            )
+
+        self.assertEqual(result["statusCode"], 200)
+        payload = json.loads(result["body"])
+        self.assertEqual(payload, {"items": parents, "users": [{"id": "u1", "name": "Marwa", "role": "Team Leader"}]})
+        query_items.assert_called_once_with(
+            {"scope": "top-level", "dateMode": "updated", "direction": "desc"}
+        )
+        scan_users.assert_called_once_with(handler.USERS)
+        query_activity.assert_not_called()
+
     def test_unhandled_exception_does_not_leak_exception_text(self):
         event = {
             "rawPath": "/bootstrap",

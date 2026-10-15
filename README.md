@@ -14,7 +14,7 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 
 - **[Console-first deployment guide](docs/DEPLOYMENT.md)** — primary creation/configuration workflow, team mapping, API/Lambda configuration and acceptance tests.
 - **[AWS Console implementation record](docs/IMPLEMENTATION.md)** — dated record of resources reported as actually configured in the current AWS account.
-- **[Architecture reference](docs/ARCHITECTURE.md)** — whole-system architecture, trust boundaries, data model and monitoring; does not assume resources already exist.
+- **[Architecture reference](docs/ARCHITECTURE.md)** — whole-system architecture, trust boundaries, data model and monitoring.
 - **[Complete project documentation](docs/DOCUMENTATION.md)** — system analysis/design, diagrams, schema, UI/UX, API, testing, security and operations.
 - **[DynamoDB schema reference](backend/table-schema.json)** — target physical keys, index names, capacity settings and separate current-account snapshot.
 - **[Console Lambda IAM policy](backend/console-lambda-policy.json)** — least-privilege policy template to adapt for manual Lambda setup.

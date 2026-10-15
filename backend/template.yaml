@@ -284,7 +284,6 @@ Resources:
   TeamFollowUpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
-      Name: !Sub '${ResourceNamePrefix}-Api'
       StageName: '$default'
       DefinitionBody:
         openapi: '3.0.1'

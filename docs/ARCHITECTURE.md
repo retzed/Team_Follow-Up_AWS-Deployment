@@ -1,85 +1,124 @@
-# Architecture and request flow
+# Architecture reference
 
-This document distinguishes AWS resources already created manually from the backend resources that will be deployed by AWS SAM later.
+**Purpose:** reference the complete Team Follow-Up target architecture, its trust boundaries, data model, monitoring and resource-creation approaches. This is a target-state design, not an assertion that every resource has already been created in the AWS account.
 
-## 1. Current AWS state
+**Primary deployment method:** create and configure AWS resources manually in the AWS Management Console. The optional full-stack CloudFormation/SAM template in `backend/template.yaml` is retained as an automation/reference method; it creates resources from scratch and does not expect pre-existing Cognito or DynamoDB resources.
 
-- **Region:** US East (N. Virginia), `us-east-1`.
-- **Cognito:** existing pool `us-east-1_7dYZw2Is6`, app client `7id8c2g27fvbh365atqntqurir`; email sign-in, self-registration disabled, MFA off. The operator confirmed `custom:teamUserId` was added, Read enabled, and Write disabled for `Team_FollowUp` on 15 October 2026; permissions on other app clients remain to be verified.
-- **DynamoDB:** four manually created Standard tables with provisioned 1 RCU / 1 WCU per base table and per GSI. Three Items GSIs plus two Archive GSIs means **9 RCUs and 9 WCUs** configured.
-- **Not yet deployed:** Amplify Hosting, API Gateway, Lambda, CloudWatch log groups/dashboard/alarms, Cognito hosted-login domain and callback URLs, team Cognito accounts, and their Users-table mappings.
-- **Budget:** `TeamFollowUp-Monthly-Cost`, USD $1/month, with actual 50/80/100% and forecast 100% alerts. This is a notification budget, not a spend cap.
+## 1. Complete target architecture
 
-## 2. Target deployment, reusing existing data resources
+All application services are intended to run in **US East (N. Virginia), `us-east-1`**. AWS Budgets is an account-level billing monitor; its notifications are not a spending cap.
 
 ```mermaid
 flowchart LR
-    B[Team member browser] -->|HTTPS| A[Amplify Hosting]
-    B -->|Sign in / JWT| C[Existing Cognito pool and app client]
-    B -->|JWT + API request| G[API Gateway HTTP API\nJWT authorizer + restricted CORS]
-    G --> L[Python 3.12 Lambda\nvalidation + hierarchy rules]
-    L --> I[(Existing DynamoDB Items)]
-    L --> E[(Existing DynamoDB Activity)]
-    L --> U[(Existing DynamoDB Users)]
-    L --> R[(Existing DynamoDB Archive)]
-    L --> M[CloudWatch logs]
-    G --> M
-    M --> O[Dashboard + alarms]
+    Dev["Source repository<br/>GitHub"]
+    Member["Team member browser"]
+    Host["Amplify Hosting<br/>builds and serves dist/"]
+    Auth["Cognito User Pool<br/>public app client<br/>custom:teamUserId"]
+    Api["API Gateway HTTP API<br/>JWT authorizer<br/>HTTPS + exact-origin CORS"]
+    Fn["Python 3.12 Lambda<br/>identity + validation<br/>hierarchy + audit logic"]
+    Items[("DynamoDB Items<br/>projects, jobs, tasks, follow-ups")]
+    Activity[("DynamoDB Activity<br/>append-only event history")]
+    Users[("DynamoDB Users<br/>team profile mappings")]
+    Archive[("DynamoDB Archive<br/>archived snapshots")]
+    Obs["CloudWatch<br/>Lambda/API logs"]
+    Ops["CloudWatch dashboard<br/>error and throttle alarms"]
+    Budget["AWS Budgets<br/>monthly cost alerts"]
+
+    Dev -->|commit / branch build| Host
+    Member -->|HTTPS website| Host
+    Member <-->|SRP sign-in / session tokens| Auth
+    Member -->|Bearer access token + JSON| Api
+    Auth -.->|issuer / client identity| Api
+    Api --> Fn
+    Fn <--> Items
+    Fn <--> Activity
+    Fn <--> Users
+    Fn <--> Archive
+    Api --> Obs
+    Fn --> Obs
+    Obs --> Ops
+    Budget -.->|email notifications only| Ops
 ```
 
-The frontend and backend have separate release steps. API Gateway verifies the JWT against the existing Cognito pool and app-client audience. Lambda then resolves the verified Cognito `sub` to exactly one enabled team profile before reading or changing application data. User-entered creator/editor IDs, timestamps, index keys, and version values are not trusted.
+### Request and trust boundaries
 
-**SAM owns only the API Gateway HTTP API, Lambda, scoped IAM policies, CloudWatch log groups, dashboard, and alarms.** Its parameters point to the existing pool/client and four table names. It does not create, import, replace, or manage the existing Cognito or DynamoDB data resources. Removing the backend stack will not delete those manually created resources.
+1. **Frontend delivery:** GitHub contains the source. Amplify Hosting checks out the selected branch, uses `amplify.yml` with Node.js 24 to run `scripts/build.mjs`, then publishes `dist/`. Public runtime settings are injected at build time; no AWS credentials or private account mappings are included in the browser artifact.
+2. **Authentication:** the frontend signs in directly against Cognito using the SRP flow and keeps the resulting session in the browser auth SDK. The current app does not use Cognito managed login/hosted UI, so a hosted-login domain or OAuth callback URL is not required.
+3. **API edge:** the browser sends an access token as `Authorization: Bearer ...`. API Gateway's JWT authorizer validates the token signature, issuer and app-client audience. CORS permits the exact Amplify branch HTTPS origin, the `Authorization` and `content-type` request headers, and the methods the client uses.
+4. **Application logic:** Lambda resolves the verified token's Cognito `sub` to exactly one enabled `TeamFollowUp-Users` profile by matching `cognitoSub`. It does not trust browser-supplied creator/editor identity, timestamps, index helper attributes, or version numbers.
+5. **Shared persistence:** Lambda performs reads and writes against the four DynamoDB tables. Item changes and audit events use transactions where supported; hierarchy rules are enforced in Lambda because DynamoDB does not implement relational foreign keys.
+6. **Operations:** API access and Lambda logs use CloudWatch. A dashboard summarizes request volume, Lambda invocations/errors/throttles and duration; alarms detect Lambda errors, Lambda throttles and API Gateway 5xx responses. AWS Budgets sends actual and forecast cost warning emails independently of application traffic.
 
-## 3. Existing DynamoDB model and access patterns
+## 2. Component and ownership reference
 
-| Table | Primary key | Existing indexes / Lambda access |
-|---|---|---|
-| `TeamFollowUp-Items` | Partition `itemId` (String) | `ParentIdIndex`: `parentId` / `createdAt`; `AssignedToIndex`: `assignedTo` / `updatedAt`; `WorkspaceIndex`: `workspaceKey` / `createdAt` |
-| `TeamFollowUp-Activity` | Partition `itemId` (String), sort `activityKey` (String) | No GSIs. Item history uses Query on `itemId`; application-wide history uses Scan. |
-| `TeamFollowUp-Users` | Partition `userId` (String) | No GSIs. Cognito-subject lookup scans this deliberately small six-member table and fails closed on missing, duplicate, or disabled mappings. |
-| `TeamFollowUp-Archive` | Partition `archiveId` (String) | `GSI_ArchiveIndex`: `archivePK` / `archiveSort`; `GSI_ArchiveRoot`: `archiveRootPK` / `archiveRootSort`. Both use All projection. |
+| Component | Purpose and target configuration | Console-first creation | Optional template resource |
+|---|---|---|---|
+| GitHub repository | Source control and reviewed changes; target branch is configurable, default `main`. | Connect repository to Amplify. | Repository URL and a private GitHub access token are deployment-time parameters to `AWS::Amplify::App`. |
+| Amplify Hosting | Static frontend build and HTTPS distribution. | Create a Hosting app/branch and set public build variables. | `FrontendApp` + `FrontendBranch`; environment variables reference the pool, client and API outputs. |
+| Cognito User Pool | Email-based sign-in, administrator-created users only, MFA off, mutable String custom attribute `teamUserId` (length 1–32). | Create a pool and its schema in Cognito. | `TeamFollowUpUserPool`. |
+| Cognito app client | Public browser client with no secret; supports SRP and refresh; can read but cannot write `custom:teamUserId`. | Create `Team_FollowUp` and set attribute permissions. | `TeamFollowUpAppClient`. |
+| DynamoDB Items | Active Projects, Jobs, Tasks and Follow-ups. Partition key `itemId`; GSIs `ParentIdIndex`, `AssignedToIndex`, `WorkspaceIndex`. | Create table and three indexes. | `ItemsTable`. |
+| DynamoDB Activity | Activity history. Partition key `itemId`, sort key `activityKey`; no GSIs. | Create table with composite key only. | `ActivityTable`. |
+| DynamoDB Users | Team profile and Cognito subject mapping. Partition key `userId`; no GSIs. | Create table; seed profiles after Cognito accounts exist. | `UsersTable`. |
+| DynamoDB Archive | Archived copies/hierarchy metadata. Partition key `archiveId`; GSIs `GSI_ArchiveIndex`, `GSI_ArchiveRoot`. | Create table and two indexes. | `ArchiveTable`. |
+| API Gateway HTTP API | Authenticated JSON endpoints, Cognito JWT authorizer, access logs and CORS. | Create API, Lambda integration, route and authorizer in the console. | `TeamFollowUpApi` with the same JWT/CORS contract. |
+| Lambda | Python 3.12 handler, 256 MB, 20-second timeout, structured JSON logs. | Create execution role/policy, package `backend/src`, upload ZIP and configure four table names. | `ApiFunction` plus tightly scoped IAM policy. |
+| CloudWatch | 30-day API/Lambda access logs, dashboard, Lambda error/throttle alarms, API 5xx alarm. | Create log groups, dashboard and alarms. | Log groups, `TeamFollowUpDashboard` and three alarms. |
+| AWS Budgets | USD $1 monthly cost budget; actual thresholds at 50%, 80%, 100%, plus forecast 100%; email notifications only. | Create budget and enter the notification email. | `MonthlyCostBudget`; recipient is a deployment parameter, not committed. |
 
-All four base tables and all five GSIs are provisioned at 1 RCU / 1 WCU each. Auto scaling, point-in-time recovery, deletion protection, and DynamoDB Streams are disabled.
+The console procedure and the template should create the same logical service set, table/index names and low-capacity data settings. AWS-generated identifiers (Cognito pool ID, app-client ID, API ID and Amplify app ID) will naturally differ between deployments.
 
-### Materialized item attributes
+## 3. DynamoDB physical schema and access patterns
 
-- Project/job records receive `workspaceKey=WORKSPACE` so top-level items use `WorkspaceIndex`.
-- Child records retain `parentId`, which drives `ParentIdIndex`.
-- The API keeps `ownerId` as the frontend/business field and copies it to `assignedTo` for `AssignedToIndex`.
-- Filtered results are sorted by the requested creation/update timestamp after retrieval through the matching current index.
+The four tables use the DynamoDB **Standard** table class, **Provisioned** billing, and **1 RCU / 1 WCU** for every base table and GSI. The target is **9 RCUs and 9 WCUs** across four base tables and five GSIs. Auto scaling, point-in-time recovery, deletion protection and Streams are off in the low-cost baseline. DynamoDB encryption at rest uses the AWS-owned default key.
 
-### Activity key and performance trade-off
+| Table | Key schema | Indexes | Runtime access |
+|---|---|---|---|
+| `TeamFollowUp-Items` | Partition `itemId` (String) | `ParentIdIndex`: `parentId` / `createdAt`; `AssignedToIndex`: `assignedTo` / `updatedAt`; `WorkspaceIndex`: `workspaceKey` / `createdAt`. All projection. | Workspace, children and assigned-to queries. `ownerId` is the UI/business field; the API maintains `assignedTo` for the index. Top-level Project/Job rows use `workspaceKey=WORKSPACE`. |
+| `TeamFollowUp-Activity` | Partition `itemId` (String), sort `activityKey` (String) | None | `activityKey = ISO timestamp + "#" + eventId`. Single-item history uses Query; all-activity uses Scan. `eventId` is not the table key. |
+| `TeamFollowUp-Users` | Partition `userId` (String) | None | Lambda scans this small team table to resolve the JWT `sub` against `cognitoSub`. Missing, duplicate or disabled mappings are denied. |
+| `TeamFollowUp-Archive` | Partition `archiveId` (String) | `GSI_ArchiveIndex`: `archivePK` / `archiveSort`; `GSI_ArchiveRoot`: `archiveRootPK` / `archiveRootSort`. All projection. | Archived hierarchy listings and restore. |
 
-Activity is **not** an eventId-keyed table. Every event is stored under `itemId` and `activityKey = ISO timestamp + "#" + eventId`; `eventId` remains a regular attribute for the UI. Per-item timelines are queried directly by partition key. Since the existing Activity table has no GSIs, application-wide activity history deliberately scans the table. This avoids adding index capacity now, but scan time and read-capacity consumption grow with the history table. Do not run the legacy ActivityEvents index-migration script against `TeamFollowUp-Activity`.
+The schema reference is [`backend/table-schema.json`](../backend/table-schema.json), and the handler's current index names are checked by `scripts/test-infrastructure.py`. Activity/Users scans are intentional in the current small-team design; their cost and latency grow with table size. Do not run the legacy `migrate_activity_application_index.py` script against this table contract.
 
-## 4. Transaction, archive, and audit behavior
+### Transaction, archive and audit rules
 
-- **Create/update:** item writes and their audit-event writes share a DynamoDB transaction. Updates use a version condition to detect stale edits.
-- **Delete/archive:** the selected item and descendants are copied to Archive and then removed from Items in bounded transactions. Parent/root snapshots are preserved, and a summary activity event records the archive operation. If a later transaction fails, the handler attempts compensating rollback and reports if reconciliation may be needed.
-- **Restore:** selected archived rows are checked for valid parent/child types before being returned to Items. Restore summaries are committed with the last selected item for a hierarchy where possible. A conflict after earlier chunks can result in a partial restore; refresh Archive and inspect the returned restored IDs before retrying.
-- **Activity history:** events are append-only through the API. Item history is read by item partition; global activity is read by a full-table scan on the existing Activity table.
+- Item creation/update writes item data and its activity event together in a DynamoDB transaction. Update versions reject stale writes.
+- Archiving copies selected items and descendants to Archive and removes them from Items in bounded transactional batches; the handler attempts compensating recovery on failure.
+- Restore validates parent/child type rules before reinserting records. A restore may partially succeed if a later chunk conflicts; inspect returned IDs and refresh Archive before retrying.
+- Activity events are maintained by the application API. The Lambda's IAM policy allows table-scoped reads, transaction-scoped writes to Items/Activity/Archive, and Activity-only batch writes for partial-restore summary events.
 
-## 5. Security boundaries
+## 4. Identity and security model
 
-- API Gateway uses the existing Cognito pool issuer and app-client ID as JWT audience. CORS permits only the exact HTTPS `AllowedOrigin` supplied at deployment.
-- Lambda treats Cognito `sub` as the authenticated identity and scans `TeamFollowUp-Users` for the corresponding `cognitoSub`. It denies unknown, duplicate, or disabled mappings.
-- Lambda read permissions are scoped to the four configured tables and their indexes. Transactional writes are scoped to Items, Activity, and Archive. Direct batch-write permission exists only for partial-restore activity summaries on Activity.
-- The `custom:teamUserId` attribute was added according to operator confirmation, and the operator confirmed Read is enabled and Write is disabled for `Team_FollowUp`. Before creating/inviting team accounts, verify that **every other** app client in the pool is also denied Write permission. The frontend uses this claim to resolve the signed-in team identity; only trusted administration should set or correct its value.
-- The frontend receives only public Cognito IDs, API URL, and custom-attribute name. Never put AWS access keys, client secrets, or private Cognito subject values in frontend files or Amplify environment variables.
+- **Public client boundary:** the browser app client has no client secret. It may read `custom:teamUserId`, but its writable attribute list excludes that attribute. Trusted administration assigns each account a unique team ID.
+- **Two-way identity mapping:** Cognito `custom:teamUserId` identifies the frontend team profile; the ID token/access-token `sub` is mapped to the same enabled Users-table row via `cognitoSub`. Both mappings must agree.
+- **No privilege by role label:** `role` values (Team Leader/AWS Engineer) are descriptive only. Authorization comes from a valid Cognito session and enabled team profile, not from role labels.
+- **Minimum Lambda access:** Lambda does not receive Cognito administration privileges. The execution policy is scoped to application tables and the indexes it uses; it does not grant broad DynamoDB CRUD actions.
+- **CORS is not authentication:** exact-origin CORS is configured for the branch HTTPS URL, but all data routes must still use the JWT authorizer. Never remove the authorization boundary as a CORS workaround.
+- **No secrets in source:** Cognito IDs, the API URL, and the team-attribute name are public build-time settings. Do not put AWS access keys, GitHub tokens, passwords, a client secret, real `cognitoSub` values, or billing email addresses in committed files.
 
-## 6. Monitoring, recovery, and cost
+## 5. Monitoring, cost and recovery
 
-SAM adds CloudWatch log groups, a dashboard, and alarms for Lambda errors/throttles and API Gateway 5xx responses. Alarm notification actions are not configured by default. The budget created in AWS notifies by email but does not stop spend.
+- API Gateway and Lambda log groups retain logs for 30 days in the target configuration.
+- Dashboard metrics include Lambda invocations/errors/throttles/duration and API count/5xx responses. The three alarms report on Lambda errors, Lambda throttles and API Gateway 5xx responses. Email/SNS alarm actions are not configured by default.
+- The $1 monthly AWS Budget sends warning emails; it does **not** stop resources or cap spend. Costs can exceed the budget between alert evaluations.
+- Point-in-time recovery and Streams are off on the baseline DynamoDB tables. Export/back up important data before schema changes or destructive operations.
+- The optional automation template sets `DeletionPolicy: Retain` and `UpdateReplacePolicy: Retain` on DynamoDB tables. Deleting its CloudFormation stack retains the table data; a fresh stack cannot recreate the same named tables until the retained tables have been deliberately handled. Review all changesets before deployment or deletion.
 
-All existing DynamoDB tables have point-in-time recovery disabled. Activity and Users scans are reasonable for the current small lab, but their latency/cost grows with table size. Retention settings on newly created backend resources do not constitute backups of pre-existing tables. Check account credits and current regional pricing before changing capacity or adding GSIs, backups, hosted services, or monitoring.
+Provisioned-capacity values are deliberately small for the current learning workload; they may throttle even a modest spike. Always confirm current account credits, free-plan status and regional prices before increasing capacity or enabling optional features.
 
-## 7. Deployment boundary
+## 6. Deployment and source-of-truth rules
 
-1. Verify the existing Cognito pool/client settings and the `custom:teamUserId` Read/Write permissions, then create the unique team account mappings and confirm all required index statuses.
-2. Create Amplify Hosting and record the final HTTPS origin.
-3. Build and deploy the SAM backend with the existing pool/client/table-name parameters and that `AllowedOrigin`. Review the change set to confirm no Cognito pool or DynamoDB table is being created.
-4. Set Amplify environment variables using the existing Cognito IDs and the deployed API output.
-5. Test sign-in, cross-session shared data, item hierarchy validation, activity history, archive/restore, unauthorized requests, and CloudWatch alarms.
+### Primary: AWS Management Console
 
-The schema reference in `backend/table-schema.json` and the contract tests intentionally encode the current table keys and index names so later code changes cannot silently drift back to the abandoned table design. See [IMPLEMENTATION.md](IMPLEMENTATION.md) for the exact bootstrap record and [DEPLOYMENT.md](DEPLOYMENT.md) for commands.
+The intended project workflow is to create/configure AWS resources manually in the console, record generated identifiers privately, and deploy/update each service with the matching console workflow. [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) is the primary runbook; [`docs/IMPLEMENTATION.md`](IMPLEMENTATION.md) is a dated record of the AWS resources reported as already created in the current account. If the live account state changes, update that implementation record separately from this target architecture.
+
+### Optional automation reference: CloudFormation/SAM
+
+[`backend/template.yaml`](../backend/template.yaml) is a **full-stack, from-scratch template**. It creates a Cognito pool and public client, four DynamoDB tables/indexes, API Gateway, Lambda/IAM, CloudWatch logs/dashboard/alarms, an Amplify Hosting app/branch and the $1 monthly Budget. It does not accept IDs or names of pre-existing data resources. At the default prefix, it uses the same DynamoDB names and schema as the console runbook.
+
+This template is **not** the planned day-to-day deployment method. Run `sam validate` and `sam build` for optional validation/build checks; do not run `sam deploy` as part of the console-first workflow. To exercise the automation alternative, use a fresh environment or deliberately choose a different resource prefix. Do not deploy it on top of the current console-created pool/tables/budget: CloudFormation does not automatically adopt them, and duplicate physical names will fail. The template needs deployment-time GitHub repository access and a budget-alert email; neither value belongs in Git. The template creates the exact branch HTTPS origin for CORS from Amplify's generated domain and injects the generated API URL into the branch configuration.
+
+## 7. Current-account checkpoint
+
+This architecture deliberately describes the complete target regardless of which resources currently exist. The dated [implementation record](IMPLEMENTATION.md) states that the user's `us-east-1` account has already had a Cognito pool/client, the four DynamoDB tables and the $1 monthly budget created manually; Amplify Hosting, API Gateway/Lambda and CloudWatch observability were still pending in that record. Those facts describe the current account snapshot, not requirements that other environments or the full-stack template may assume.

@@ -121,7 +121,7 @@ assert.match(template, /ITEMS_TABLE:\s*!Ref ItemsTable/, 'Lambda must receive th
 assert.match(template, /ACTIVITY_TABLE:\s*!Ref ActivityTable/, 'Lambda must receive the Activity table created by the template');
 assert.match(template, /USERS_TABLE:\s*!Ref UsersTable/, 'Lambda must receive the Users table created by the template');
 assert.match(template, /ARCHIVE_TABLE:\s*!Ref ArchiveTable/, 'Lambda must receive the Archive table created by the template');
-assert.match(template, /ResourceNamePrefix:\s*\n\s+Type: String\s*\n\s+Default: TeamFollowUp/, 'Template must default to the console workflow's physical resource naming contract');
+assert.match(template, /ResourceNamePrefix:\s*\n\s+Type: String\s*\n\s+Default: TeamFollowUp/, 'Template must default to the console physical resource naming contract');
 assert.doesNotMatch(template, /ExistingCognitoUserPoolId|ExistingCognitoAppClientId|ExistingItemsTableName|ExistingActivityTableName|ExistingUsersTableName|ExistingArchiveTableName|AllowedOrigin:/, 'Full-stack template must not depend on pre-created resources or a pre-known website origin');
 assert.match(template, /Name: custom:teamUserId|Name: teamUserId/, 'Template must create the custom team identity schema attribute');
 const clientBlock = template.match(/  TeamFollowUpAppClient:[\s\S]*?\n  ItemsTable:/)?.[0] || '';

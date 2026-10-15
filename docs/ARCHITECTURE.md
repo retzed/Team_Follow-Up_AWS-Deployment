@@ -6,7 +6,7 @@
 
 ## 1. Complete target architecture
 
-All application services are intended to run in **US East (N. Virginia), `us-east-1`**. AWS Budgets is an account-level billing monitor; its notifications are not a spending cap.
+All regional application services are intended to run in **US East (N. Virginia), `us-east-1`**. AWS Budgets is an account-level billing monitor and is drawn separately in the diagram; its notifications are not a spending cap.
 
 ```mermaid
 flowchart LR
@@ -22,7 +22,7 @@ flowchart LR
     Archive[("DynamoDB Archive<br/>archived snapshots")]
     Obs["CloudWatch<br/>Lambda/API logs"]
     Ops["CloudWatch dashboard<br/>error and throttle alarms"]
-    Budget["AWS Budgets<br/>monthly cost alerts"]
+    Budget["AWS Budgets<br/>account-level monthly cost alerts"]
 
     Dev -->|commit / branch build| Host
     Member -->|HTTPS website| Host

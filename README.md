@@ -126,7 +126,9 @@ sam build --template-file backend/template.yaml
 
 **These commands validate/build artifacts only; they do not create AWS resources.** GitHub Actions follows the same principle and never deploys to an AWS account. To use the optional full-stack template as an automation method, follow [the automated deployment runbook](docs/AUTOMATED_DEPLOYMENT.md), supply GitHub-token and budget-email parameters privately, and use a clean environment or a distinct resource prefix. Never save those sensitive parameter values in `samconfig.toml` or commit credentials.
 
-## Amplify public environment variables
+## Configuration
+
+### Amplify public environment variables
 
 The console-first Amplify branch needs these values before a successful frontend build:
 
@@ -136,3 +138,88 @@ The console-first Amplify branch needs these values before a successful frontend
 - `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE=custom:teamUserId` (the default)
 
 They are public browser configuration values, not secrets. Do not add AWS credentials, GitHub access tokens, Cognito client secrets, real Cognito `sub` values, or billing-recipient email addresses to source files or Amplify environment variables. A passing CI run is evidence of code/build-contract validation only, not proof of a live AWS deployment.
+
+
+### Configuration rules
+
+1. Deploy/configure the Cognito User Pool and public app client, API Gateway HTTP API with its Cognito JWT authorizer, Lambda function, DynamoDB tables, and API CORS policy using the [console deployment runbook](docs/DEPLOYMENT.md). The application cannot perform real sign-in or read/write shared data until those resources are deployed and correctly connected.
+2. In **Amplify Console → App settings → Environment variables**, configure the four variables listed above for the branch that builds the app. Set TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE to exactly custom:teamUserId.
+3. Use the actual User Pool ID, public app-client ID, and **HTTPS API Gateway base URL at its root**. TEAM_FOLLOW_UP_API_BASE_URL must not include a path, stage prefix, query string, or fragment; the template uses the $default HTTP API stage.
+4. Configure API Gateway CORS to allow the exact Amplify branch origin. For local testing at http://localhost:8000, add that exact origin to the API CORS allow-list as well, then redeploy/save the API settings.
+5. Create the administrator-managed Cognito team accounts, assign their unique custom:teamUserId values, and seed the matching Users-table profiles using the trusted script described in the deployment runbook.
+
+The Cognito IDs and API URL are public browser configuration, not credentials. Never put AWS access keys, secret access keys, GitHub tokens, a Cognito app-client secret, real cognitoSub values, or the budget notification email into frontend settings or source control. The build script validates the values and embeds them into dist/index.html, so a successful build alone does not prove the live services are configured correctly.
+
+## Run the AWS-backed frontend locally
+
+This starts the **frontend only** and requires a correctly deployed backend plus a valid Cognito team account. From the repository root, first set the environment variables from the configuration section above.
+
+**Windows PowerShell**
+```powershell
+$env:TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID = "<actual-pool-id>"
+$env:TEAM_FOLLOW_UP_COGNITO_CLIENT_ID = "<actual-public-client-id>"
+$env:TEAM_FOLLOW_UP_API_BASE_URL = "https://<actual-api-id>.execute-api.us-east-1.amazonaws.com"
+$env:TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE = "custom:teamUserId"
+npm run build
+python -m http.server 8000 --directory dist
+```
+
+**macOS / Linux**
+```bash
+export TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID="<actual-pool-id>"
+export TEAM_FOLLOW_UP_COGNITO_CLIENT_ID="<actual-public-client-id>"
+export TEAM_FOLLOW_UP_API_BASE_URL="https://<actual-api-id>.execute-api.us-east-1.amazonaws.com"
+export TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE="custom:teamUserId"
+npm run build
+python -m http.server 8000 --directory dist
+```
+
+Open [http://localhost:8000](http://localhost:8000). Keep the terminal running while testing. The frontend signs in directly with Cognito and sends API requests with a Cognito access token. Authentication, CORS, API Gateway, Lambda, team-user mappings, and DynamoDB must be configured first; starting the static server does not start the backend.
+
+## API documentation
+
+The AWS-backed application uses a JSON HTTP API. The frontend sends authenticated requests to the configured TEAM_FOLLOW_UP_API_BASE_URL; API Gateway validates the Cognito JWT, and Lambda resolves the verified Cognito sub to one enabled team profile. All routes below require a valid mapped team identity. Send Accept: application/json; JSON request bodies use Content-Type: application/json.
+
+### Endpoints
+
+| Method | Route | Purpose and key parameters |
+|---|---|---|
+| GET | /bootstrap | Returns the initial workspace payload: items, activity events, and enabled team profiles. |
+| GET | /users | Lists enabled team profiles for assignee selectors. |
+| GET | /items | Lists work items. Query parameters include scope=top-level, parentId, rootParentId, assigneeUserId, type, status, priority, q, dateMode, from, to, direction, limit, and offset. |
+| GET | /items/assigned-to-me | Lists items assigned to the authenticated mapped team member. Accepts the normal item filters and paging options. |
+| GET | /items/{itemId}/children | Lists direct children of an item; accepts type/status/priority/search/date/order and paging filters. |
+| GET | /items/{itemId}/activity | Reads activity for one item. scope=all includes descendants for a Project/Job and a Task plus its direct Follow-ups. Optional q searches the returned activity. |
+| GET | /activity | Reads broader activity. Provide scope=application (or global), rootParentId, itemId, or parentId; optional q searches events. |
+| GET | /archive | Lists archived snapshots. Optional filters: type, rootParentId, q, limit, and offset. |
+| POST | /items | Creates an item. Supply name, type, and the applicable fields; Tasks and Follow-ups require parentId. |
+| PATCH | /items/{itemId} | Updates an existing item's editable fields. The server retains trusted creator/identity/timestamp/index values, validates hierarchy and assignment, and returns 409 if a concurrent update wins. |
+| DELETE | /items/{itemId} | Archives the requested item and its descendant subtree where applicable, and records the delete activity event. |
+| POST | /archive/restore | Restores selected archived records. JSON body: {"itemIds":["archive-item-id"]}. Required parent records must be active or included in a valid restore selection. |
+
+Item query filters use the stored values, such as type=project, status=in-progress, priority=high, dateMode=created or updated, direction=asc or desc, ISO date strings (from=YYYY-MM-DD / to=YYYY-MM-DD), and a bounded page limit with offset. List responses include items, count, and nextOffset. Activity responses include events and count. Public responses omit DynamoDB-only index attributes.
+
+Activity is append-oriented: POST /activity is rejected because events are written atomically with item mutations; PATCH and DELETE on /activity/{eventId} return 405 Method Not Allowed. Do not send requests with AWS credentials from the browser; Cognito access tokens, not AWS IAM keys, authorize application calls.
+
+### Common response codes
+
+- 200 OK — successful query or update/restore operation.
+- 201 Created — item created.
+- 400 Bad Request — invalid JSON, unsupported fields/values, hierarchy violation, or invalid restore selection.
+- 401 Unauthorized — no valid authenticated identity was supplied.
+- 403 Forbidden — the Cognito subject is not mapped to exactly one enabled team profile.
+- 404 Not Found — item/route does not exist.
+- 405 Method Not Allowed — attempt to write/delete standalone activity events.
+- 409 Conflict — stale concurrent update or an archive/restore conflict; refresh the workspace before retrying.
+- 500 Internal Server Error — backend/database failure. Internal exception details are intentionally not returned to the browser.
+
+The authoritative route implementation is [backend/src/handler.py](backend/src/handler.py). This repository does not currently publish a separate OpenAPI/Swagger document; keep this endpoint summary synchronized with the handler and its unit tests.
+
+## Executable artifact and deployed application
+
+This is a browser-hosted web application, so a native .exe, .jar, or .apk installer is not applicable. The build generates dist/index.html; AWS Amplify Hosting publishes that static artifact after running amplify.yml. The artifact requires the configured Cognito and HTTPS API settings to work against a live backend.
+
+- **Console-first deployment procedure:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+- **Optional automated deployment procedure:** [docs/AUTOMATED_DEPLOYMENT.md](docs/AUTOMATED_DEPLOYMENT.md).
+- **Current public demonstration:** [https://retzed.github.io/Team_Follow-Up/](https://retzed.github.io/Team_Follow-Up/) — this is the local-storage demo and is **not** the AWS-backed shared-data application.
+- **AWS-backed live URL:** use the branch URL displayed by Amplify Console after that environment has been deployed. When using the optional SAM template, the FrontendUrl CloudFormation stack output provides the URL. GitHub Actions validates and builds the code but does not deploy AWS resources, so it cannot supply a live AWS URL.

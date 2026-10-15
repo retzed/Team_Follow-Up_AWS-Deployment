@@ -355,7 +355,7 @@ erDiagram
         string actorUserId
         string action
         string kind
-        string timestamp
+        string event_time
     }
     ARCHIVE_SNAPSHOT {
         string archiveId PK

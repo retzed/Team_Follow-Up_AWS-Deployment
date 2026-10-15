@@ -40,7 +40,7 @@ def commit_item_with_events(item, events, condition=None, expected_version=None)
         writes[0]['Put']['ExpressionAttributeNames']={'#version':'version'}
         writes[0]['Put']['ExpressionAttributeValues']={':expected':SERIALIZER.serialize(expected_version)}
     for event in events:
-        writes.append({'Put': {'TableName': ACTIVITY.name, 'Item': av_map(event), 'ConditionExpression': 'attribute_not_exists(#eventId)', 'ExpressionAttributeNames': {'#eventId': 'eventId'}}})
+        writes.append({'Put': {'TableName': ACTIVITY.name, 'Item': av_map(event), 'ConditionExpression': 'attribute_not_exists(#activityKey)', 'ExpressionAttributeNames': {'#activityKey': 'activityKey'}}})
     ddb.meta.client.transact_write_items(TransactItems=writes)
 
 ddb = boto3.resource('dynamodb')
@@ -112,16 +112,25 @@ def get_identity(event):
     except Exception:
         return {}
 def current_profile(event):
-    sub=get_identity(event).get('sub')
+    """Resolve the authenticated Cognito subject against the small existing Users table.
+
+    The manually created TeamFollowUp-Users table has no Cognito-subject GSI.
+    Its profile count is deliberately small (six team members), so scan it and
+    fail closed if a subject is missing, duplicated, or disabled.
+    """
+    sub=str(get_identity(event).get('sub') or '').strip()
     if not sub:
         return None
-    rows=all_pages(USERS, IndexName='GSI_CognitoSub', KeyConditionExpression=Key('cognitoSub').eq(sub), Limit=1)
-    return rows[0] if rows and rows[0].get('enabled',True) else None
+    matches=[row for row in scan_pages(USERS) if str(row.get('cognitoSub') or '').strip()==sub]
+    if len(matches)!=1 or not matches[0].get('enabled',True):
+        return None
+    return matches[0]
 
 # ---------------------------------------------------------------------------
 # Work-item and audit-event data contracts
 # ---------------------------------------------------------------------------
 def index_work_item(x):
+    """Materialize only the secondary-index attributes present on TeamFollowUp-Items."""
     x=dict(x)
     item_id=str(x.get('itemId') or x.get('id') or '')
     if not item_id:
@@ -131,47 +140,54 @@ def index_work_item(x):
     x['createdByUserId']=x.get('createdByUserId') or x.get('createdBy') or ''
     x['updatedByUserId']=x.get('updatedByUserId') or x.get('updatedBy') or ''
     x.pop('activityEvents',None)
+
+    # The existing WorkspaceIndex lists top-level Projects/Jobs by createdAt.
+    # ParentIdIndex lists children by parentId/createdAt. AssignedToIndex uses
+    # assignedTo/updatedAt; ownerId remains the public business-facing field.
     top=x.get('type') in ('project','job')
-    root=item_id if top else (x.get('rootParentId') or x.get('parentId') or '')
-    x['listPK']='TOP_LEVEL' if top else 'PARENT#'+str(x.get('parentId') or '')
-    x['updatedSort']=str(x.get('updatedAt') or now())+'#'+item_id
-    x['createdSort']=str(x.get('createdAt') or now())+'#'+item_id
-    x['rootPK']='ROOT#'+str(root)
-    x['rootUpdatedSort']=str(x.get('updatedAt') or now())+'#'+item_id
-    if x.get('ownerId'):
-        x['assigneePK']='USER#'+str(x['ownerId'])
-        x['assigneeUpdatedSort']=str(x.get('updatedAt') or now())+'#'+item_id
-        x['assigneeCreatedSort']=str(x.get('createdAt') or now())+'#'+item_id
+    if top:
+        x.pop('parentId',None)
+        x['rootParentId']=item_id
+        x['workspaceKey']='WORKSPACE'
     else:
-        for k in ('assigneePK','assigneeUpdatedSort','assigneeCreatedSort'):
-            x.pop(k,None)
+        x.pop('workspaceKey',None)
+
+    owner_id=x.get('ownerId')
+    if owner_id:
+        x['assignedTo']=str(owner_id)
+    else:
+        x.pop('assignedTo',None)
+
+    # Drop fields from the previous, un-deployed SAM-only index design.
+    for key in ('listPK','updatedSort','createdSort','rootPK','rootUpdatedSort',
+                'assigneePK','assigneeUpdatedSort','assigneeCreatedSort'):
+        x.pop(key,None)
     return x
 
 
 def activity_item(e):
+    """Return an audit event keyed by the existing Activity table's composite PK."""
     x=dict(e)
-    event_id=str(x.get('eventId') or x.get('id') or uuid.uuid4().hex)
+    event_id=str(x.get('eventId') or x.get('id') or ('evt_'+uuid.uuid4().hex))
+    item_id=str(x.get('itemId') or '')
+    if not item_id:
+        raise ValueError('Activity event itemId is required.')
     x.pop('id',None)
     x['eventId']=event_id
+    x['itemId']=item_id
     x['actorUserId']=x.get('actorUserId') or x.get('userId') or ''
     x['itemNameSnapshot']=x.get('itemNameSnapshot') or x.get('itemName') or ''
     x['itemTypeSnapshot']=x.get('itemTypeSnapshot') or x.get('itemType') or ''
     x.pop('userId',None)
     x.pop('itemName',None)
     x.pop('itemType',None)
-    stamp=str(x.get('at') or now())+'#'+event_id
-    x['itemPK']='ITEM#'+str(x.get('itemId') or '')
-    x['itemSort']=stamp
-    x['applicationPK']='APPLICATION'
-    x['applicationSort']=stamp
-    x['rootPK']='ROOT#'+str(x.get('rootParentId') or '')
-    x['rootSort']=stamp
-    if x.get('parentId'):
-        x['parentPK']='PARENT#'+str(x['parentId'])
-        x['parentSort']=str(x.get('at') or now())+'#'+event_id
-    else:
-        x.pop('parentPK',None)
-        x.pop('parentSort',None)
+    event_at=str(x.get('at') or now())
+    x['at']=event_at
+    # The current table is keyed by itemId + activityKey, not eventId.
+    x['activityKey']=event_at+'#'+event_id
+    for key in ('itemPK','itemSort','applicationPK','applicationSort','rootPK',
+                'rootSort','parentPK','parentSort'):
+        x.pop(key,None)
     return x
 
 
@@ -181,7 +197,7 @@ def public_item(x):
     y.pop('itemId',None)
     y['createdBy']=y.get('createdByUserId') or y.get('createdBy','')
     y['updatedBy']=y.get('updatedByUserId') or y.get('updatedBy','')
-    for k in ('createdByUserId','updatedByUserId','listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK','assigneeUpdatedSort','assigneeCreatedSort','deletedAt'):
+    for k in ('createdByUserId','updatedByUserId','listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK','assigneeUpdatedSort','assigneeCreatedSort','workspaceKey','assignedTo','deletedAt'):
         y.pop(k,None)
     return y
 
@@ -227,7 +243,7 @@ def make_archive_record(item, archived_at, actor_user_id, row_cache=None):
     parent_id=str(raw.get('parentId') or '')
     parent_row=lookup(parent_id) if parent_id else None
     parent_name=(parent_row or {}).get('name') or (parent_row or {}).get('archiveParentName') or raw.get('archiveParentName') or ''
-    for key in ('id','deletedAt','listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK','assigneeUpdatedSort','assigneeCreatedSort'):
+    for key in ('id','deletedAt','listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK','assigneeUpdatedSort','assigneeCreatedSort','workspaceKey','assignedTo'):
         raw.pop(key,None)
     raw['archiveId']=item_id
     raw['archiveRootId']=root_id
@@ -252,11 +268,15 @@ def public_event(x):
     y['userId']=y.get('actorUserId') or y.get('userId')
     y['itemName']=y.get('itemNameSnapshot') or y.get('itemName')
     y['itemType']=y.get('itemTypeSnapshot') or y.get('itemType')
-    for k in ('actorUserId','itemNameSnapshot','itemTypeSnapshot','itemPK','itemSort','applicationPK','applicationSort','rootPK','rootSort','parentPK','parentSort'):
+    for k in ('actorUserId','itemNameSnapshot','itemTypeSnapshot','activityKey',
+              'itemPK','itemSort','applicationPK','applicationSort','rootPK',
+              'rootSort','parentPK','parentSort'):
         y.pop(k,None)
     return y
 
+
 # ---------------------------------------------------------------------------
+# Server-side business validation# ---------------------------------------------------------------------------
 # Server-side business validation and audit construction
 # ---------------------------------------------------------------------------
 def validate_item(event, item, previous=None):
@@ -296,7 +316,7 @@ def validate_item(event, item, previous=None):
     # Clients may edit business fields, but never control server-owned IDs/timestamps,
     # creator/editor identity, index keys, deletion state, or concurrency versions.
     for field in ('listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK',
-                  'assigneeUpdatedSort','assigneeCreatedSort','deletedAt'):
+                  'assigneeUpdatedSort','assigneeCreatedSort','workspaceKey','assignedTo','deletedAt'):
         item.pop(field,None)
     if previous is None:
         item['createdByUserId']=profile['userId']
@@ -321,7 +341,7 @@ def validate_item(event, item, previous=None):
         item.pop('parentId',None)
         item['rootParentId']=item_id
         if kind=='job':
-            children=all_pages(WORK,IndexName='GSI_ListUpdated',KeyConditionExpression=Key('listPK').eq('PARENT#'+item_id))
+            children=query_children_rows(item_id)
             if any(not c.get('deletedAt') and c.get('type')=='task' for c in children):
                 raise ValueError('A project containing tasks cannot be changed to a job.')
     elif kind in ('task','followup'):
@@ -355,7 +375,7 @@ def validate_item(event, item, previous=None):
             raise ValueError('Follow-ups cannot contain child items.')
         item['rootParentId']=parent.get('itemId') if parent_type in ('project','job') else parent.get('rootParentId')
         if previous and previous.get('type')=='task' and kind=='followup':
-            nested=all_pages(WORK,IndexName='GSI_ListUpdated',KeyConditionExpression=Key('listPK').eq('PARENT#'+item_id))
+            nested=query_children_rows(item_id)
             if any(not c.get('deletedAt') for c in nested):
                 raise ValueError('A task containing follow-ups cannot be converted to a follow-up.')
     else:
@@ -438,45 +458,113 @@ def build_audit_events(item, actor, event_kind, supplied_events=None, previous=N
 # ---------------------------------------------------------------------------
 # Indexed data access for the application views
 # ---------------------------------------------------------------------------
+def query_children_rows(parent_id, direction='desc'):
+    """Query children through the existing ParentIdIndex."""
+    rows=all_pages(
+        WORK,
+        IndexName='ParentIdIndex',
+        KeyConditionExpression=Key('parentId').eq(str(parent_id)),
+        ScanIndexForward=(direction=='asc'),
+    )
+    return [row for row in rows if not row.get('deletedAt')]
+
+
+def query_descendant_rows(root_id):
+    """Walk the existing parent index to collect a hierarchy without a root GSI."""
+    root_id=str(root_id)
+    collected=[]
+    visited={root_id}
+    queue=[root_id]
+    while queue:
+        parent_id=queue.pop(0)
+        for row in query_children_rows(parent_id):
+            item_id=str(row.get('itemId') or '')
+            if not item_id or item_id in visited:
+                continue
+            visited.add(item_id)
+            collected.append(row)
+            if row.get('type') in ('project','job','task'):
+                queue.append(item_id)
+    return collected
+
+
+def query_root_rows(root_id, include_root=True):
+    """Return an active hierarchy using GetItem plus ParentIdIndex only."""
+    rows=query_descendant_rows(root_id)
+    if include_root:
+        root=WORK.get_item(Key={'itemId':str(root_id)}).get('Item')
+        if root and not root.get('deletedAt'):
+            rows.append(root)
+    return rows
+
+
+def query_events_for_item(item_id):
+    """Read one item's audit timeline from Activity's actual composite primary key."""
+    return all_pages(
+        ACTIVITY,
+        KeyConditionExpression=Key('itemId').eq(str(item_id)),
+        ScanIndexForward=False,
+    )
+
+
+def query_events_for_items(item_ids):
+    """Merge item-specific timelines and de-duplicate by public event ID."""
+    rows=[]
+    seen_items=set()
+    for item_id in item_ids:
+        item_id=str(item_id)
+        if not item_id or item_id in seen_items:
+            continue
+        seen_items.add(item_id)
+        rows.extend(query_events_for_item(item_id))
+    unique={str(row.get('eventId') or row.get('activityKey')):row for row in rows}
+    return sorted(unique.values(),key=lambda row:(str(row.get('at') or ''),str(row.get('eventId') or '')),reverse=True)
+
+
 def query_work_items(qs):
+    direction='asc' if qs.get('direction')=='asc' else 'desc'
+    date_field='updatedAt' if qs.get('dateMode','updated')=='updated' else 'createdAt'
     if qs.get('scope')=='top-level':
-        index='GSI_ListUpdated' if qs.get('dateMode','updated')=='updated' else 'GSI_ListCreated'
-        sort_key='createdSort' if index=='GSI_ListCreated' else 'updatedSort'
-        rows=all_pages(WORK,IndexName=index,KeyConditionExpression=Key('listPK').eq('TOP_LEVEL'),ScanIndexForward=(qs.get('direction')=='asc'))
+        rows=all_pages(
+            WORK,
+            IndexName='WorkspaceIndex',
+            KeyConditionExpression=Key('workspaceKey').eq('WORKSPACE'),
+        )
     elif qs.get('parentId'):
-        index='GSI_ListUpdated' if qs.get('dateMode','updated')=='updated' else 'GSI_ListCreated'
-        sort_key='createdSort' if index=='GSI_ListCreated' else 'updatedSort'
-        rows=all_pages(WORK,IndexName=index,KeyConditionExpression=Key('listPK').eq('PARENT#'+qs['parentId']),ScanIndexForward=(qs.get('direction')=='asc'))
+        rows=query_children_rows(qs['parentId'],direction)
     elif qs.get('rootParentId'):
-        rows=all_pages(WORK,IndexName='GSI_RootUpdated',KeyConditionExpression=Key('rootPK').eq('ROOT#'+qs['rootParentId']),ScanIndexForward=(qs.get('direction')=='asc'))
+        rows=query_root_rows(qs['rootParentId'],include_root=True)
     elif qs.get('assigneeUserId'):
-        index='GSI_AssignedUpdated' if qs.get('dateMode','updated')=='updated' else 'GSI_AssignedCreated'
-        rows=all_pages(WORK,IndexName=index,KeyConditionExpression=Key('assigneePK').eq('USER#'+qs['assigneeUserId']),ScanIndexForward=(qs.get('direction')=='asc'))
+        rows=all_pages(
+            WORK,
+            IndexName='AssignedToIndex',
+            KeyConditionExpression=Key('assignedTo').eq(str(qs['assigneeUserId'])),
+        )
     else:
-        raise ValueError('Choose a supported indexed work-item query.')
-    rows=[x for x in rows if not x.get('deletedAt')]
-    # Optional filters are intentionally applied only after an indexed query; choose key conditions where practical.
+        raise ValueError('Choose a supported work-item query.')
+
+    rows=[row for row in rows if not row.get('deletedAt')]
     for key in ('type','priority'):
         value=qs.get(key)
         if value and value!='all':
-            rows=[x for x in rows if x.get(key)==value]
+            rows=[row for row in rows if row.get(key)==value]
     status=qs.get('status')
     if status and status!='all':
-        rows=[x for x in rows if (x.get('status')!='completed' if status=='not-completed' else x.get('status')==status)]
-    search=qs.get('q','').lower()
+        rows=[row for row in rows if (row.get('status')!='completed' if status=='not-completed' else row.get('status')==status)]
+    search=str(qs.get('q') or '').lower()
     if search:
-        rows=[x for x in rows if search in str(x.get('name','')).lower() or search in str(x.get('description','')).lower()]
+        rows=[row for row in rows if search in str(row.get('name','')).lower() or search in str(row.get('description','')).lower()]
     start=qs.get('from')
     end=qs.get('to')
-    date_field='updatedAt' if qs.get('dateMode','updated')=='updated' else 'createdAt'
     if start:
-        rows=[x for x in rows if str(x.get(date_field,''))[:10]>=start]
+        rows=[row for row in rows if str(row.get(date_field,''))[:10]>=start]
     if end:
-        rows=[x for x in rows if str(x.get(date_field,''))[:10]<=end]
+        rows=[row for row in rows if str(row.get(date_field,''))[:10]<=end]
+    rows.sort(key=lambda row:(str(row.get(date_field) or ''),str(row.get('itemId') or '')),reverse=(direction!='asc'))
     offset=max(0,int(qs.get('offset',0)))
     limit=max(1,min(250,int(qs.get('limit',100))))
     total=len(rows)
-    return {'items':[public_item(x) for x in rows[offset:offset+limit]],'count':total,'nextOffset':offset+limit if offset+limit<total else None}
+    return {'items':[public_item(row) for row in rows[offset:offset+limit]],'count':total,'nextOffset':offset+limit if offset+limit<total else None}
 
 
 
@@ -545,9 +633,9 @@ def lambda_handler(event, context):
             by_id={x['id']:x for x in items}
             items=list(by_id.values())
             activities=[]
-            for p in parents:
-                ev=all_pages(ACTIVITY,IndexName='GSI_RootTimeline',KeyConditionExpression=Key('rootPK').eq('ROOT#'+p['id']),ScanIndexForward=False)
-                activities.extend(public_event(e) for e in ev)
+            for item in items:
+                activities.extend(public_event(e) for e in query_events_for_item(item['id']))
+            activities=sorted({e['id']:e for e in activities}.values(),key=lambda e:(str(e.get('at') or ''),str(e.get('id') or '')),reverse=True)
             user_rows=scan_pages(USERS)
             users=[{'id':u['userId'],'name':u.get('displayName',''),'role':u.get('role','AWS Engineer')} for u in user_rows if u.get('enabled',True)]
             return response(200,{'items':items,'activity':activities,'users':users})
@@ -694,7 +782,7 @@ def lambda_handler(event, context):
                             chunk_events.append(audit_event)
                             chunk_root_ids.append(root_id)
                 for audit_event in chunk_events:
-                    writes.append({'Put':{'TableName':ACTIVITY.name,'Item':av_map(audit_event),'ConditionExpression':'attribute_not_exists(#eventId)','ExpressionAttributeNames':{'#eventId':'eventId'}}})
+                    writes.append({'Put':{'TableName':ACTIVITY.name,'Item':av_map(audit_event),'ConditionExpression':'attribute_not_exists(#activityKey)','ExpressionAttributeNames':{'#activityKey':'activityKey'}}})
                 try:
                     ddb.meta.client.transact_write_items(TransactItems=writes)
                 except ClientError:
@@ -737,22 +825,22 @@ def lambda_handler(event, context):
         if m and method=='GET':
             item_id=m.group(1)
             item=WORK.get_item(Key={'itemId':item_id}).get('Item')
-            if not item:
+            if not item or item.get('deletedAt'):
                 return response(404,{'message':'Item not found'})
             scope=qs.get('scope','item')
             if scope=='all' and item.get('type') in ('project','job'):
-                rows=all_pages(ACTIVITY,IndexName='GSI_RootTimeline',KeyConditionExpression=Key('rootPK').eq('ROOT#'+item_id),ScanIndexForward=False)
+                rows=query_root_rows(item_id,include_root=True)
+                item_ids=[str(row.get('itemId') or '') for row in rows]
             elif scope=='all' and item.get('type')=='task':
-                rows=all_pages(ACTIVITY,IndexName='GSI_ParentTimeline',KeyConditionExpression=Key('parentPK').eq('PARENT#'+item_id),ScanIndexForward=False)
-                rows+=all_pages(ACTIVITY,IndexName='GSI_ItemTimeline',KeyConditionExpression=Key('itemPK').eq('ITEM#'+item_id),ScanIndexForward=False)
+                rows=[item]+query_children_rows(item_id)
+                item_ids=[str(row.get('itemId') or '') for row in rows]
             else:
-                rows=all_pages(ACTIVITY,IndexName='GSI_ItemTimeline',KeyConditionExpression=Key('itemPK').eq('ITEM#'+item_id),ScanIndexForward=False)
-            search=qs.get('q','').lower()
+                item_ids=[item_id]
+            events=query_events_for_items(item_ids)
+            search=str(qs.get('q') or '').lower()
             if search:
-                rows=[e for e in rows if search in json.dumps(e,ensure_ascii=False).lower()]
-            unique={e['eventId']:e for e in rows}
-            rows=sorted(unique.values(),key=lambda e:e.get('at',''),reverse=True)
-            return response(200,{'events':[public_event(e) for e in rows],'count':len(rows)})
+                events=[row for row in events if search in json.dumps(row,ensure_ascii=False,default=str).lower()]
+            return response(200,{'events':[public_event(row) for row in events],'count':len(events)})
         if path=='/items' and method=='POST':
             item=dict(body)
             events=item.pop('activityEvents',[]) or []
@@ -795,9 +883,9 @@ def lambda_handler(event, context):
             item_type=str(old.get('type') or '')
             root_id=item_id if item_type in ('project','job') else str(old.get('rootParentId') or item_id)
             if item_type in ('project','job'):
-                candidate_rows=all_pages(WORK,IndexName='GSI_RootUpdated',KeyConditionExpression=Key('rootPK').eq('ROOT#'+root_id))
+                candidate_rows=query_descendant_rows(root_id)
             elif item_type=='task':
-                candidate_rows=all_pages(WORK,IndexName='GSI_ListUpdated',KeyConditionExpression=Key('listPK').eq('PARENT#'+item_id))
+                candidate_rows=query_children_rows(item_id)
             else:
                 candidate_rows=[]
             candidates={str(row.get('itemId')):row for row in candidate_rows if not row.get('deletedAt')}
@@ -842,7 +930,7 @@ def lambda_handler(event, context):
                     is_final=start+len(chunk)>=len(collected)
                     if is_final:
                         for event_row in normalized_events:
-                            writes.append({'Put':{'TableName':ACTIVITY.name,'Item':av_map(event_row),'ConditionExpression':'attribute_not_exists(#eventId)','ExpressionAttributeNames':{'#eventId':'eventId'}}})
+                            writes.append({'Put':{'TableName':ACTIVITY.name,'Item':av_map(event_row),'ConditionExpression':'attribute_not_exists(#activityKey)','ExpressionAttributeNames':{'#activityKey':'activityKey'}}})
                     ddb.meta.client.transact_write_items(TransactItems=writes)
                     completed.extend(chunk)
             except ClientError:
@@ -869,22 +957,32 @@ def lambda_handler(event, context):
         if path=='/activity' and method=='POST':
             return response(405,{'message':'Activity events must be written atomically with an item create, update, or delete.'})
         if path=='/activity' and method=='GET':
-            # Application history is a first-class indexed timeline, not an unfiltered table scan.
+            # The existing Activity table has itemId + activityKey as its key and
+            # no GSIs. Item-scoped history uses Query; app-wide history scans the
+            # small table until a dedicated application timeline GSI is approved.
             if qs.get('scope') in ('application','global'):
-                rows=all_pages(ACTIVITY,IndexName='GSI_ApplicationTimeline',KeyConditionExpression=Key('applicationPK').eq('APPLICATION'),ScanIndexForward=False)
+                rows=scan_pages(ACTIVITY)
             elif qs.get('rootParentId'):
-                rows=all_pages(ACTIVITY,IndexName='GSI_RootTimeline',KeyConditionExpression=Key('rootPK').eq('ROOT#'+qs['rootParentId']),ScanIndexForward=False)
+                rows=query_events_for_items([
+                    str(row.get('itemId') or '')
+                    for row in query_root_rows(qs['rootParentId'],include_root=True)
+                ])
             elif qs.get('itemId'):
-                rows=all_pages(ACTIVITY,IndexName='GSI_ItemTimeline',KeyConditionExpression=Key('itemPK').eq('ITEM#'+qs['itemId']),ScanIndexForward=False)
+                rows=query_events_for_item(qs['itemId'])
             elif qs.get('parentId'):
-                rows=all_pages(ACTIVITY,IndexName='GSI_ParentTimeline',KeyConditionExpression=Key('parentPK').eq('PARENT#'+qs['parentId']),ScanIndexForward=False)
+                rows=query_events_for_items([
+                    str(row.get('itemId') or '')
+                    for row in query_children_rows(qs['parentId'])
+                ])
             else:
-                return response(400,{'message':'Provide scope=application, itemId, rootParentId, or parentId for an indexed activity query.'})
+                return response(400,{'message':'Provide scope=application, itemId, rootParentId, or parentId for an activity query.'})
             search=str(qs.get('q') or '').strip().lower()
             if search:
-                rows=[e for e in rows if search in json.dumps(e,ensure_ascii=False,default=str).lower()]
-            rows.sort(key=lambda e:(str(e.get('at') or ''),str(e.get('eventId') or '')),reverse=True)
-            return response(200,{'events':[public_event(e) for e in rows],'count':len(rows)})
+                rows=[row for row in rows if search in json.dumps(row,ensure_ascii=False,default=str).lower()]
+            rows.sort(key=lambda row:(str(row.get('at') or ''),str(row.get('eventId') or '')),reverse=True)
+            unique={str(row.get('eventId') or row.get('activityKey')):row for row in rows}
+            events=sorted(unique.values(),key=lambda row:(str(row.get('at') or ''),str(row.get('eventId') or '')),reverse=True)
+            return response(200,{'events':[public_event(row) for row in events],'count':len(events)})
         m=re.fullmatch(r'/activity/([^/]+)',path)
         if m and method in ('PATCH','DELETE'):
             return response(405,{'message':'Activity history is append-only and cannot be edited or deleted.'})

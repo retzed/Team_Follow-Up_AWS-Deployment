@@ -353,6 +353,46 @@ def main():
     if not batch_write or "ActivityTable" not in str(batch_write.get("Resource")) or "ItemsTable" in str(batch_write.get("Resource")):
         fail("BatchWriteItem is only allowed on Activity for partial-restore summaries.")
 
+    # The manual Console workflow uses an equivalent least-privilege policy template.
+    console_policy_path = ROOT / "backend" / "console-lambda-policy.json"
+    try:
+        with console_policy_path.open(encoding="utf-8") as stream:
+            console_policy = json.load(stream)
+    except (OSError, json.JSONDecodeError) as exc:
+        fail(f"Could not load console Lambda policy template: {exc}")
+    if console_policy.get("Version") != "2012-10-17":
+        fail("Console Lambda policy must use the current IAM policy language version.")
+    console_statements = console_policy.get("Statement", [])
+    if not isinstance(console_statements, list) or not console_statements:
+        fail("Console Lambda policy must define a non-empty Statement list.")
+    serialized_console_policy = json.dumps(console_policy)
+    if "*" in [resource for statement in console_statements for resource in (
+        statement.get("Resource", []) if isinstance(statement.get("Resource", []), list) else [statement.get("Resource")]
+    )]:
+        fail("Console Lambda policy must not grant resource-wide wildcard access.")
+    for table_name in ("TeamFollowUp-Items", "TeamFollowUp-Activity", "TeamFollowUp-Users", "TeamFollowUp-Archive"):
+        if table_name not in serialized_console_policy:
+            fail(f"Console Lambda policy must include the target {table_name} table.")
+    if "REPLACE_WITH_12_DIGIT_ACCOUNT_ID" not in serialized_console_policy:
+        fail("Console Lambda policy must use an explicit account-ID placeholder rather than a guessed account ID.")
+    console_read = next((s for s in console_statements if "dynamodb:Scan" in str(s.get("Action", []))), None)
+    if not console_read or not all(action in str(console_read.get("Action", [])) for action in (
+        "dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan"
+    )):
+        fail("Console Lambda policy must allow the table-scoped read/query operations used by the handler.")
+    console_batch_write = next((s for s in console_statements if "dynamodb:BatchWriteItem" in str(s.get("Action", []))), None)
+    if not console_batch_write or "TeamFollowUp-Activity" not in str(console_batch_write.get("Resource")) or "TeamFollowUp-Items" in str(console_batch_write.get("Resource")):
+        fail("Console Lambda policy BatchWriteItem must be scoped to the Activity table only.")
+    console_transact = next((s for s in console_statements if "dynamodb:TransactWriteItems" in str(s.get("Action", []))), None)
+    if not console_transact or not all(name in str(console_transact.get("Resource")) for name in (
+        "TeamFollowUp-Items", "TeamFollowUp-Activity", "TeamFollowUp-Archive"
+    )):
+        fail("Console Lambda policy transactions must be scoped to Items, Activity, and Archive.")
+    if "dynamodb:EnclosingOperation" not in serialized_console_policy:
+        fail("Console Lambda policy transactional item-level writes must be restricted to TransactWriteItems.")
+    if "TeamFollowUp-Users" in str(console_transact.get("Resource", [])):
+        fail("Console Lambda policy must not grant transaction-write access to Users.")
+
     # The generated web origin and frontend settings are wired together without a dependency cycle.
     app_properties = resources["FrontendApp"]["Properties"]
     if app_properties.get("Repository") != {"Ref": "RepositoryUrl"} or app_properties.get("AccessToken") != {"Ref": "GitHubAccessToken"}:

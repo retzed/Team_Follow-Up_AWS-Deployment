@@ -175,6 +175,7 @@ def main():
         "UsersTable": "AWS::DynamoDB::Table",
         "ArchiveTable": "AWS::DynamoDB::Table",
         "TeamFollowUpApi": "AWS::Serverless::HttpApi",
+        "ApiExecutionRole": "AWS::IAM::Role",
         "ApiFunction": "AWS::Serverless::Function",
         "ApiAccessLogGroup": "AWS::Logs::LogGroup",
         "ApiFunctionLogGroup": "AWS::Logs::LogGroup",
@@ -321,7 +322,17 @@ def main():
         fail("Lambda CodeUri must remain backend/src/ so handler and dependency manifest package together.")
     if not (ROOT / "backend" / "src" / "requirements.txt").exists():
         fail("SAM CodeUri must include requirements.txt so backend dependencies are reproducible.")
-    policies = function.get("Policies", [])
+    role_properties = resources["ApiExecutionRole"]["Properties"]
+    if function.get("Role") != {"GetAtt": "ApiExecutionRole.Arn"}:
+        fail("Lambda must use the explicit execution role shared by the console and template configurations.")
+    if role_properties.get("RoleName") != {"Sub": "${ResourceNamePrefix}-Api-ExecutionRole"}:
+        fail("Template execution-role name must match the console runbook at the default prefix.")
+    if not any("AWSLambdaBasicExecutionRole" in str(value) for value in role_properties.get("ManagedPolicyArns", [])):
+        fail("Explicit Lambda execution role must include the AWSLambdaBasicExecutionRole managed policy.")
+    trust = role_properties.get("AssumeRolePolicyDocument", {})
+    if not any("lambda.amazonaws.com" in str(statement.get("Principal", {})) and "sts:AssumeRole" in str(statement.get("Action", [])) for statement in trust.get("Statement", [])):
+        fail("Execution role must allow Lambda service to assume it.")
+    policies = [policy.get("PolicyDocument", {}) for policy in role_properties.get("Policies", [])]
     if "DynamoDBCrudPolicy" in str(policies):
         fail("Lambda must not receive broad DynamoDB CRUD permissions.")
     statements = [
@@ -456,6 +467,7 @@ def main():
         "UsersTableName": {"Ref": "UsersTable"},
         "ArchiveTableName": {"Ref": "ArchiveTable"},
         "CloudWatchDashboardName": {"Ref": "TeamFollowUpDashboard"},
+        "ApiExecutionRoleName": {"Ref": "ApiExecutionRole"},
         "MonthlyCostBudgetName": {"Ref": "MonthlyCostBudget"},
     }
     for name, value in expected_outputs.items():

@@ -355,7 +355,7 @@ erDiagram
         string actorUserId
         string action
         string kind
-        string at
+        string eventTimestamp "stored as at"
     }
     ARCHIVE_SNAPSHOT {
         string archiveId PK
@@ -639,7 +639,7 @@ flowchart TD
     Choose --> Edit[Edit item / status / priority / assignment]
     Choose --> History[Review item or application history]
     Choose --> Archive[Archive item or hierarchy]
-    Choose --> Restore[Select archived item(s) to restore]
+    Choose --> Restore["Select archived items for restore"]
     Create --> Validate[Server validates fields and relationships]
     Edit --> Validate
     Validate --> Valid{Valid and current version?}

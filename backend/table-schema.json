@@ -2,7 +2,7 @@
   "tables": [
     {
       "name": "TeamFollowUp-Items",
-      "physicalNameTemplate": "${ExistingItemsTableName}",
+      "physicalNameTemplate": "${ResourceNamePrefix}-Items",
       "billingMode": "PROVISIONED",
       "tableClass": "STANDARD",
       "primaryKey": {
@@ -60,12 +60,12 @@
       ],
       "notes": [
         "Top-level project/job rows receive workspaceKey=WORKSPACE; child rows use parentId for ParentIdIndex.",
-        "ownerId remains the UI/business field; assignedTo duplicates it solely for the existing AssignedToIndex."
+        "Target schema for both console-first creation and the optional full-stack CloudFormation/SAM template. Top-level project/job rows receive workspaceKey=WORKSPACE; child rows use parentId for ParentIdIndex."
       ]
     },
     {
       "name": "TeamFollowUp-Activity",
-      "physicalNameTemplate": "${ExistingActivityTableName}",
+      "physicalNameTemplate": "${ResourceNamePrefix}-Activity",
       "billingMode": "PROVISIONED",
       "tableClass": "STANDARD",
       "primaryKey": {
@@ -101,12 +101,13 @@
       ],
       "notes": [
         "Activity events use itemId as the partition key and activityKey = ISO timestamp + # + unique eventId as the sort key.",
-        "Item-scoped history uses Query on the composite primary key. Application-wide history scans the table because no activity GSI was created."
+        "Item-scoped history uses Query on the composite primary key. Application-wide history scans the table because no activity GSI was created.",
+        "Target schema for both deployment paths. Item-scoped history queries itemId; app-wide history scans this table because it has no GSI."
       ]
     },
     {
       "name": "TeamFollowUp-Users",
-      "physicalNameTemplate": "${ExistingUsersTableName}",
+      "physicalNameTemplate": "${ResourceNamePrefix}-Users",
       "billingMode": "PROVISIONED",
       "tableClass": "STANDARD",
       "primaryKey": {
@@ -127,12 +128,13 @@
         "cognitoSub"
       ],
       "notes": [
-        "The small six-member user table stores Cognito subject mappings in cognitoSub; Lambda scans it because no Cognito-subject GSI exists."
+        "The small six-member user table stores Cognito subject mappings in cognitoSub; Lambda scans it because no Cognito-subject GSI exists.",
+        "Target schema for both deployment paths. Cognito subject lookup scans the small six-member table because no cognitoSub GSI is defined."
       ]
     },
     {
       "name": "TeamFollowUp-Archive",
-      "physicalNameTemplate": "${ExistingArchiveTableName}",
+      "physicalNameTemplate": "${ResourceNamePrefix}-Archive",
       "billingMode": "PROVISIONED",
       "tableClass": "STANDARD",
       "primaryKey": {
@@ -189,17 +191,19 @@
       "notes": [
         "Archived records preserve the original item ID, parent/root relationships, content and timestamps.",
         "Activity events remain in TeamFollowUp-Activity and retain item-specific histories after a subtree is archived.",
-        "Restore validates parent/child hierarchy before moving selected records back to TeamFollowUp-Items."
+        "Restore validates parent/child hierarchy before moving selected records back to TeamFollowUp-Items.",
+        "Target schema for both deployment paths. Archive rows preserve the original item ID, hierarchy and timestamps."
       ]
     }
   ],
   "defaultTableNamePrefix": "TeamFollowUp",
   "notes": [
-    "The tables array is the current manually provisioned DynamoDB contract, also consumed by the Lambda handler and deployment contract tests; this JSON does not provision or import AWS resources.",
-    "backend/template.yaml provisions only API Gateway, Lambda, IAM, CloudWatch logs/dashboard/alarms. It reuses the Cognito pool/client and four DynamoDB tables by parameter and does not create or manage them.",
-    "The handler uses only existing Items/Activity/Archive indexes. It scans the small Users table for cognitoSub because no GSI_CognitoSub exists, and scans Activity for application-wide history because Activity has no GSIs.",
-    "The existing activity table's itemId + activityKey primary key is authoritative; eventId is a regular attribute and not a table key.",
-    "The frontend has no local database/demo adapter; application data goes through the Cognito-authenticated API."
+    "The tables array is the target physical DynamoDB contract for both the primary AWS Console deployment and the optional full-stack CloudFormation/SAM automation template. This JSON is a reference and test input; it does not provision resources.",
+    "backend/template.yaml creates all four tables and indexes from scratch; it does not accept table-name parameters or assume existing tables. The default ResourceNamePrefix produces the same TeamFollowUp-Items, TeamFollowUp-Activity, TeamFollowUp-Users, and TeamFollowUp-Archive names used in the console procedure.",
+    "The template creates the Cognito pool and public app client, the four DynamoDB tables, Amplify Hosting app/branch, API Gateway HTTP API, Lambda and scoped IAM, CloudWatch logs/dashboard/alarms, and a $1 monthly budget with actual/forecast email alerts. It is an automation reference, not the primary deployment method.",
+    "The handler uses the physical Items/Archive indexes listed here. It scans the small Users table for cognitoSub and scans Activity for application-wide history because neither table has a GSI.",
+    "Activity's itemId + activityKey primary key is authoritative; eventId is a regular attribute. The frontend has no local database/demo adapter; application data goes through the Cognito-authenticated API.",
+    "DynamoDB data tables use CloudFormation DeletionPolicy/UpdateReplacePolicy Retain in the automation template. Deleting the stack therefore retains table data; the retained tables must be handled before recreating a stack with the same names."
   ],
   "samTargetResourcesDeployed": false,
   "currentConsoleBootstrap": {
@@ -397,10 +401,9 @@
       "API Gateway HTTP API",
       "AWS Lambda API function",
       "CloudWatch log groups, dashboard, and alarms",
-      "Cognito domain, callback URL, and sign-out URL",
       "Cognito team accounts and their DynamoDB profile mappings"
     ],
-    "compatibilityWarning": "The handler and SAM template are aligned to the four manually created tables: Items uses ParentIdIndex, AssignedToIndex and WorkspaceIndex; Activity uses itemId + activityKey and no GSIs; Users uses userId and no GSIs; Archive uses archiveId plus GSI_ArchiveIndex and GSI_ArchiveRoot. The SAM stack parameterizes and reuses the existing Cognito pool/client and table names instead of provisioning duplicate data resources. The custom:teamUserId attribute was added on 2026-10-15 per operator confirmation; Read is enabled and Write disabled for Team_FollowUp per operator confirmation. Verify Write restrictions on other app clients before deployment. Application-wide activity queries scan TeamFollowUp-Activity, and profile lookup scans the six-member Users table.",
+    "compatibilityWarning": "The console-created Cognito pool/client and four tables recorded below are the actual state of the user's current AWS account as operator-reported; this historical inventory does not constrain the target architecture or template. For a fresh environment, the optional template creates a new Cognito pool/client and all four DynamoDB tables with matching keys and indexes. Do not deploy the full-stack template into the same account/Region while the console-created resources with the same physical names still exist; CloudFormation will not automatically adopt them. The current application uses direct Cognito SRP sign-in, so a Cognito managed-login domain and hosted-UI callback URLs are not required.",
     "capacitySummary": {
       "baseTables": 4,
       "globalSecondaryIndexes": 5,
@@ -409,28 +412,29 @@
       "explanation": "Four base tables at 1 RCU/1 WCU each, plus three Items GSIs and two Archive GSIs at 1 RCU/1 WCU each."
     },
     "backendIntegration": {
-      "status": "code-aligned; not deployed",
-      "cognitoPoolParameter": "ExistingCognitoUserPoolId",
-      "cognitoAppClientParameter": "ExistingCognitoAppClientId",
-      "tableParameters": {
-        "TeamFollowUp-Items": "ExistingItemsTableName",
-        "TeamFollowUp-Activity": "ExistingActivityTableName",
-        "TeamFollowUp-Users": "ExistingUsersTableName",
-        "TeamFollowUp-Archive": "ExistingArchiveTableName"
+      "status": "code-aligned; full-stack template not deployed",
+      "cognitoPoolResource": "TeamFollowUpUserPool",
+      "cognitoAppClientResource": "TeamFollowUpAppClient",
+      "tableResources": {
+        "TeamFollowUp-Items": "ItemsTable",
+        "TeamFollowUp-Activity": "ActivityTable",
+        "TeamFollowUp-Users": "UsersTable",
+        "TeamFollowUp-Archive": "ArchiveTable"
       },
       "requiredManualVerification": [
-        "The operator confirmed custom:teamUserId was added to the existing Cognito pool, and that the Team_FollowUp app client can read it.",
-        "Read is enabled and Write disabled for custom:teamUserId on Team_FollowUp per operator confirmation; verify Write is disabled on every other app client in the pool.",
-        "Confirm the existing browser app client has no client secret and supports the frontend's sign-in flow.",
-        "Confirm all required DynamoDB tables and GSIs are ACTIVE in us-east-1."
+        "For the primary Console deployment, verify the existing pool/client settings recorded in currentConsoleBootstrap; do not create duplicates for resources already present.",
+        "The current operator-confirmed console app client can read custom:teamUserId and cannot write it; verify Write is disabled on every app client if more clients exist.",
+        "For the automation template, the pool/client and custom attribute are created from scratch and the app client WriteAttributes omit custom:teamUserId.",
+        "Confirm all four table names, primary keys, GSI names/key attributes, All projections, and 1 RCU/1 WCU settings match the target schema.",
+        "Create six administrator-managed Cognito accounts with unique custom:teamUserId values u1 through u6 and seed matching Users-table profiles via the trusted admin script after infrastructure creation."
       ],
       "accessPatternNotes": [
         "Work-item queries use WorkspaceIndex, ParentIdIndex, and AssignedToIndex.",
-        "Activity rows use the existing itemId + activityKey composite primary key.",
-        "Application-wide activity reads use Scan because the current Activity table has no GSI.",
-        "Cognito subject lookup uses Scan over the small Users table because the current Users table has no GSI."
+        "Activity rows use itemId + activityKey; application-wide activity reads use Scan.",
+        "Cognito subject lookup uses Scan over the small Users table because it has no cognitoSub GSI."
       ]
     }
   },
-  "thisFileProvisionsAwsResources": false
+  "thisFileProvisionsAwsResources": false,
+  "fullStackTemplateDeployed": false
 }

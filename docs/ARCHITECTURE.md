@@ -1,137 +1,85 @@
 # Architecture and request flow
 
-This document describes the intended **target AWS deployment**; committing the files does not create AWS resources. The sections and diagrams below describe the target SAM stack, not the current manual console bootstrap.
+This document distinguishes AWS resources already created manually from the backend resources that will be deployed by AWS SAM later.
 
-## Current console state (15 October 2026)
+## 1. Current AWS state
 
-- Region: **US East (N. Virginia), us-east-1**.
-- Cognito pool: **User pool - fnzspt**, ID **us-east-1_7dYZw2Is6**; app client **Team_FollowUp**, client ID **7id8c2g27fvbh365atqntqurir**; feature plan **Essentials**; email sign-in; self-registration disabled; MFA off.
-- DynamoDB tables: **TeamFollowUp-Items** (partition key **itemId**, with **ParentIdIndex**, **AssignedToIndex**, and **WorkspaceIndex**); **TeamFollowUp-Activity** (partition key **itemId**, sort key **activityKey**); **TeamFollowUp-Users** (partition key **userId**); and **TeamFollowUp-Archive** (partition key **archiveId**, with **GSI_ArchiveIndex** on `archivePK`/`archiveSort` and **GSI_ArchiveRoot** on `archiveRootPK`/`archiveRootSort`). The four base tables use provisioned capacity of 1 RCU and 1 WCU each; the three Items indexes and two Archive indexes also use 1 RCU and 1 WCU each. Total configured capacity is **9 RCUs / 9 WCUs**. Point-in-time recovery, deletion protection, Streams, and auto scaling are disabled.
-- Cost monitoring: recurring **$1/month** budget named **TeamFollowUp-Monthly-Cost**, with 50%, 80%, and 100% actual-cost alerts plus a 100% forecast alert, using unblended costs.
-- Not yet deployed/configured: Amplify Hosting, API Gateway, Lambda, CloudWatch dashboard/log groups/alarms, Cognito domain/callback configuration, Cognito team accounts, and UserProfiles mappings. The Archive table exists already, but was created manually and is not managed by a CloudFormation stack.
+- **Region:** US East (N. Virginia), `us-east-1`.
+- **Cognito:** existing pool `us-east-1_7dYZw2Is6`, app client `7id8c2g27fvbh365atqntqurir`; email sign-in, self-registration disabled, MFA off. The custom `custom:teamUserId` attribute and app-client readable attributes still require verification.
+- **DynamoDB:** four manually created Standard tables with provisioned 1 RCU / 1 WCU per base table and per GSI. Three Items GSIs plus two Archive GSIs means **9 RCUs and 9 WCUs** configured.
+- **Not yet deployed:** Amplify Hosting, API Gateway, Lambda, CloudWatch log groups/dashboard/alarms, Cognito hosted-login domain and callback URLs, team Cognito accounts, and their Users-table mappings.
+- **Budget:** `TeamFollowUp-Monthly-Cost`, USD $1/month, with actual 50/80/100% and forecast 100% alerts. This is a notification budget, not a spend cap.
 
-**Compatibility blocker:** the manually created Archive table's primary key and both GSIs match the Archive contract expected by the handler/template, but it is provisioned rather than on-demand and is not CloudFormation-managed. With the default `TeamFollowUp` prefix, the SAM `ArchiveTable` resource would collide with the existing `TeamFollowUp-Archive`. The template also expects a separate Cognito pool and WorkItems/ActivityEvents/UserProfiles tables with names or key/index contracts that do not match the current Items/Activity/Users resources. Do not deploy the current SAM template or point the handler at the console tables until resource ownership, billing, and the complete data model are reconciled. The remainder of this document describes the target architecture, not a ready-to-deploy stack.
-
-## 1. At a glance
+## 2. Target deployment, reusing existing data resources
 
 ```mermaid
 flowchart LR
-    U[Team member browser]
-    A[Amplify Hosting<br/>Static HTML]
-    C[Cognito User Pool<br/>Login and tokens]
-    G[API Gateway HTTP API<br/>JWT authorizer + CORS]
-    L[Python 3.12 Lambda<br/>Rules + validation]
-    W[(DynamoDB<br/>WorkItems)]
-    E[(DynamoDB<br/>ActivityEvents)]
-    P[(DynamoDB<br/>UserProfiles)]
-    R[(DynamoDB<br/>Archive)]
-    M[CloudWatch<br/>Logs, alarms, dashboard]
-
-    U -->|HTTPS page| A
-    U -->|Credentials| C
-    C -->|JWT access token| U
-    U -->|HTTPS + bearer token| G
-    G -->|Authorized request| L
-    L <--> W
-    L <--> E
-    L <--> P
-    L <--> R
+    B[Team member browser] -->|HTTPS| A[Amplify Hosting]
+    B -->|Sign in / JWT| C[Existing Cognito pool and app client]
+    B -->|JWT + API request| G[API Gateway HTTP API\nJWT authorizer + restricted CORS]
+    G --> L[Python 3.12 Lambda\nvalidation + hierarchy rules]
+    L --> I[(Existing DynamoDB Items)]
+    L --> E[(Existing DynamoDB Activity)]
+    L --> U[(Existing DynamoDB Users)]
+    L --> R[(Existing DynamoDB Archive)]
+    L --> M[CloudWatch logs]
     G --> M
-    L --> M
+    M --> O[Dashboard + alarms]
 ```
 
-| Service | Responsibility |
-|---|---|
-| **Amplify Hosting** | Builds and serves the frontend. `amplify.yml` publishes only `dist/`; `scripts/build.mjs` injects public runtime configuration. |
-| **Amazon Cognito** | Authenticates users and issues JWTs. Self-service registration is disabled; administrators assign each user a `custom:teamUserId`. |
-| **API Gateway HTTP API** | Validates the JWT before forwarding a request to Lambda and allows browser calls from one explicitly configured HTTPS origin. |
-| **AWS Lambda** | Enforces team-profile and hierarchy rules, derives trusted audit identity, validates input, and coordinates data writes. |
-| **Amazon DynamoDB** | Shared source of truth for active items, append-only activity events, enabled team profiles, and archived items. |
-| **Amazon CloudWatch** | Stores Lambda/API access logs and exposes operational metrics, alarms, and a dashboard. |
+The frontend and backend have separate release steps. API Gateway verifies the JWT against the existing Cognito pool and app-client audience. Lambda then resolves the verified Cognito `sub` to exactly one enabled team profile before reading or changing application data. User-entered creator/editor IDs, timestamps, index keys, and version values are not trusted.
 
-The frontend and backend have separate release steps: Amplify publishes the web app; AWS SAM deploys or updates the backend stack. A CI build uses explicitly supplied test configuration to validate the artifact; it does not deploy the SAM stack. A real Amplify release must use the actual Cognito/API outputs from the target AWS stack.
+**SAM owns only the API Gateway HTTP API, Lambda, scoped IAM policies, CloudWatch log groups, dashboard, and alarms.** Its parameters point to the existing pool/client and four table names. It does not create, import, replace, or manage the existing Cognito or DynamoDB data resources. Removing the backend stack will not delete those manually created resources.
 
-## 2. Sign-in and request sequence
+## 3. Existing DynamoDB model and access patterns
 
-```mermaid
-sequenceDiagram
-    participant User as Team member
-    participant UI as Amplify-hosted UI
-    participant Cognito
-    participant API as API Gateway
-    participant Lambda
-    participant Profile as DynamoDB UserProfiles
-    participant Data as DynamoDB tables
-
-    User->>UI: Open site and enter credentials
-    UI->>Cognito: SRP sign-in
-    Cognito-->>UI: JWT access token / refresh token
-    UI->>API: HTTPS request + bearer access token
-    API->>API: Validate issuer, client audience and token expiry
-    API->>Lambda: Invoke matched API route
-    Lambda->>Profile: Query GSI_CognitoSub using verified sub
-    Profile-->>Lambda: Enabled team profile
-    Lambda->>Lambda: Validate input, permissions and parent/child type rules
-    Lambda->>Data: Query indexed records or transact writes
-    Data-->>Lambda: Saved item and audit records
-    Lambda-->>UI: JSON response with public fields only
-```
-
-API Gateway authentication is the first gate, but the Lambda handler also requires the JWT subject to map to exactly one enabled profile. A Cognito account that is not mapped, or whose profile is disabled, cannot use the application data API. User roles displayed in the UI are descriptive labels; they are not privilege levels.
-
-## 3. DynamoDB model and access patterns
-
-The **target SAM template** defines four on-demand, server-side-encrypted tables. Their physical names use `<TableNamePrefix>-<suffix>`; the default prefix is `TeamFollowUp`. This is not the current console table layout listed above. Use a different prefix for each environment only after the existing resources and backend contract have been reconciled.
-
-| Logical table | Primary key | Secondary indexes |
+| Table | Primary key | Existing indexes / Lambda access |
 |---|---|---|
-| **WorkItems** | `itemId` | `GSI_ListUpdated`, `GSI_ListCreated`, `GSI_RootUpdated`, `GSI_AssignedUpdated`, `GSI_AssignedCreated` |
-| **ActivityEvents** | `eventId` | `GSI_ItemTimeline`, `GSI_ApplicationTimeline`, `GSI_RootTimeline`, `GSI_ParentTimeline` |
-| **UserProfiles** | `userId` | `GSI_CognitoSub` |
-| **Archive** | `archiveId` | `GSI_ArchiveIndex`, `GSI_ArchiveRoot` |
+| `TeamFollowUp-Items` | Partition `itemId` (String) | `ParentIdIndex`: `parentId` / `createdAt`; `AssignedToIndex`: `assignedTo` / `updatedAt`; `WorkspaceIndex`: `workspaceKey` / `createdAt` |
+| `TeamFollowUp-Activity` | Partition `itemId` (String), sort `activityKey` (String) | No GSIs. Item history uses Query on `itemId`; application-wide history uses Scan. |
+| `TeamFollowUp-Users` | Partition `userId` (String) | No GSIs. Cognito-subject lookup scans this deliberately small six-member table and fails closed on missing, duplicate, or disabled mappings. |
+| `TeamFollowUp-Archive` | Partition `archiveId` (String) | `GSI_ArchiveIndex`: `archivePK` / `archiveSort`; `GSI_ArchiveRoot`: `archiveRootPK` / `archiveRootSort`. Both use All projection. |
 
-The index partition/sort keys are materialized by the Lambda handler and are also described in `backend/table-schema.json`. `backend/template.yaml` is the deployable source of truth for physical resources and index definitions; the JSON file is a human-readable companion, not a second provisioning mechanism.
+All four base tables and all five GSIs are provisioned at 1 RCU / 1 WCU each. Auto scaling, point-in-time recovery, deletion protection, and DynamoDB Streams are disabled.
 
-### Write and audit behavior
+### Materialized item attributes
 
-- **Create and update:** an item write and the associated activity events are written in one DynamoDB transaction. Updates use a version condition so stale edits return a conflict instead of silently overwriting a newer edit.
-- **Delete/archive:** the selected item and its descendants are copied to the Archive table and removed from WorkItems in chunks. The operation records a summary activity event. If a later chunk conflicts, the handler attempts a compensating rollback and reports whether reconciliation may be needed.
-- **Restore:** selected archived rows are checked for valid parents and hierarchy types before they are restored in bounded transactions. A restore summary is written after the last selected descendant in that root is saved. A conflict after earlier chunks can result in a partial restore; refresh Archive and review the response before retrying.
-- **Activity history:** ActivityEvents are append-only from the application API. Indexed attributes support item, parent, root, and application-wide timelines. For an existing installation that predates the application-wide timeline index, run the migration script described in the deployment guide after the GSI is active.
+- Project/job records receive `workspaceKey=WORKSPACE` so top-level items use `WorkspaceIndex`.
+- Child records retain `parentId`, which drives `ParentIdIndex`.
+- The API keeps `ownerId` as the frontend/business field and copies it to `assignedTo` for `AssignedToIndex`.
+- Filtered results are sorted by the requested creation/update timestamp after retrieval through the matching current index.
 
-## 4. Security and trust boundaries
+### Activity key and performance trade-off
 
-### Browser
+Activity is **not** an eventId-keyed table. Every event is stored under `itemId` and `activityKey = ISO timestamp + "#" + eventId`; `eventId` remains a regular attribute for the UI. Per-item timelines are queried directly by partition key. Since the existing Activity table has no GSIs, application-wide activity history deliberately scans the table. This avoids adding index capacity now, but scan time and read-capacity consumption grow with the history table. Do not run the legacy ActivityEvents index-migration script against `TeamFollowUp-Activity`.
 
-The web app is public client-side code. Build-time Cognito IDs, API URL, mode, and the custom attribute name are public browser configuration—not secrets. Never put AWS access keys, client secrets, or private Cognito-subject mappings into Amplify variables or frontend files.
+## 4. Transaction, archive, and audit behavior
 
-The repository has no local authentication mode, mock data adapter, browser database, seeded workspace, or offline work-data cache. Every work item, team profile, archive record, and activity event is obtained from or written through the Cognito-authenticated API to DynamoDB. The frontend keeps a transient in-memory view of the API response only so it can render and edit the current screen; that view is not a database and is never used as a fallback source after a failed request. The build fails unless a valid Cognito User Pool ID, public app-client ID, and HTTPS API base URL are supplied.
+- **Create/update:** item writes and their audit-event writes share a DynamoDB transaction. Updates use a version condition to detect stale edits.
+- **Delete/archive:** the selected item and descendants are copied to Archive and then removed from Items in bounded transactions. Parent/root snapshots are preserved, and a summary activity event records the archive operation. If a later transaction fails, the handler attempts compensating rollback and reports if reconciliation may be needed.
+- **Restore:** selected archived rows are checked for valid parent/child types before being returned to Items. Restore summaries are committed with the last selected item for a hierarchy where possible. A conflict after earlier chunks can result in a partial restore; refresh Archive and inspect the returned restored IDs before retrying.
+- **Activity history:** events are append-only through the API. Item history is read by item partition; global activity is read by a full-table scan on the existing Activity table.
 
-### Authentication and API authorization
+## 5. Security boundaries
 
-- Cognito's browser client has no client secret and is configured for SRP sign-in and token refresh.
-- API Gateway uses the generated Cognito issuer and client audience as a JWT authorizer.
-- CORS is limited to the exact HTTPS origin supplied as the SAM `AllowedOrigin` parameter. If the Amplify or custom domain changes, update the parameter and redeploy the backend.
-- Lambda treats Cognito `sub` as the authenticated identity and resolves it through `UserProfiles.GSI_CognitoSub`. User-entered creator/editor IDs, timestamps, index fields, and version values are not trusted.
-- The Lambda's DynamoDB role is read-only by default. Write operations are restricted to named transactional writes on WorkItems, ActivityEvents, and Archive, plus the ActivityEvents batch-write recovery path for a partially completed restore.
+- API Gateway uses the existing Cognito pool issuer and app-client ID as JWT audience. CORS permits only the exact HTTPS `AllowedOrigin` supplied at deployment.
+- Lambda treats Cognito `sub` as the authenticated identity and scans `TeamFollowUp-Users` for the corresponding `cognitoSub`. It denies unknown, duplicate, or disabled mappings.
+- Lambda read permissions are scoped to the four configured tables and their indexes. Transactional writes are scoped to Items, Activity, and Archive. Direct batch-write permission exists only for partial-restore activity summaries on Activity.
+- `custom:teamUserId` must exist and be readable by the existing browser app client for the identity-mapping workflow. Verify this before creating/inviting the team accounts.
+- The frontend receives only public Cognito IDs, API URL, and custom-attribute name. Never put AWS access keys, client secrets, or private Cognito subject values in frontend files or Amplify environment variables.
 
-### Data protection
+## 6. Monitoring, recovery, and cost
 
-- All four console-created DynamoDB tables currently have point-in-time recovery disabled. The target SAM template also defaults this option to disabled for the current cost-controlled lab. **Retention is not a backup**; do not enable recovery features without an explicit cost/recovery decision.
-- Lambda returns generic errors to clients. Request IDs, error types, and database error codes are logged for operators, but request bodies and authorization headers are intentionally excluded from access logs.
-- Deployment scripts are administrative tools. Run them from a trusted workstation or controlled CI job using short-lived AWS credentials and the minimum IAM actions documented in the deployment guide.
+SAM adds CloudWatch log groups, a dashboard, and alarms for Lambda errors/throttles and API Gateway 5xx responses. Alarm notification actions are not configured by default. The budget created in AWS notifies by email but does not stop spend.
 
-## 5. Monitoring and operating model
+All existing DynamoDB tables have point-in-time recovery disabled. Activity and Users scans are reasonable for the current small lab, but their latency/cost grows with table size. Retention settings on newly created backend resources do not constitute backups of pre-existing tables. Check account credits and current regional pricing before changing capacity or adding GSIs, backups, hosted services, or monitoring.
 
-The stack creates log groups with configurable retention, a CloudWatch dashboard, and alarms for Lambda errors, Lambda throttles, and API Gateway 5xx responses. Alarm actions are not configured by default, so email or paging requires an SNS topic/subscription and explicit alarm actions.
+## 7. Deployment boundary
 
-After the target backend is deployed, monitor Lambda logs and API Gateway access logs. The planned dashboard reports request volume, 5xx responses, Lambda duration, errors, and throttling. The target SAM template uses on-demand DynamoDB billing; the four current console tables instead use provisioned capacity of 1 RCU and 1 WCU each, plus the same capacity on each configured index. Point-in-time recovery, log ingestion/retention, and Cognito features can add costs. Check current regional pricing before changing the lab configuration.
+1. Verify the existing Cognito pool/client settings, custom attribute, team account mappings, and all required index statuses.
+2. Create Amplify Hosting and record the final HTTPS origin.
+3. Build and deploy the SAM backend with the existing pool/client/table-name parameters and that `AllowedOrigin`. Review the change set to confirm no Cognito pool or DynamoDB table is being created.
+4. Set Amplify environment variables using the existing Cognito IDs and the deployed API output.
+5. Test sign-in, cross-session shared data, item hierarchy validation, activity history, archive/restore, unauthorized requests, and CloudWatch alarms.
 
-## 6. Deployment boundary
-
-- **Frontend release:** Amplify connects to the repository branch and publishes `dist/` using `amplify.yml`.
-- **Backend release:** run checks, `sam validate --lint`, and `sam build`, then deploy the packaged template with `sam deploy`.
-- **Identity bootstrap:** create the six Cognito accounts, assign `custom:teamUserId` values `u1`–`u6`, and seed UserProfiles from the actual Cognito subjects.
-- **Go-live:** configure Amplify with `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, `TEAM_FOLLOW_UP_API_BASE_URL`, and optionally `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE=custom:teamUserId`; then complete the smoke-test checklist.
-
-For the ordered console steps, exact commands, environment variables, migration instructions, rollback cautions, and troubleshooting, follow [DEPLOYMENT.md](DEPLOYMENT.md).
+The schema reference in `backend/table-schema.json` and the contract tests intentionally encode the current table keys and index names so later code changes cannot silently drift back to the abandoned table design. See [IMPLEMENTATION.md](IMPLEMENTATION.md) for the exact bootstrap record and [DEPLOYMENT.md](DEPLOYMENT.md) for commands.

@@ -2336,7 +2336,7 @@ async function restoreSelectedArchive(){
   const rawMessage=String(error?.message||'');const displayMessage=/restore the parent item together|restore the parent first|parent item.+together/i.test(rawMessage)?tr('archiveParentRequired'):(rawMessage||tr('archiveRestoreFailed'));ui.modal={kind:'archive',loading:false,archiveItems:items,selectedIds:selected.filter(id=>items.some(x=>x.id===id)),error:displayMessage};render();toast(ui.modal.error,true);
  }
 }
-function openHistory(itemId){const item=allItem(itemId)||assignedItemCache.get(String(itemId));if(!item)return;ui.modal={kind:'history',itemId,itemSnapshot:allItem(itemId)?null:{...item},historyQuery:'',historyScope:'all',historyRefreshError:''};renderModal();void refreshActivityFor(itemId,item.type==='followup'?'item':'all');}
+function openHistory(itemId){const item=allItem(itemId)||assignedItemCache.get(String(itemId));if(!item)return;const historyScope=item.type==='followup'?'item':'all';ui.modal={kind:'history',itemId,itemSnapshot:allItem(itemId)?null:{...item},historyQuery:'',historyScope,historyRefreshError:''};renderModal();void refreshActivityFor(itemId,historyScope);}
 function openApplicationHistory(){ui.modal={kind:'global-history',historyQuery:'',historyUserFilter:'all',historyRefreshError:''};renderModal();void refreshApplicationHistory();}
 function openEdit(id){const item=allItem(id);if(!item)return;ui.modal={kind:'edit',itemId:id};renderModal();}
 function openNewParent(){ui.modal={kind:'new-parent',type:'project',focusNameOnOpen:true};renderModal();}

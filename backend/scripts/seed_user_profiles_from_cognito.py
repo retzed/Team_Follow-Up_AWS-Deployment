@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed the UserProfiles table from administrator-managed Cognito team IDs.
+"""Seed the existing TeamFollowUp-Users table from administrator-managed Cognito team IDs.
 
 Each of the six Cognito users must have custom:teamUserId set to u1..u6.
 The script resolves Cognito sub values itself so operators do not copy them
@@ -80,7 +80,7 @@ def list_team_users(cognito, user_pool_id):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--user-pool-id", required=True, help="Deployed Cognito User Pool ID.")
-    parser.add_argument("--table", required=True, help="Exact UserProfiles table name from stack outputs.")
+    parser.add_argument("--table", required=True, help="Existing Users table name; use TeamFollowUp-Users in the current lab.")
     parser.add_argument("--region", required=True, help="AWS Region for Cognito and DynamoDB.")
     parser.add_argument("--dry-run", action="store_true", help="Validate account mapping without writing records.")
     args = parser.parse_args(argv)

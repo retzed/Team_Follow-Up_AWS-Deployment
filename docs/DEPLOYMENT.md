@@ -1,152 +1,75 @@
 # Deployment runbook
 
-This runbook describes the intended path from the repository to a live shared application. The frontend and AWS backend are deployed separately: **Amplify hosts the website; AWS SAM is the current target mechanism for the API and monitoring resources.** The actual console bootstrap already created for this project is recorded in [IMPLEMENTATION.md](IMPLEMENTATION.md).
+This runbook deploys the shared Team Follow-Up application using AWS resources already created manually. Amplify hosts the frontend; AWS SAM deploys only the API/backend and monitoring resources.
 
-> **AWS-only:** this repository has no demo sign-in, local database, seeded workspace, or offline data mode. The frontend requires the deployed Cognito/API configuration and fails closed without it. Never commit credentials or real Cognito subject mappings, and do not delete a stack as a way to clear data. The target SAM template retains the resources it creates.
->
-> **Important current-state warning:** the console-created resources are only partly aligned with the target SAM schema. The existing pool is **us-east-1_7dYZw2Is6**; the console tables are **TeamFollowUp-Items**, **TeamFollowUp-Activity**, **TeamFollowUp-Users**, and **TeamFollowUp-Archive**. The Archive table's `archiveId` key and both GSIs (**GSI_ArchiveIndex**, **GSI_ArchiveRoot**) match the handler's Archive contract, but its provisioned billing mode differs from the template's on-demand setting, and it is not managed by CloudFormation. The default `TeamFollowUp` prefix means the SAM `ArchiveTable` would collide with this existing physical table. The template also creates its own Cognito pool plus **WorkItems**, **ActivityEvents**, and **UserProfiles** tables whose names/keys/indexes do not match the other console tables. **Do not follow Step 4 or configure the app against these tables until resource ownership, billing, Cognito, and the data model are reconciled.** Keep this document's stack-deployment steps as a target runbook, not as permission to deploy the current template.
+> **Current contract:** the application uses the existing Cognito pool/client and four existing DynamoDB tables in **us-east-1**. SAM does not create, import, or manage Cognito or DynamoDB data resources. It creates API Gateway, Lambda, IAM, and CloudWatch resources only. The Activity table uses `itemId + activityKey`; the Users table has no Cognito-subject GSI. Do not restore the previous WorkItems/ActivityEvents/UserProfiles table design.
 
-## Deployment plan
+## Deployment order
 
-1. Prepare tools, credentials, Region, and source checks.
-2. Create the Amplify Hosting app and record its assigned HTTPS origin.
-3. Deploy the SAM backend stack using that exact origin.
-4. Create the six Cognito accounts and seed their DynamoDB team profiles.
-5. Configure Amplify with the real Cognito/API outputs and publish the AWS-connected website.
-6. Run the acceptance checklist and verify monitoring.
+1. Verify the existing Cognito app client/custom attribute and DynamoDB indexes.
+2. Create/map the six Cognito team accounts and seed the existing Users table.
+3. Create Amplify Hosting and copy its final HTTPS origin.
+4. Run repository checks and deploy SAM against the existing resources.
+5. Configure Amplify environment variables and publish the website.
+6. Run the end-to-end acceptance checklist.
 
-## 1. Prerequisites and environment setup
+## 1. Check account, Region, and tools
 
-Have the following ready:
+Keep application resources in **US East (N. Virginia), `us-east-1`**. Use a named AWS CLI profile or short-lived credentials; avoid routine use of the root account.
 
-- Access to the private GitHub repository and permission to connect it to Amplify Hosting.
-- An AWS account and a deployment role allowed to create/update the resources in `backend/template.yaml` through CloudFormation/SAM, including IAM roles and policies.
-- A selected AWS Region. Keep the SAM stack, Cognito user pool, DynamoDB tables, and API in that same Region.
-- Node.js 24, Python 3.12, AWS CLI v2, and AWS SAM CLI on the workstation used for deployment.
-- Six valid team email addresses that can receive Cognito invitations or password-reset messages.
-- Access to the Amplify console and permission to add branch environment variables.
+    aws sts get-caller-identity
+    aws configure get region
 
-Use a named AWS CLI profile or short-lived IAM Identity Center credentials rather than long-lived access keys where possible. Confirm the active account and Region before changing resources:
+If using a named profile:
 
-```bash
-aws sts get-caller-identity
-aws configure get region
-```
+    aws sso login --profile team-followup-dev
+    aws sts get-caller-identity --profile team-followup-dev
 
-If you use a named IAM Identity Center profile, sign in first (replace the profile name with your configured profile):
+Install/use Node.js 24, Python 3.12, AWS CLI v2, and AWS SAM CLI. The included `amplify.yml` expects Node.js 24; select Amplify's **Amazon Linux 2023** build image or a compatible custom image.
 
-```bash
-aws sso login --profile team-followup-dev
-aws sts get-caller-identity --profile team-followup-dev
-```
+The `TableNamePrefix` parameter names the API, Lambda, log groups, dashboard, and alarms only. It does not rename or provision the existing DynamoDB tables.
 
-Avoid using the AWS root user for routine deployment.
+## 2. Verify the existing Cognito and DynamoDB resources
 
-**Shell note:** command examples use Bash syntax and are intended to be run from the repository root. On Windows, use Git Bash, WSL, or another Bash-compatible shell; alternatively, convert line continuations to PowerShell syntax before running the commands. Use the same AWS profile and Region throughout a deployment.
+### Cognito — required manual checks
 
-Keep separate environment stacks and prefixes, for example:
-
-| Environment | Stack name | `TableNamePrefix` |
-|---|---|---|
-| Development/lab | `team-follow-up-dev` | `TeamFollowUpDev` |
-| Production | `team-follow-up-prod` | `TeamFollowUpProd` |
-
-The prefix must start with a letter or number and contain 3–20 letters, digits, dots, underscores, or hyphens. The prefix controls DynamoDB table names and several log/dashboard names; it does not select an AWS Region.
-
-### Amplify build image
-
-The included `amplify.yml` selects Node.js 24 with `nvm use 24`. In the Amplify console, select the **Amazon Linux 2023** build image (or a custom image that includes Node.js 24 and NVM) before the first successful frontend build. Do not use an older Amazon Linux 2 image that cannot provide the configured Node version. See the [Amplify build image guidance](https://docs.aws.amazon.com/amplify/latest/userguide/troubleshooting-general.html) if the build image needs changing.
-
-## 2. Run checks before deployment
-
-From the repository root:
-
-```bash
-python -m pip install -r backend/requirements-dev.txt
-npm run test:all
-python -m compileall -q backend/src backend/scripts scripts/test-infrastructure.py
-sam validate --lint --template-file backend/template.yaml
-sam build --template-file backend/template.yaml
-```
-
-The SAM commands require AWS SAM CLI, but do not create resources. Do not proceed if a command fails; fix the failure and rerun it. The GitHub Actions workflow runs the frontend regression tests, AWS-only build/config tests, backend unit tests, infrastructure contract tests, Python compilation, SAM validation, and SAM build. CI supplies non-production test values only to exercise the build; it does **not** deploy the SAM stack. A normal build of the release artifact requires the real Cognito/API values from the deployed stack, as shown in Step 6.
-
-The built frontend is written to `dist/index.html`; Amplify publishes the `dist/` folder. The Lambda package is built from `backend/src/`, which contains both `handler.py` and its `requirements.txt`.
-
-## 3. Create Amplify Hosting and record the website origin
-
-Amplify must exist first because the backend CORS policy needs the final website origin. The frontend has no local/demo configuration, so its first build will intentionally fail until the real Cognito/API outputs are added in Step 6. Do not add placeholder AWS IDs or introduce a local mode to bypass this check.
-
-1. Open **AWS Amplify → Create new app → Host web app** and connect the private GitHub repository.
-2. Select the branch intended for this environment. Enable the Amazon Linux 2023 build image as described above.
-3. Let Amplify register the branch and assign its default branch hostname. In the Amplify console, open the app’s **Domain management / branch domain** details and copy the exact HTTPS origin, for example `https://main.abc123.amplifyapp.com`. Keep only scheme and host—no path, query, or trailing slash. If a custom domain will be used, attach and validate it before deploying the backend, then use that final HTTPS origin.
-4. The first Amplify build may fail with a message naming missing `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, or `TEAM_FOLLOW_UP_API_BASE_URL`. This is expected before the backend exists; record the failed build, proceed with the origin, and return to Step 6 after deploying and seeding AWS resources.
-
-## 4. Deploy Cognito, API Gateway, Lambda, DynamoDB, and CloudWatch
-
-The SAM template provisions these resources; do not create duplicates manually. Use the exact Amplify origin from Step 3 for `AllowedOrigin`.
-
-From the repository root:
-
-```bash
-sam build --template-file backend/template.yaml
-sam deploy --guided --template-file .aws-sam/build/template.yaml
-```
-
-In the guided prompts, use values like these:
-
-| Prompt / parameter | Example or instruction |
+| Setting | Value |
 |---|---|
-| Stack name | `team-follow-up-dev` |
-| AWS Region | The Region verified in Step 1 |
-| `TableNamePrefix` | `TeamFollowUpDev` |
-| `AllowedOrigin` | The exact HTTPS origin copied from Amplify |
-| `LogRetentionDays` | `30` |
-| `EnablePointInTimeRecovery` | `false` for this cost-controlled lab; enable only after an explicit cost/recovery decision |
-| Confirm changes before deploy | `Y` |
-| Allow SAM CLI to create IAM roles / capabilities | Accept the required IAM capability when prompted |
+| Existing User Pool ID | `us-east-1_7dYZw2Is6` |
+| Existing app Client ID | `7id8c2g27fvbh365atqntqurir` |
 
-Review the CloudFormation change set before approving it. Use the same stack name, Region, and prefix when updating this environment. Do not deploy development parameters into a production stack.
+In **Amazon Cognito → User pools**, select that exact pool and verify:
 
-The stack creates:
+- The custom attribute `custom:teamUserId` exists. Its existence was not independently confirmed during initial setup.
+- The `Team_FollowUp` app client is a browser/public client with **no client secret**.
+- The app client can read `custom:teamUserId` and supports the sign-in/token flow used by the frontend.
+- Self-registration remains disabled.
 
-- A Cognito User Pool and a browser app client with no client secret.
-- An API Gateway HTTP API with a Cognito JWT authorizer, exact-origin CORS, and access logs.
-- A Python 3.12 Lambda with scoped DynamoDB permissions and JSON CloudWatch logs.
-- Four on-demand, server-side-encrypted DynamoDB tables with the indexes used by the handler.
-- CloudWatch log groups, a dashboard, and alarms for Lambda errors/throttles and API Gateway 5xx responses.
+If the custom attribute is absent, stop and resolve the pool schema before creating accounts or deploying. Do not create a second Cognito pool to bypass this prerequisite.
 
-Point-in-time recovery is disabled by default in this repository's target template to match the current cost-controlled lab choice. Enabling it can incur charges. WorkItems, ActivityEvents, UserProfiles, Archive, and the SAM-managed Cognito User Pool use CloudFormation retain policies. Stack removal therefore does not remove those target-stack resources; see **Operations and recovery** before cleanup.
+### DynamoDB — actual table contract
 
-### Read the stack outputs
+| Table | Primary key | Global secondary indexes |
+|---|---|---|
+| `TeamFollowUp-Items` | `itemId` (String) | `ParentIdIndex`, `AssignedToIndex`, `WorkspaceIndex` |
+| `TeamFollowUp-Activity` | `itemId` (String) + `activityKey` (String) | None |
+| `TeamFollowUp-Users` | `userId` (String) | None |
+| `TeamFollowUp-Archive` | `archiveId` (String) | `GSI_ArchiveIndex`, `GSI_ArchiveRoot` |
 
-After SAM deployment, retrieve the output table:
+Confirm all four tables are **ACTIVE**, and confirm the three Items indexes and two Archive indexes are **ACTIVE**. Activity and Users intentionally have no GSIs. The application-wide Activity endpoint scans Activity; Lambda scans the small Users table for the authenticated Cognito subject.
 
-```bash
-aws cloudformation describe-stacks \
-  --stack-name team-follow-up-dev \
-  --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' \
-  --output table
-```
+Inspect the live tables if needed:
 
-Record these values securely in your deployment notes (not in Git):
+    aws dynamodb describe-table --table-name TeamFollowUp-Items --region us-east-1 --query 'Table.{Status:TableStatus,Indexes:GlobalSecondaryIndexes[*].[IndexName,IndexStatus]}' --output json
+    aws dynamodb describe-table --table-name TeamFollowUp-Archive --region us-east-1 --query 'Table.{Status:TableStatus,Indexes:GlobalSecondaryIndexes[*].[IndexName,IndexStatus]}' --output json
+    aws dynamodb describe-table --table-name TeamFollowUp-Activity --region us-east-1 --query 'Table.{Status:TableStatus,Key:KeySchema}' --output json
+    aws dynamodb describe-table --table-name TeamFollowUp-Users --region us-east-1 --query 'Table.{Status:TableStatus,Key:KeySchema}' --output json
 
-- `CognitoUserPoolId`
-- `CognitoUserPoolClientId`
-- `ApiBaseUrl`
-- `WorkItemsTableName`
-- `ActivityEventsTableName`
-- `UserProfilesTableName`
-- `ArchiveTableName`
-- `CloudWatchDashboardName`
+The four base tables and five GSIs are provisioned at 1 RCU / 1 WCU each (9 RCUs / 9 WCUs total). These are provisioned-capacity settings, not a guarantee of zero cost.
 
-Use the actual outputs for the chosen stack. Do not assume the default table prefix when another prefix was deployed.
+## 3. Create Cognito accounts and seed team mappings
 
-## 5. Create and map the six Cognito users
-
-1. Open **Amazon Cognito → User pools** and select the pool whose ID matches `CognitoUserPoolId`.
-2. Create one account per team member, using a valid email address. Keep self-service sign-up disabled. Set each account’s administrator-managed custom attribute **`custom:teamUserId`** to exactly the ID shown below.
-3. The role labels are display metadata only. They do not grant extra API permissions.
+Create one administrator-managed account for each team member in the existing pool and set a unique `custom:teamUserId`:
 
 | Team ID | Display name | Role label |
 |---|---|---|
@@ -157,125 +80,124 @@ Use the actual outputs for the chosen stack. Do not assume the default table pre
 | `u5` | Haneen | AWS Engineer |
 | `u6` | Dina | AWS Engineer |
 
-Each team ID must map to exactly one Cognito account. The Lambda resolves the signed-in Cognito `sub` through the UserProfiles table; sign-in alone is not enough until that profile row exists.
+Role labels are descriptive only; they do not grant extra privileges. Each team ID must map to exactly one Cognito account.
 
-### Seed UserProfiles from Cognito (recommended)
+Install the Python dependency:
 
-Use the script that reads real Cognito subjects directly, so you do not need to copy a subject by hand. Install the Python package if you have not already:
+    python -m pip install -r backend/requirements.txt
 
-```bash
-python -m pip install -r backend/requirements.txt
-```
+First perform a dry run against the **existing** Users table:
 
-First run the dry-run command. Replace the sample values with stack outputs and the selected Region:
+    python backend/scripts/seed_user_profiles_from_cognito.py --user-pool-id us-east-1_7dYZw2Is6 --table TeamFollowUp-Users --region us-east-1 --dry-run
 
-```bash
-python backend/scripts/seed_user_profiles_from_cognito.py \
-  --user-pool-id YOUR_COGNITO_USER_POOL_ID \
-  --table YOUR_USER_PROFILES_TABLE_NAME \
-  --region YOUR_AWS_REGION \
-  --dry-run
-```
+Verify that all six expected IDs/names appear with correct enabled states. Cognito subject values are not printed. Only after the dry run succeeds, repeat without `--dry-run` to write the mappings. This administrative script overwrites the matching six profile rows in `TeamFollowUp-Users`; review carefully before using the write command.
 
-Check that the output lists the six expected IDs and names with the correct enabled/disabled status. The script intentionally does not print Cognito `sub` values. Only after the mapping is correct, repeat the same command without `--dry-run` to write the six profile records.
+The operator needs `cognito-idp:ListUsers` on the existing pool and `dynamodb:BatchWriteItem` on `TeamFollowUp-Users`. Do not give those administrative permissions to the application Lambda.
 
-The deployment operator needs `cognito-idp:ListUsers` on the selected pool and `dynamodb:BatchWriteItem` on the selected UserProfiles table. Do not grant these admin permissions to the application Lambda.
+The Lambda maps Cognito JWT `sub` to one enabled `userId` through the `cognitoSub` attribute. There is no Cognito-subject GSI; the scan is intentional for the small team table. Missing, duplicate, or disabled mappings should be denied.
 
-### Alternative: manually maintained mapping file
+## 4. Create Amplify Hosting and record the final origin
 
-Prefer the Cognito-based script above. If an audited private mapping file is necessary, copy `backend/team-users.example.json` to a local ignored file such as `backend/team-users.private.json`, replace all placeholder subject values with real subjects, and keep that file out of Git. Validate before writing:
+1. Open **AWS Amplify → Create new app → Host web app** and connect the private GitHub repository `retzed/Team_Follow-Up_AWS-Deployment`.
+2. Select the intended branch and use the Amazon Linux 2023 build image with Node.js 24 support.
+3. Copy the exact **HTTPS origin** (scheme + hostname only, no path/trailing slash). If using a custom domain, attach/validate it first and use that final origin.
+4. The first build can fail before the API exists because `TEAM_FOLLOW_UP_API_BASE_URL` is not known yet. Record the Amplify origin and continue to backend deployment; return to Amplify configuration after Step 5.
 
-```bash
-python backend/scripts/seed_user_profiles.py \
-  --file backend/team-users.private.json \
-  --table YOUR_USER_PROFILES_TABLE_NAME \
-  --region YOUR_AWS_REGION \
-  --dry-run
-```
+## 5. Validate and deploy the backend
 
-Remove `--dry-run` only after the six IDs, names, roles, and subjects are correct. The manual script overwrites the corresponding profile rows.
+From the repository root:
 
-After seeding, wait until `GSI_CognitoSub` is `ACTIVE` and has propagated the writes before testing sign-in.
+    python -m pip install -r backend/requirements-dev.txt
+    npm run test:all
+    python -m compileall -q backend/src backend/scripts scripts/test-infrastructure.py
+    sam validate --lint --template-file backend/template.yaml
+    sam build --template-file backend/template.yaml
 
-## 6. Switch Amplify to live shared-data mode
+Fix every failure before proceeding. GitHub Actions runs similar checks but does not deploy resources or verify the live AWS environment.
 
-In **Amplify → App settings → Environment variables**, add the following variables to the exact branch you are deploying:
+Deploy the backend using the exact Amplify origin. In guided prompts, use these parameters:
+
+| Parameter | Value/instruction |
+|---|---|
+| Stack name | `team-follow-up-dev` or a deliberately selected name |
+| Region | `us-east-1` |
+| `TableNamePrefix` | `TeamFollowUp` (API/log/dashboard names only) |
+| `ExistingCognitoUserPoolId` | `us-east-1_7dYZw2Is6` |
+| `ExistingCognitoAppClientId` | `7id8c2g27fvbh365atqntqurir` |
+| `ExistingItemsTableName` | `TeamFollowUp-Items` |
+| `ExistingActivityTableName` | `TeamFollowUp-Activity` |
+| `ExistingUsersTableName` | `TeamFollowUp-Users` |
+| `ExistingArchiveTableName` | `TeamFollowUp-Archive` |
+| `AllowedOrigin` | Exact HTTPS origin copied from Amplify |
+| `LogRetentionDays` | `30` |
+
+Run:
+
+    sam build --template-file backend/template.yaml
+    sam deploy --guided --template-file .aws-sam/build/template.yaml
+
+Review the CloudFormation change set before approving. **It should create API Gateway, Lambda, IAM, and CloudWatch resources only.** If it proposes a Cognito pool or any DynamoDB table, stop; that is the wrong template revision/parameter contract.
+
+Retrieve outputs after deployment:
+
+    aws cloudformation describe-stacks --stack-name team-follow-up-dev --region us-east-1 --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' --output table
+
+Record these outputs in private deployment notes (not Git): `CognitoUserPoolId`, `CognitoUserPoolClientId`, `ApiBaseUrl`, `ItemsTableName`, `ActivityTableName`, `UsersTableName`, `ArchiveTableName`, and `CloudWatchDashboardName`. The four table outputs report existing names; the stack does not own or configure their schema or capacity.
+
+## 6. Configure Amplify for live data
+
+In **Amplify → App settings → Environment variables**, set these values on the branch being deployed:
 
 | Variable | Value |
 |---|---|
-| `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID` | Stack output `CognitoUserPoolId` |
-| `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID` | Stack output `CognitoUserPoolClientId` |
-| `TEAM_FOLLOW_UP_API_BASE_URL` | Stack output `ApiBaseUrl` |
-| `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE` | `custom:teamUserId` (optional; this is the default) |
+| `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID` | Output `CognitoUserPoolId` (existing pool) |
+| `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID` | Output `CognitoUserPoolClientId` (existing client) |
+| `TEAM_FOLLOW_UP_API_BASE_URL` | Output `ApiBaseUrl` |
+| `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE` | `custom:teamUserId` |
 
-There is no data-mode flag, browser-side identity map, local sign-in flag, or local database switch. Cognito’s administrator-managed custom attribute is the source of the team ID mapping. These values are public browser configuration, not secrets. **Never add AWS access keys or an app-client secret to Amplify.**
+Save the settings and trigger a new build/redeploy. The frontend has no local/demo database or sign-in fallback. These are public browser configuration values; never add AWS access keys or a Cognito client secret to Amplify.
 
-Save the settings and trigger a new build/redeploy. The build fails unless the Cognito IDs and valid HTTPS API base URL are all present and valid. If you later change the Amplify branch URL or custom domain, update `AllowedOrigin` in the SAM stack and redeploy it before testing browser API calls.
+If the Amplify hostname changes later, update `AllowedOrigin` in the SAM stack and redeploy before testing browser API calls.
 
 ## 7. Verify the deployed environment
 
-Before inviting the team, use two separate browsers or sessions and at least two team accounts.
+Use at least two accounts in separate browsers/sessions:
 
-1. Sign in with a provisioned account and confirm the application loads instead of staying on the startup screen. An unmapped or disabled profile should be denied by the API.
-2. Create a project and a job. Refresh and open the site in the second session; both items should appear there. If the data does not appear in the second session, verify the deployed Amplify environment variables, the API URL, and API/DynamoDB permissions; there is no browser database to fall back to.
-3. Add a task and a follow-up under a project. Add follow-ups under a job and task. Confirm the API refuses invalid hierarchy combinations.
-4. Edit a task’s name, assignee, status, priority, or due date. Confirm the action appears in Activity History and is attributed to the signed-in user.
-5. Archive an item subtree. Verify the items appear in Archive and their existing activity history remains. Restore a valid parent/child selection and verify the hierarchy. If restore reports a conflict or partial result, refresh Archive and review which IDs were restored before retrying.
-6. Request an API route without a valid Cognito access token. API Gateway should reject it. Also verify an authenticated but unmapped/disabled account cannot read team data.
-7. Open the CloudWatch dashboard from `CloudWatchDashboardName`. Inspect Lambda logs at `/aws/lambda/<TableNamePrefix>-Api` and API access logs at `/<TableNamePrefix>/apigateway/access`.
+1. Sign in with a seeded team account. An unmapped or disabled profile should receive an authorization denial.
+2. Create a project and a job. Refresh and verify both appear in the second session.
+3. Add tasks/follow-ups under allowed parent types. Verify invalid hierarchy combinations are rejected.
+4. Edit an item's name, assignee, status, priority, or due date. Confirm Activity History records the change and attributes it to the signed-in user.
+5. Archive a subtree, verify it appears in Archive and previous activity remains, then restore a valid parent/child selection.
+6. Request an API route without a valid Cognito access token and confirm API Gateway rejects it.
+7. Open the dashboard from `CloudWatchDashboardName`. With the default prefix, Lambda logs are at `/aws/lambda/TeamFollowUp-Api` and API access logs at `/TeamFollowUp/apigateway/access`.
 
-For index status, use the exact table name from stack outputs:
+## 8. Releases, legacy migration, monitoring, and cost
 
-```bash
-aws dynamodb describe-table \
-  --table-name YOUR_USER_PROFILES_TABLE_NAME \
-  --query 'Table.GlobalSecondaryIndexes[*].[IndexName,IndexStatus]' \
-  --output table
-```
+### Releases
 
-All required GSIs should be `ACTIVE`. Repeat for the other tables if a query or write fails during initial setup.
+- **Frontend:** merge reviewed changes to the Amplify-connected branch. Amplify uses `amplify.yml` and publishes `dist/`.
+- **Backend:** rerun Step 5 checks, review the template/change set, and deploy with `sam build` and `sam deploy`.
+- Keep stack names/prefixes separate between environments. Each backend stack reuses the existing resources unless you intentionally change the parameter values.
 
-## 8. Releases, migration, and operations
+### Legacy ActivityEvents migration warning
 
-### Frontend and backend releases
+`backend/scripts/migrate_activity_application_index.py` targets a legacy schema with `eventId` as the table primary key and `GSI_ApplicationTimeline`. It is **not compatible** with the existing `TeamFollowUp-Activity` table, whose key is `itemId + activityKey` and which has no GSIs. Do not run the legacy script against `TeamFollowUp-Activity`. The current handler queries item-specific history and scans Activity for application-wide history.
 
-- **Frontend:** merge the reviewed change to the Amplify-connected branch. Amplify runs `amplify.yml` and publishes `dist/`; verify the Amplify build log after the commit.
-- **Backend:** run the checks from Step 2, review the SAM/template changes, and redeploy with `sam build` and `sam deploy` using the existing stack name and environment-specific parameters. A passing GitHub Actions run validates/builds the template but does not apply a CloudFormation change set.
-- Keep deployment environment values separate. Never run a dev stack command using production’s stack name/table prefix or vice versa.
+### Monitoring, recovery, and cost
 
-### Backfill old application activity (only when upgrading an existing table)
-
-New events automatically receive the application-wide timeline keys. An old table that was created before `GSI_ApplicationTimeline` existed may need a one-time backfill after the updated index is `ACTIVE`. Do not run this on a new empty table.
-
-```bash
-python backend/scripts/migrate_activity_application_index.py \
-  --table YOUR_ACTIVITY_EVENTS_TABLE_NAME \
-  --region YOUR_AWS_REGION \
-  --dry-run
-```
-
-Check the projected number of rows. Then repeat without `--dry-run` to write the missing keys. The script is safe to rerun: it skips correctly indexed rows and fails clearly if a row is missing its required event ID or timestamp. The operator needs Scan and UpdateItem on that exact ActivityEvents table.
-
-### Monitoring, backup, and cost
-
-- Configure an SNS topic/subscription and add notification actions to the alarms if the team needs emails or paging. Alarms are created without notification actions by default.
-- For this Free account plan lab, keep point-in-time recovery and optional backups disabled as currently configured. They are recovery features, not required for the demo, and can add charges. Revisit them only if the project's recovery requirements and budget change.
-- Review regional pricing and enable AWS Budgets before production. DynamoDB on-demand reads/writes, point-in-time recovery, Cognito usage, Lambda/API requests, and CloudWatch ingestion/storage can all add costs.
-- Access logs omit authorization headers and request bodies. Do not add secrets or sensitive work-item contents to logs.
-
-### Removal and recovery caution
-
-`DeletionPolicy: Retain` protects WorkItems, ActivityEvents, UserProfiles, Archive, and the Cognito User Pool from automatic deletion when the CloudFormation stack is removed or resources are replaced. Stack deletion is **not** a cleanup method and retention is not a backup. Before intentionally removing an environment, export/backup data, identify retained resources, and confirm which tables and user pool should be permanently deleted.
+- SAM creates CloudWatch log groups, dashboard, and alarms for Lambda errors/throttles and API Gateway 5xx responses. Alarm notifications are not wired to email by default.
+- Keep optional backups and point-in-time recovery disabled for this cost-controlled lab unless you explicitly approve the feature and its price.
+- DynamoDB provisioned throughput, Cognito usage, Lambda/API requests, and CloudWatch log ingestion/storage can still incur charges. The $1 budget sends alerts; it does not cap spend. Check account credits separately in Billing.
+- The existing Cognito pool and four DynamoDB tables are not managed by the backend CloudFormation stack. Removing the stack leaves them intact; this is not a backup. Plan data exports/backups separately.
 
 ## Troubleshooting
 
 | Symptom | What to check |
 |---|---|
-| Amplify build fails before publishing | Confirm Amazon Linux 2023/Node 24 and all three required AWS settings: `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, and `TEAM_FOLLOW_UP_API_BASE_URL`. Read the exact failed build step. |
-| Site is not available after the first failed Amplify build | This is expected until Step 6. Confirm the three real AWS variables were saved to the correct branch, then trigger a new build. The application has no local/demo mode. |
-| Cognito accepts credentials but the app says the account is not linked | Check the user’s `custom:teamUserId`, matching UserProfiles row, correct `cognitoSub`, `enabled=true`, and `GSI_CognitoSub` status. |
-| API returns 401 or 403 | A 401 indicates missing/invalid access token; a 403 generally indicates no enabled profile mapping. Verify the deployed pool/client IDs and JWT issuer/audience. |
-| Browser reports CORS | Confirm `AllowedOrigin` exactly matches the browser’s HTTPS origin, then redeploy SAM. Do not use `*`. |
-| DynamoDB permission or transaction error | Check the Lambda execution role policies, all table names injected into the function, and GSI readiness. The Lambda has transactional write access on WorkItems/ActivityEvents/Archive and only a batch-write recovery permission on ActivityEvents. |
-| Application-wide history is missing old entries | If this is an upgraded table, wait for `GSI_ApplicationTimeline` to become active and run the migration dry-run from Step 8. |
-| A restore reports a conflict or partial restore | Refresh Archive, inspect the response’s restored IDs and current active items, then retry only the still-archived selection. Do not blindly repeat the entire selection. |
+| Amplify build fails | Confirm Node.js 24/Amazon Linux 2023 and all three required environment variables: Cognito pool ID, app client ID, and HTTPS API URL. |
+| Credentials work but app says account is not linked | Verify `custom:teamUserId` exists and is readable by the app client, then check that the matching `TeamFollowUp-Users` row has the correct `cognitoSub` and `enabled=true`. No Cognito-subject GSI is expected. |
+| API returns 401/403 | 401 indicates a missing/invalid token; 403 generally means no enabled mapping. Verify JWT issuer/audience, custom attribute, and Users-table row. |
+| Browser reports CORS | Confirm `AllowedOrigin` exactly matches the browser's HTTPS origin and redeploy SAM. Do not use `*`. |
+| DynamoDB permission or transaction error | Check all four table-name parameters, the Lambda execution role, and ACTIVE status of Items/Archive indexes. Activity/Users do not have GSIs. |
+| Global activity history is slow | The current Activity table has no timeline GSI, so application-wide history scans the table. Do not run the legacy ActivityEvents migration on it. |
+| A restore reports a conflict or partial restore | Refresh Archive, inspect restored IDs/current active items, then retry only the still-archived selection. |

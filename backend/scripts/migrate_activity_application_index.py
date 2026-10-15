@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Backfill application-wide timeline keys on existing ActivityEvents rows.
+"""Legacy-only migration for a separate ActivityEvents table keyed by eventId.
 
-Run after GSI_ApplicationTimeline is ACTIVE. Requires Scan and UpdateItem
-permissions on the exact ActivityEvents table. Safe to rerun: correct keys are skipped.
+This is NOT compatible with the current TeamFollowUp-Activity table (itemId +
+activityKey, no GSIs). Never run it against TeamFollowUp-Activity.
 """
 import argparse
 import os
@@ -48,6 +48,8 @@ def main(argv=None):
 
     if not args.region:
         parser.error("Pass --region or set AWS_REGION/AWS_DEFAULT_REGION.")
+    if args.table == "TeamFollowUp-Activity":
+        parser.error("TeamFollowUp-Activity uses itemId + activityKey and has no application timeline GSI; this legacy ActivityEvents migration is incompatible.")
     if not 1 <= args.workers <= 32:
         parser.error("--workers must be between 1 and 32.")
     if not 1 <= args.page_size <= 500:

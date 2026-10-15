@@ -111,7 +111,8 @@ def validate_console_bootstrap():
         "TeamFollowUp-Archive": expected_archive_indexes,
     }
     documented_tables = {row.get("name"): row for row in schema.get("tables", [])}
-    if set(documented_tables) != expected_names:
+    expected_documented_names = {"TeamFollowUp-Items", "TeamFollowUp-Activity", "TeamFollowUp-Users", "TeamFollowUp-Archive"}
+    if set(documented_tables) != expected_documented_names:
         fail("table-schema.json must document the same four existing DynamoDB tables, not an un-deployed target schema.")
     for table_name, indexes in expected_table_indexes.items():
         row = documented_tables[table_name]

@@ -81,7 +81,7 @@ def load_profiles(path):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--file", required=True, help="Private JSON file containing the six actual Cognito sub values.")
-    parser.add_argument("--table", required=True, help="Exact UserProfiles table name from the SAM stack outputs.")
+    parser.add_argument("--table", required=True, help="Existing Users table name; use TeamFollowUp-Users in the current lab.")
     parser.add_argument("--region", required=True, help="AWS Region where the table exists.")
     parser.add_argument("--dry-run", action="store_true", help="Validate and preview the mapping without writing records.")
     args = parser.parse_args(argv)

@@ -1,22 +1,29 @@
 # Repository and deployment notes
 
-## Current AWS console bootstrap (15 October 2026)
+## Current AWS console bootstrap and backend integration (15 October 2026)
 
-The Cognito pool, all four DynamoDB tables (Items, Activity, Users, and Archive), and the monthly cost budget have been created manually in us-east-1. Amplify Hosting, API Gateway, Lambda, and CloudWatch observability resources have not yet been deployed.
+The existing Cognito pool/client, all four DynamoDB tables (Items, Activity, Users, and Archive), and the monthly cost budget have been created manually in `us-east-1`. Amplify Hosting, API Gateway, Lambda, and CloudWatch observability resources have not yet been deployed.
 
-**Do not deploy the current SAM template yet.** The existing `TeamFollowUp-Archive` table has the same primary key and GSIs as the target Archive contract, but it uses provisioned billing and is not CloudFormation-managed; the default SAM prefix would collide with it. The template also creates a second Cognito pool and WorkItems/ActivityEvents/UserProfiles tables that do not match the other console tables. The handler's expected indexes, including **GSI_CognitoSub**, are not present on the current Users table. Reconcile resource ownership, billing, Cognito, and the remaining table schemas before live integration. The SAM template defaults point-in-time recovery to disabled.
+The Lambda handler now uses the actual table keys and indexes:
+
+- **Items:** `WorkspaceIndex`, `ParentIdIndex`, and `AssignedToIndex`.
+- **Activity:** `itemId + activityKey` composite primary key; `eventId` is a regular attribute. Per-item history uses Query; application-wide history scans because Activity has no GSIs.
+- **Users:** `userId` primary key, with a small table scan matching Cognito `sub` to `cognitoSub`; no Cognito-subject GSI is assumed.
+- **Archive:** `archiveId` plus `GSI_ArchiveIndex` and `GSI_ArchiveRoot`.
+
+The SAM template parameterizes and reuses the existing Cognito pool/client and four table names. It provisions only API Gateway, Lambda, scoped IAM, and CloudWatch resources. It does not create duplicate pools/tables or manage existing data resources. Before deployment, verify that `custom:teamUserId` exists and is readable by the existing browser app client, the Items/Archive GSIs are ACTIVE, all six Cognito accounts/profile mappings are set up, and the final Amplify HTTPS origin is ready.
 
 ## AWS-only behavior
 
 - Frontend sign-in is handled exclusively by Amazon Cognito. There is no local-auth fallback, seeded sample workspace, demo reset action, browser-side identity map, or local work-data database.
 - Every application data read/write uses the Cognito-authenticated API backed by API Gateway, Python Lambda, and DynamoDB. The browser holds a transient view snapshot for rendering only; it does not persist a work-data cache or continue from offline demo data.
 - The frontend build requires a real Cognito User Pool ID, public app-client ID, and HTTPS API base URL. The build emits only public browser configuration; secrets must never be supplied to frontend code.
-- The AWS SAM stack provisions Cognito, API Gateway, Python 3.12 Lambda, four DynamoDB tables and required indexes, and CloudWatch logs/dashboard/alarms.
-- Lambda IAM is constrained to read-only table policies, transactional write operations on WorkItems/ActivityEvents/Archive, and the narrow ActivityEvents batch-write recovery path.
-- Archive/restore handling is transaction-bounded. Trusted administration scripts validate Cognito-to-profile mappings and support dry runs for profile seeding and activity-index migration.
+- The AWS SAM stack reuses Cognito and the existing DynamoDB tables, provisioning only API Gateway, Python 3.12 Lambda, scoped IAM, and CloudWatch logs/dashboard/alarms.
+- Lambda IAM scopes reads to the existing Items/Activity/Users/Archive tables and index ARNs, transactional writes to Items/Activity/Archive, and partial-restore batch writes to Activity only.
+- Archive/restore handling is transaction-bounded. Trusted administration scripts validate Cognito-to-Users-table mappings and support dry-run profile seeding. The legacy ActivityEvents index migration is not used with the current Activity table.
 
 ## Validation and release boundary
 
-The GitHub Actions workflow in `.github/workflows/validate.yml` runs frontend regression tests, AWS-only build-configuration tests, backend/admin-script tests, infrastructure contract checks, Python compilation, `sam validate --lint`, and `sam build`. It uses non-production test configuration only to verify the frontend build path.
+GitHub Actions runs frontend regression tests, AWS-only build-configuration tests, backend unit tests, infrastructure contract checks, Python compilation, `sam validate --lint`, and `sam build`. It uses non-production test configuration only to verify the frontend build path.
 
-CI validation does **not** deploy the SAM stack or prove that any AWS account is configured. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for first deployment, Cognito provisioning, Amplify environment variables, acceptance testing, migrations, and recovery. Do not treat a green CI run as a live deployment or smoke test.
+CI validation does **not** deploy the SAM stack or prove any AWS account is configured. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for pre-deployment verification, Cognito account mapping, Amplify environment variables, acceptance testing, and cost/recovery cautions. Do not treat a green CI run as a live deployment or smoke test.

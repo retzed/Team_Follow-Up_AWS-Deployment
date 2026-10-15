@@ -27,7 +27,7 @@ The backend is defined in `backend/template.yaml` and deployed with AWS SAM; Amp
 
 `index.html` contains the frontend. `scripts/build.mjs` generates `dist/index.html` and refuses to build unless real Cognito IDs and an HTTPS API base URL are configured. The `backend/` directory contains the SAM template, Lambda handler, DynamoDB schema reference, administrative seeding/migration scripts, and tests. The `docs/` directory contains the detailed architecture and deployment runbooks.
 
-## Local validation (not local application runtime)
+## Local validation
 
 Requirements: Node.js 24, Python 3.12, and AWS SAM CLI for infrastructure validation. These commands test/build the package only; they do not run an alternative local database or local sign-in mode.
 

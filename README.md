@@ -11,6 +11,7 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 - **[AWS console implementation record](docs/IMPLEMENTATION.md)** — actual resources and settings currently configured in AWS.
 - **[Deployment guide](docs/DEPLOYMENT.md)** — target deployment workflow, Cognito team mapping, and pre-deployment verification.
 - **[Architecture guide](docs/ARCHITECTURE.md)** — request flow, security boundaries, data model, and operational design.
+- **[Complete project documentation](docs/DOCUMENTATION.md)** — system analysis/design, diagrams, data model, UI/UX, API, testing, and deployment.
 - **[Release notes](RELEASE_NOTES.md)** — implementation and validation notes.
 
 ## Target architecture (not yet fully deployed)

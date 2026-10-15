@@ -278,8 +278,8 @@ flowchart TB
             Dashboard[CloudWatch dashboard]
             Alarms[CloudWatch alarms]
         end
-        Budget[AWS Budgets<br/>monthly cost alerts]
     end
+    Budget[AWS Budgets<br/>account-level monthly cost alerts]
     GitHub[GitHub repository]
 
     GitHub -->|branch build| Hosting

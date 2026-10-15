@@ -1163,7 +1163,7 @@ python backend/scripts/seed_user_profiles_from_cognito.py --user-pool-id <POOL_I
 
 Confirm the six expected IDs/names and enabled states, then repeat without `--dry-run` to write the corresponding `cognitoSub` profile mappings. The script can overwrite the six matching Users profile rows; review before running the write operation. Use administrator credentials with Cognito `ListUsers` and DynamoDB `BatchWriteItem` permission on Users. Do not grant those administration permissions to the application Lambda, and do not commit real `sub` values or usernames.
 
-### 11.3 Console-first Amplify, Lambda and API setup
+### 11.3 AWS Console Amplify, Lambda and API setup
 
 Follow the full service-by-service procedure in [`DEPLOYMENT.md`](DEPLOYMENT.md). The key settings are summarized here as a design cross-check.
 

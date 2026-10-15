@@ -1,36 +1,43 @@
 {
   "tables": [
     {
-      "name": "TeamFollowUp-WorkItems",
-      "physicalNameTemplate": "${TableNamePrefix}-WorkItems",
+      "name": "TeamFollowUp-Items",
+      "physicalNameTemplate": "${ExistingItemsTableName}",
+      "billingMode": "PROVISIONED",
+      "tableClass": "STANDARD",
       "primaryKey": {
-        "partition": "itemId"
+        "partition": "itemId",
+        "partitionType": "S",
+        "sort": null
+      },
+      "provisionedThroughput": {
+        "readCapacityUnits": 1,
+        "writeCapacityUnits": 1
       },
       "gsis": [
         {
-          "name": "GSI_ListUpdated",
-          "pk": "listPK",
-          "sk": "updatedSort"
+          "name": "ParentIdIndex",
+          "pk": "parentId",
+          "sk": "createdAt",
+          "projection": "ALL",
+          "readCapacityUnits": 1,
+          "writeCapacityUnits": 1
         },
         {
-          "name": "GSI_ListCreated",
-          "pk": "listPK",
-          "sk": "createdSort"
+          "name": "AssignedToIndex",
+          "pk": "assignedTo",
+          "sk": "updatedAt",
+          "projection": "ALL",
+          "readCapacityUnits": 1,
+          "writeCapacityUnits": 1
         },
         {
-          "name": "GSI_RootUpdated",
-          "pk": "rootPK",
-          "sk": "rootUpdatedSort"
-        },
-        {
-          "name": "GSI_AssignedUpdated",
-          "pk": "assigneePK",
-          "sk": "assigneeUpdatedSort"
-        },
-        {
-          "name": "GSI_AssignedCreated",
-          "pk": "assigneePK",
-          "sk": "assigneeCreatedSort"
+          "name": "WorkspaceIndex",
+          "pk": "workspaceKey",
+          "sk": "createdAt",
+          "projection": "ALL",
+          "readCapacityUnits": 1,
+          "writeCapacityUnits": 1
         }
       ],
       "businessFields": [
@@ -42,92 +49,117 @@
         "parentId",
         "rootParentId",
         "ownerId",
+        "assignedTo",
+        "workspaceKey",
         "createdByUserId",
         "createdAt",
         "updatedByUserId",
         "updatedAt",
         "dueDate",
         "version"
+      ],
+      "notes": [
+        "Top-level project/job rows receive workspaceKey=WORKSPACE; child rows use parentId for ParentIdIndex.",
+        "ownerId remains the UI/business field; assignedTo duplicates it solely for the existing AssignedToIndex."
       ]
     },
     {
-      "name": "TeamFollowUp-ActivityEvents",
-      "physicalNameTemplate": "${TableNamePrefix}-ActivityEvents",
+      "name": "TeamFollowUp-Activity",
+      "physicalNameTemplate": "${ExistingActivityTableName}",
+      "billingMode": "PROVISIONED",
+      "tableClass": "STANDARD",
       "primaryKey": {
-        "partition": "eventId"
+        "partition": "itemId",
+        "partitionType": "S",
+        "sort": "activityKey",
+        "sortType": "S"
       },
-      "gsis": [
-        {
-          "name": "GSI_ItemTimeline",
-          "pk": "itemPK",
-          "sk": "itemSort"
-        },
-        {
-          "name": "GSI_ApplicationTimeline",
-          "pk": "applicationPK",
-          "sk": "applicationSort"
-        },
-        {
-          "name": "GSI_RootTimeline",
-          "pk": "rootPK",
-          "sk": "rootSort"
-        },
-        {
-          "name": "GSI_ParentTimeline",
-          "pk": "parentPK",
-          "sk": "parentSort"
-        }
-      ],
+      "provisionedThroughput": {
+        "readCapacityUnits": 1,
+        "writeCapacityUnits": 1
+      },
+      "gsis": [],
       "businessFields": [
+        "eventId",
         "itemId",
+        "activityKey",
         "itemNameSnapshot",
         "itemTypeSnapshot",
         "rootParentId",
+        "rootParentName",
+        "rootParentType",
         "parentId",
         "ancestorIds",
         "actorUserId",
         "action",
         "summary",
         "kind",
-        "at"
+        "at",
+        "bulkOperation",
+        "affectedCount",
+        "affectedDescendantCount"
+      ],
+      "notes": [
+        "Activity events use itemId as the partition key and activityKey = ISO timestamp + # + unique eventId as the sort key.",
+        "Item-scoped history uses Query on the composite primary key. Application-wide history scans the table because no activity GSI was created."
       ]
     },
     {
-      "name": "TeamFollowUp-UserProfiles",
-      "physicalNameTemplate": "${TableNamePrefix}-UserProfiles",
+      "name": "TeamFollowUp-Users",
+      "physicalNameTemplate": "${ExistingUsersTableName}",
+      "billingMode": "PROVISIONED",
+      "tableClass": "STANDARD",
       "primaryKey": {
-        "partition": "userId"
+        "partition": "userId",
+        "partitionType": "S",
+        "sort": null
       },
-      "gsis": [
-        {
-          "name": "GSI_CognitoSub",
-          "pk": "cognitoSub",
-          "sk": null
-        }
-      ],
+      "provisionedThroughput": {
+        "readCapacityUnits": 1,
+        "writeCapacityUnits": 1
+      },
+      "gsis": [],
       "businessFields": [
+        "userId",
         "displayName",
         "role",
         "enabled",
         "cognitoSub"
+      ],
+      "notes": [
+        "The small six-member user table stores Cognito subject mappings in cognitoSub; Lambda scans it because no Cognito-subject GSI exists."
       ]
     },
     {
       "name": "TeamFollowUp-Archive",
-      "physicalNameTemplate": "${TableNamePrefix}-Archive",
+      "physicalNameTemplate": "${ExistingArchiveTableName}",
+      "billingMode": "PROVISIONED",
+      "tableClass": "STANDARD",
       "primaryKey": {
-        "partition": "archiveId"
+        "partition": "archiveId",
+        "partitionType": "S",
+        "sort": null
+      },
+      "provisionedThroughput": {
+        "readCapacityUnits": 1,
+        "writeCapacityUnits": 1
       },
       "gsis": [
         {
           "name": "GSI_ArchiveIndex",
           "pk": "archivePK",
-          "sk": "archiveSort"
+          "sk": "archiveSort",
+          "projection": "ALL",
+          "readCapacityUnits": 1,
+          "writeCapacityUnits": 1
         },
         {
           "name": "GSI_ArchiveRoot",
           "pk": "archiveRootPK",
-          "sk": "archiveRootSort"
+          "sk": "archiveRootSort",
+          "projection": "ALL",
+          "readCapacityUnits": 1,
+          "writeCapacityUnits": 1
         }
       ],
       "businessFields": [
@@ -148,6 +180,7 @@
         "version",
         "archiveRootId",
         "archiveRootName",
+        "archiveRootType",
         "archiveParentId",
         "archiveParentName",
         "archivedAt",
@@ -155,17 +188,18 @@
       ],
       "notes": [
         "Archived records preserve the original item ID, parent/root relationships, content and timestamps.",
-        "Activity events remain in TeamFollowUp-ActivityEvents and keep their item/root/parent references.",
-        "Restoring moves only selected archived rows back to WorkItems, after validating that every archived ancestor is restored too or already active."
+        "Activity events remain in TeamFollowUp-Activity and retain item-specific histories after a subtree is archived.",
+        "Restore validates parent/child hierarchy before moving selected records back to TeamFollowUp-Items."
       ]
     }
   ],
   "defaultTableNamePrefix": "TeamFollowUp",
   "notes": [
-    "The tables array above documents the intended SAM target schema used by backend/template.yaml and backend/src/handler.py.",
-    "currentConsoleBootstrap records the actual four manually created DynamoDB tables and Cognito/budget settings as of 2026-10-15; it is documentation, not a provisioning mechanism.",
-    "The SAM target stack has not been deployed. Its current table/index contract does not match the console bootstrap.",
-    "The frontend has no local database or demo adapter; all application data is intended to flow through the Cognito-authenticated API once the schema is reconciled."
+    "The tables array is the current manually provisioned DynamoDB contract, also consumed by the Lambda handler and deployment contract tests; this JSON does not provision or import AWS resources.",
+    "backend/template.yaml provisions only API Gateway, Lambda, IAM, CloudWatch logs/dashboard/alarms. It reuses the Cognito pool/client and four DynamoDB tables by parameter and does not create or manage them.",
+    "The handler uses only existing Items/Activity/Archive indexes. It scans the small Users table for cognitoSub because no GSI_CognitoSub exists, and scans Activity for application-wide history because Activity has no GSIs.",
+    "The existing activity table's itemId + activityKey primary key is authoritative; eventId is a regular attribute and not a table key.",
+    "The frontend has no local database/demo adapter; application data goes through the Cognito-authenticated API."
   ],
   "samTargetResourcesDeployed": false,
   "currentConsoleBootstrap": {
@@ -350,13 +384,35 @@
       "Cognito domain, callback URL, and sign-out URL",
       "Cognito team accounts and their DynamoDB profile mappings"
     ],
-    "compatibilityWarning": "This records resources created manually in the console; it is not a provisioning mechanism. TeamFollowUp-Archive exists with archiveId as its String partition key and GSI_ArchiveIndex (archivePK/archiveSort) plus GSI_ArchiveRoot (archiveRootPK/archiveRootSort), all projected. Its provisioned billing mode differs from the target SAM template's on-demand billing, and the table is not managed by CloudFormation. With the default TeamFollowUp prefix, the SAM ArchiveTable resource would collide with this existing physical table. The SAM template also provisions a separate Cognito pool and WorkItems, ActivityEvents, and UserProfiles tables whose names, keys, or indexes do not match the console-created Items, Activity, and Users tables. Do not deploy the target template or connect the current handler until resource ownership, billing settings, and the data-model contract have been reconciled.",
+    "compatibilityWarning": "The handler and SAM template are aligned to the four manually created tables: Items uses ParentIdIndex, AssignedToIndex and WorkspaceIndex; Activity uses itemId + activityKey and no GSIs; Users uses userId and no GSIs; Archive uses archiveId plus GSI_ArchiveIndex and GSI_ArchiveRoot. The SAM stack parameterizes and reuses the existing Cognito pool/client and table names instead of provisioning duplicate data resources. Verify the custom:teamUserId Cognito attribute and browser app-client settings before deployment. Application-wide activity queries scan TeamFollowUp-Activity, and profile lookup scans the six-member Users table.",
     "capacitySummary": {
       "baseTables": 4,
       "globalSecondaryIndexes": 5,
       "readCapacityUnits": 9,
       "writeCapacityUnits": 9,
       "explanation": "Four base tables at 1 RCU/1 WCU each, plus three Items GSIs and two Archive GSIs at 1 RCU/1 WCU each."
+    },
+    "backendIntegration": {
+      "status": "code-aligned; not deployed",
+      "cognitoPoolParameter": "ExistingCognitoUserPoolId",
+      "cognitoAppClientParameter": "ExistingCognitoAppClientId",
+      "tableParameters": {
+        "TeamFollowUp-Items": "ExistingItemsTableName",
+        "TeamFollowUp-Activity": "ExistingActivityTableName",
+        "TeamFollowUp-Users": "ExistingUsersTableName",
+        "TeamFollowUp-Archive": "ExistingArchiveTableName"
+      },
+      "requiredManualVerification": [
+        "Confirm custom:teamUserId exists in the existing Cognito pool and the existing app client can read it.",
+        "Confirm the existing browser app client has no client secret and supports the frontend's sign-in flow.",
+        "Confirm all required DynamoDB tables and GSIs are ACTIVE in us-east-1."
+      ],
+      "accessPatternNotes": [
+        "Work-item queries use WorkspaceIndex, ParentIdIndex, and AssignedToIndex.",
+        "Activity rows use the existing itemId + activityKey composite primary key.",
+        "Application-wide activity reads use Scan because the current Activity table has no GSI.",
+        "Cognito subject lookup uses Scan over the small Users table because the current Users table has no GSI."
+      ]
     }
   },
   "thisFileProvisionsAwsResources": false

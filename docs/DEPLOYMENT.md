@@ -42,7 +42,7 @@ In **Amazon Cognito → User pools**, select that exact pool and verify:
 
 - The custom attribute `custom:teamUserId` appears in the schema. The operator confirmed it was added on **15 October 2026**; this repository has not queried the live AWS configuration.
 - Its intended schema settings are **String**, minimum length **1**, maximum length **32**, and **Mutable** enabled.
-- Under **App clients → Team_FollowUp → Attribute permissions → Edit**, enable **Read** and disable **Write** for `custom:teamUserId`. Ensure **Write** is disabled for this attribute on every other app client in the pool as well. The attribute is mutable at the pool level, so browser clients must not be allowed to change the team ID.
+- Under **App clients → Team_FollowUp → Attribute permissions → Edit**, the operator confirmed that **Read is enabled and Write is disabled** for `custom:teamUserId`. Also check every other app client in the pool and ensure **Write** is disabled there too; that broader setting has not yet been confirmed. The attribute is mutable at the pool level, so browser clients must not be allowed to change the team ID.
 - The `Team_FollowUp` app client is a browser/public client with **no client secret** and supports the sign-in/token flow used by the frontend.
 - Self-registration remains disabled.
 

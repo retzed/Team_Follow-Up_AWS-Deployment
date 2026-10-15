@@ -61,12 +61,13 @@ def validate_console_bootstrap():
         fail("Cognito bootstrap must record the instructed String/1-32/mutable teamUserId settings.")
     app_client_permissions = cognito.get("teamUserIdAttributePermissions", {})
     followup_permissions = app_client_permissions.get("Team_FollowUp", {})
-    if followup_permissions.get("read") != "not yet verified":
-        fail("Cognito bootstrap must keep the Team_FollowUp attribute-read permission marked as unverified until checked live.")
-    if "must be disabled" not in followup_permissions.get("write", ""):
-        fail("Cognito bootstrap must explicitly note that app-client write access to teamUserId must be disabled.")
-    if "must be disabled" not in app_client_permissions.get("allAppClients", {}).get("write", ""):
-        fail("Cognito bootstrap must require teamUserId write permission to be disabled on every app client.")
+    if "enabled per operator confirmation" not in followup_permissions.get("read", ""):
+        fail("Cognito bootstrap must reflect the operator-confirmed enabled Read permission for Team_FollowUp.")
+    if "disabled per operator confirmation" not in followup_permissions.get("write", ""):
+        fail("Cognito bootstrap must reflect the operator-confirmed disabled Write permission for Team_FollowUp.")
+    other_clients_write = app_client_permissions.get("otherAppClients", {}).get("write", "")
+    if "must be disabled" not in other_clients_write or "not yet confirmed" not in other_clients_write:
+        fail("Cognito bootstrap must distinguish the required other-client Write restriction from its unconfirmed status.")
 
     table_rows = bootstrap.get("dynamodb", [])
     tables = {row.get("name"): row for row in table_rows if isinstance(row, dict)}

@@ -217,7 +217,7 @@
       "domainAndCallbackUrls": "not configured yet",
       "teamAccountsCreated": false,
       "teamUserIdAttribute": "custom:teamUserId",
-      "teamUserIdAttributeStatus": "added per operator confirmation on 2026-10-15; app-client permissions pending verification",
+      "teamUserIdAttributeStatus": "added per operator confirmation on 2026-10-15; Team_FollowUp Read enabled and Write disabled per operator confirmation; other app-client permissions pending verification",
       "teamUserIdAttributeSettings": {
         "dataType": "String",
         "minLength": 1,
@@ -227,11 +227,11 @@
       },
       "teamUserIdAttributePermissions": {
         "Team_FollowUp": {
-          "read": "not yet verified",
-          "write": "not yet verified; must be disabled"
+          "read": "enabled per operator confirmation on 2026-10-15",
+          "write": "disabled per operator confirmation on 2026-10-15"
         },
-        "allAppClients": {
-          "write": "must be disabled for custom:teamUserId"
+        "otherAppClients": {
+          "write": "must be disabled; not yet confirmed"
         }
       }
     },
@@ -400,7 +400,7 @@
       "Cognito domain, callback URL, and sign-out URL",
       "Cognito team accounts and their DynamoDB profile mappings"
     ],
-    "compatibilityWarning": "The handler and SAM template are aligned to the four manually created tables: Items uses ParentIdIndex, AssignedToIndex and WorkspaceIndex; Activity uses itemId + activityKey and no GSIs; Users uses userId and no GSIs; Archive uses archiveId plus GSI_ArchiveIndex and GSI_ArchiveRoot. The SAM stack parameterizes and reuses the existing Cognito pool/client and table names instead of provisioning duplicate data resources. The custom:teamUserId attribute was added on 2026-10-15 per operator confirmation; verify its schema settings and app-client read/write permissions before deployment. Application-wide activity queries scan TeamFollowUp-Activity, and profile lookup scans the six-member Users table.",
+    "compatibilityWarning": "The handler and SAM template are aligned to the four manually created tables: Items uses ParentIdIndex, AssignedToIndex and WorkspaceIndex; Activity uses itemId + activityKey and no GSIs; Users uses userId and no GSIs; Archive uses archiveId plus GSI_ArchiveIndex and GSI_ArchiveRoot. The SAM stack parameterizes and reuses the existing Cognito pool/client and table names instead of provisioning duplicate data resources. The custom:teamUserId attribute was added on 2026-10-15 per operator confirmation; Read is enabled and Write disabled for Team_FollowUp per operator confirmation. Verify Write restrictions on other app clients before deployment. Application-wide activity queries scan TeamFollowUp-Activity, and profile lookup scans the six-member Users table.",
     "capacitySummary": {
       "baseTables": 4,
       "globalSecondaryIndexes": 5,
@@ -419,8 +419,8 @@
         "TeamFollowUp-Archive": "ExistingArchiveTableName"
       },
       "requiredManualVerification": [
-        "The operator confirmed custom:teamUserId was added to the existing Cognito pool; verify it appears in the correct pool and the Team_FollowUp app client can read it.",
-        "Disable Write permission for custom:teamUserId on every app client in the pool; the frontend must not be able to change its team identity mapping.",
+        "The operator confirmed custom:teamUserId was added to the existing Cognito pool, and that the Team_FollowUp app client can read it.",
+        "Read is enabled and Write disabled for custom:teamUserId on Team_FollowUp per operator confirmation; verify Write is disabled on every other app client in the pool.",
         "Confirm the existing browser app client has no client secret and supports the frontend's sign-in flow.",
         "Confirm all required DynamoDB tables and GSIs are ACTIVE in us-east-1."
       ],

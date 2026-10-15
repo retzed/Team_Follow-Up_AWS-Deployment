@@ -1,7 +1,7 @@
 # AWS Console Implementation Record
 
 **Last updated:** 15 October 2026  
-**Status:** Initial Cognito, DynamoDB, and budget setup completed manually. The operator confirmed that `custom:teamUserId` was added to the existing Cognito pool on 15 October 2026. App-client attribute permissions, team account setup, website hosting, and backend deployment remain pending.
+**Status:** Initial Cognito, DynamoDB, and budget setup completed manually. The operator confirmed that `custom:teamUserId` was added to the existing Cognito pool, with Read enabled and Write disabled for the `Team_FollowUp` app client on 15 October 2026. Permission checks on other app clients, team account setup, website hosting, and backend deployment remain pending.
 
 This document records the AWS configuration actually created in the console. It intentionally does not store account IDs, email addresses, passwords, access keys, or other private credentials.
 
@@ -31,7 +31,7 @@ The JavaScript Quick setup guide was selected for reference. The app client ID i
 
 - Cognito managed-login domain, callback URL, and sign-out URL have not been configured because Amplify Hosting has not been created and no website origin exists yet.
 - The six team accounts have not been created, and their `custom:teamUserId` values have not been assigned.
-- The operator confirmed that the custom attribute was added; the existing `Team_FollowUp` app client's Read permission still needs to be checked, and Write must be disabled for this attribute on **every** app client in the pool. The repository has not queried the live AWS configuration to verify those permissions.
+- The operator confirmed that the custom attribute was added, Read is enabled, and Write is disabled for the `Team_FollowUp` app client. Write permission must also be verified as disabled on **every other** app client in the pool. The repository has not queried the live AWS configuration to verify those settings.
 - The Quick setup language selector reverting to Angular is only a guide display preference; it does not change the pool configuration.
 
 ### `custom:teamUserId` schema record
@@ -47,7 +47,7 @@ The attribute was added in the existing pool on **15 October 2026**, according t
 | Maximum length | 32 |
 | Mutable at the pool schema level | Yes |
 
-Because the attribute is mutable at the pool level and the frontend uses it to resolve the signed-in team member, app-client **Read** must be enabled for `Team_FollowUp`, while app-client **Write** must be disabled for this attribute on every app client in the pool. Only a trusted administrator should assign or correct the values. The repository's `backend/scripts/seed_user_profiles_from_cognito.py` reads this attribute, resolves the Cognito `sub`, and prepares corresponding rows in `TeamFollowUp-Users`. These settings are recorded from the operator's report and have not been independently verified through the AWS API.
+Because the attribute is mutable at the pool level and the frontend uses it to resolve the signed-in team member, app-client **Read** must be enabled for `Team_FollowUp`. The operator confirmed that **Read is enabled and Write is disabled for `Team_FollowUp`**; verify that Write is also disabled for every other app client in the pool. Only a trusted administrator should assign or correct the values. The repository's `backend/scripts/seed_user_profiles_from_cognito.py` reads this attribute, resolves the Cognito `sub`, and prepares corresponding rows in `TeamFollowUp-Users`. These settings are based on operator confirmation and have not been independently queried through the AWS API.
 
 ## 3. Amazon DynamoDB
 
@@ -165,7 +165,7 @@ The SAM stack provisions API Gateway HTTP API, Lambda, its scoped IAM policy, lo
 
 ### Required pre-deployment verification
 
-1. In the existing Cognito pool, verify that `custom:teamUserId` exists and that the `Team_FollowUp` browser app client can read it. Confirm the app client has **no client secret** and supports the frontend's sign-in flow. The attribute/app-client configuration was not independently verified during the console bootstrap.
+1. Verify that `custom:teamUserId` exists. The operator confirmed Read is enabled and Write is disabled for the `Team_FollowUp` browser app client; verify Write is disabled for every other app client too. Confirm the app client has **no client secret** and supports the frontend's sign-in flow.
 2. Confirm that the four tables are `ACTIVE`, and that the three Items indexes plus the two Archive indexes are `ACTIVE`.
 3. Confirm the six Cognito accounts exist, have unique `custom:teamUserId` values `u1`–`u6`, and that the matching `cognitoSub` profile records have been seeded into `TeamFollowUp-Users`.
 4. Use the final Amplify HTTPS origin for `AllowedOrigin`, and review the CloudFormation change set. The stack must create only API/backend/monitoring resources, not a second user pool or DynamoDB tables.

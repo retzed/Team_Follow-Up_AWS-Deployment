@@ -319,10 +319,76 @@ Resources:
               audience:
                 - !Ref TeamFollowUpAppClient
 
+  ApiExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ResourceNamePrefix}-Api-ExecutionRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: TeamFollowUpDynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadApplicationTables
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:BatchGetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt ItemsTable.Arn
+                  - !Sub '${ItemsTable.Arn}/index/*'
+                  - !GetAtt ActivityTable.Arn
+                  - !Sub '${ActivityTable.Arn}/index/*'
+                  - !GetAtt UsersTable.Arn
+                  - !Sub '${UsersTable.Arn}/index/*'
+                  - !GetAtt ArchiveTable.Arn
+                  - !Sub '${ArchiveTable.Arn}/index/*'
+              - Sid: AllowPartialRestoreActivitySummaries
+                Effect: Allow
+                Action:
+                  - dynamodb:BatchWriteItem
+                Resource: !GetAtt ActivityTable.Arn
+              - Sid: AllowTransactionalItemOperationsOnly
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:ConditionCheckItem
+                Resource:
+                  - !GetAtt ItemsTable.Arn
+                  - !GetAtt ActivityTable.Arn
+                  - !GetAtt ArchiveTable.Arn
+                Condition:
+                  ForAnyValue:StringEquals:
+                    dynamodb:EnclosingOperation:
+                      - TransactWriteItems
+              - Sid: AllowAtomicWorkItemArchiveAndAuditTransactions
+                Effect: Allow
+                Action:
+                  - dynamodb:TransactWriteItems
+                Resource:
+                  - !GetAtt ItemsTable.Arn
+                  - !GetAtt ActivityTable.Arn
+                  - !GetAtt ArchiveTable.Arn
+
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${ResourceNamePrefix}-Api'
+      Role: !GetAtt ApiExecutionRole.Arn
       CodeUri: backend/src/
       Handler: handler.lambda_handler
       LoggingConfig:
@@ -330,53 +396,6 @@ Resources:
         ApplicationLogLevel: INFO
         SystemLogLevel: WARN
         LogGroup: !Ref ApiFunctionLogGroup
-      Policies:
-        - Version: '2012-10-17'
-          Statement:
-            - Sid: ReadApplicationTables
-              Effect: Allow
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:BatchGetItem
-                - dynamodb:Query
-                - dynamodb:Scan
-              Resource:
-                - !GetAtt ItemsTable.Arn
-                - !Sub '${ItemsTable.Arn}/index/*'
-                - !GetAtt ActivityTable.Arn
-                - !Sub '${ActivityTable.Arn}/index/*'
-                - !GetAtt UsersTable.Arn
-                - !Sub '${UsersTable.Arn}/index/*'
-                - !GetAtt ArchiveTable.Arn
-                - !Sub '${ArchiveTable.Arn}/index/*'
-            - Sid: AllowPartialRestoreActivitySummaries
-              Effect: Allow
-              Action:
-                - dynamodb:BatchWriteItem
-              Resource: !GetAtt ActivityTable.Arn
-            - Sid: AllowTransactionalItemOperationsOnly
-              Effect: Allow
-              Action:
-                - dynamodb:PutItem
-                - dynamodb:UpdateItem
-                - dynamodb:DeleteItem
-                - dynamodb:ConditionCheckItem
-              Resource:
-                - !GetAtt ItemsTable.Arn
-                - !GetAtt ActivityTable.Arn
-                - !GetAtt ArchiveTable.Arn
-              Condition:
-                ForAnyValue:StringEquals:
-                  dynamodb:EnclosingOperation:
-                    - TransactWriteItems
-            - Sid: AllowAtomicWorkItemArchiveAndAuditTransactions
-              Effect: Allow
-              Action:
-                - dynamodb:TransactWriteItems
-              Resource:
-                - !GetAtt ItemsTable.Arn
-                - !GetAtt ActivityTable.Arn
-                - !GetAtt ArchiveTable.Arn
       Events:
         AllRoutes:
           Type: HttpApi
@@ -595,6 +614,9 @@ Outputs:
   FrontendUrl:
     Description: Exact HTTPS URL for the configured Amplify branch; this origin is also used by API CORS.
     Value: !Sub 'https://${FrontendBranchName}.${FrontendApp.DefaultDomain}'
+  ApiExecutionRoleName:
+    Description: Least-privilege Lambda execution role; console and template configurations use the same default name.
+    Value: !Ref ApiExecutionRole
   CloudWatchDashboardName:
     Description: CloudWatch operations dashboard.
     Value: !Ref TeamFollowUpDashboard

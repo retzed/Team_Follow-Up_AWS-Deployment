@@ -355,7 +355,6 @@ erDiagram
         string actorUserId
         string action
         string kind
-        string event_time
     }
     ARCHIVE_SNAPSHOT {
         string archiveId PK
@@ -367,7 +366,7 @@ erDiagram
     }
 ~~~
 
-The **Team Profile** table and the Cognito identity are separate records joined by identity values. WorkItem attribution fields also reference team IDs. Activity rows point to an item ID and preserve snapshots of item/root names and types so history remains understandable when active items are renamed or archived. Archive rows retain item IDs and hierarchy metadata to support restore.
+The ERD focuses on entity relationships; the activity event timestamp's physical DynamoDB attribute name is `at`, as documented in the Activity events attribute table below. The **Team Profile** table and the Cognito identity are separate records joined by identity values. WorkItem attribution fields also reference team IDs. Activity rows point to an item ID and preserve snapshots of item/root names and types so history remains understandable when active items are renamed or archived. Archive rows retain item IDs and hierarchy metadata to support restore.
 
 ### 4.2 Physical schema: current DynamoDB tables
 

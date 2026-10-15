@@ -33,9 +33,10 @@ In **Amazon Cognito → User pools**, create a user pool with these target setti
 
 | Setting | Target |
 |---|---|
-| Pool name | `TeamFollowUp-Cognito` (any clear name is acceptable if the generated pool ID is recorded) |
+| Pool name | `TeamFollowUp-Cognito` (must match the automation template's default name) |
 | Sign-in identifier | Email |
 | Self-registration | Disabled; only administrator-created users |
+| Auto-verified attribute | Email (keep the console-created pool setting aligned with the template) |
 | MFA | Off for the current low-cost lab configuration |
 | Custom schema attribute | `teamUserId`, type String, minimum length 1, maximum length 32, Mutable enabled |
 
@@ -146,7 +147,7 @@ Review the six expected IDs/names and mapping results. Only then repeat without 
 
 ## 6. Amplify Hosting — create through the console
 
-1. Open **AWS Amplify → Create new app → Host web app** and connect the private GitHub repository `retzed/Team_Follow-Up_AWS-Deployment`.
+1. Open **AWS Amplify → Create new app → Host web app**, name the app `TeamFollowUp-frontend`, and connect the private GitHub repository `retzed/Team_Follow-Up_AWS-Deployment`.
 2. Select the intended branch (normally `main`). Use the Amazon Linux 2023 build image or a compatible image with Node.js 24; the repository's `amplify.yml` invokes `nvm use 24`.
 3. Keep the repository build settings from `amplify.yml`: run `node scripts/build.mjs`, publish `dist/`.
 4. Record the exact branch HTTPS URL, for example `https://main.<generated-app-domain>`. The CORS origin must be only the origin (scheme + host), with no path or trailing slash.
@@ -201,7 +202,7 @@ Create the CloudWatch log group `/aws/lambda/TeamFollowUp-Api` and set retention
 
 ## 8. API Gateway HTTP API — create through the console
 
-Create an **HTTP API**, add the Lambda function as its integration, and configure the following target:
+Create an **HTTP API** named `TeamFollowUp API`, add the Lambda function as its integration, and configure the following target:
 
 | Setting | Value |
 |---|---|

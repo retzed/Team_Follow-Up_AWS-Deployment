@@ -114,6 +114,9 @@ if (html.includes('async function mockRoute(method,path,body)')) {
     'The local demo API must yield before table work so the loading indicator can paint.');
 }
 
+// The item-history popup previously referenced an undeclared historyRootId while loading, throwing before its request could start.
+check(!html.includes("countValueMarkup(events.length,false,historyRootId,'activity')") && html.includes(":inlineSpinnerMarkup()}</span></div>"), 'The item-history pending count must not reference an undeclared root ID.');
+
 // Item history must not build/index any cached timeline before the exact item/scope request succeeds.
 const historyBranchStart=html.indexOf("} else if(m.kind==='history'){" );
 const historyBranchEnd=html.indexOf("} else if(m.kind==='global-history')",historyBranchStart);

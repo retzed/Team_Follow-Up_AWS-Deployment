@@ -34,12 +34,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--activity-table", default="TeamFollowUp-Activity")
     parser.add_argument("--users-table", default="TeamFollowUp-Users")
     parser.add_argument("--archive-table", default="TeamFollowUp-Archive")
-    parser.add_argument("--projects", type=int, default=4, help="Synthetic Project count (default: 4).")
-    parser.add_argument("--jobs", type=int, default=2, help="Synthetic Job count (default: 2).")
-    parser.add_argument("--tasks-per-project", type=int, default=10)
-    parser.add_argument("--followups-per-task", type=int, default=2)
-    parser.add_argument("--direct-followups-per-root", type=int, default=3)
-    parser.add_argument("--events-per-item", type=int, default=4)
+    parser.add_argument("--projects", type=int, default=2, help="Synthetic Project count (default: 2).")
+    parser.add_argument("--jobs", type=int, default=1, help="Synthetic Job count (default: 1).")
+    parser.add_argument("--tasks-per-project", type=int, default=2)
+    parser.add_argument("--followups-per-task", type=int, default=1)
+    parser.add_argument("--direct-followups-per-root", type=int, default=1)
+    parser.add_argument("--events-per-item", type=int, default=2)
     parser.add_argument(
         "--run-id",
         help="Reuse a run ID from a dry run so the apply command creates the exact reviewed dataset.",

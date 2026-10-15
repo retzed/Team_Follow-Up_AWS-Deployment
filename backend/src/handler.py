@@ -493,13 +493,35 @@ def query_descendant_rows(root_id):
 
 
 def query_root_rows(root_id, include_root=True):
-    """Return an active hierarchy using GetItem plus ParentIdIndex only."""
+    """Return the active hierarchy using GetItem plus ParentIdIndex only."""
     rows=query_descendant_rows(root_id)
     if include_root:
         root=WORK.get_item(Key={'itemId':str(root_id)}).get('Item')
         if root and not root.get('deletedAt'):
             rows.append(root)
     return rows
+
+
+def query_archived_history_rows(root_id=None, parent_id=None):
+    """Return archived records needed to find old events when a history popup opens.
+
+    Archive has only its archivePK GSI in the configured table contract, so this
+    reads that partition on demand and filters by the root or direct parent.
+    It is deliberately not part of workspace bootstrap or ordinary item queries.
+    """
+    if root_id is None and parent_id is None:
+        return []
+    rows=all_pages(
+        ARCHIVE,
+        IndexName='GSI_ArchiveIndex',
+        KeyConditionExpression=Key('archivePK').eq('ARCHIVE'),
+        ScanIndexForward=False,
+    )
+    if root_id is not None:
+        wanted=str(root_id)
+        return [row for row in rows if str(row.get('archiveRootId') or row.get('rootParentId') or row.get('itemId') or '')==wanted]
+    wanted=str(parent_id)
+    return [row for row in rows if str(row.get('archiveParentId') or row.get('parentId') or '')==wanted]
 
 
 def query_events_for_item(item_id):
@@ -827,11 +849,16 @@ def lambda_handler(event, context):
             if scope=='all' and item.get('type') in ('project','job'):
                 rows=query_root_rows(item_id,include_root=True)
                 item_ids=[str(row.get('itemId') or '') for row in rows]
+                archived_rows=query_archived_history_rows(root_id=item_id)
+                item_ids.extend(str(row.get('itemId') or row.get('archiveId') or '') for row in archived_rows)
             elif scope=='all' and item.get('type')=='task':
                 rows=[item]+query_children_rows(item_id)
                 item_ids=[str(row.get('itemId') or '') for row in rows]
+                archived_rows=query_archived_history_rows(parent_id=item_id)
+                item_ids.extend(str(row.get('itemId') or row.get('archiveId') or '') for row in archived_rows)
             else:
                 item_ids=[item_id]
+            item_ids=list(dict.fromkeys(value for value in item_ids if value))
             events=query_events_for_items(item_ids)
             search=str(qs.get('q') or '').lower()
             if search:

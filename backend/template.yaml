@@ -1,57 +1,41 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: "Team Follow-Up API backend for existing Cognito and DynamoDB resources; it does not create or own those data resources."
-# Uses the manually created Cognito pool/client and four existing DynamoDB tables through parameters.
-# Do not add DynamoDB/Cognito resource definitions here unless an explicit migration/adoption plan is approved.
+Description: >-
+  Optional full-stack automation template for Team Follow-Up. Creates the Cognito
+  user pool/client, all four DynamoDB tables and their indexes, Amplify Hosting,
+  the HTTP API, Lambda execution role/function, CloudWatch observability, and
+  the monthly cost budget. The primary project deployment procedure remains
+  manual through the AWS Management Console.
+
 Parameters:
-  TableNamePrefix:
+  ResourceNamePrefix:
     Type: String
     Default: TeamFollowUp
-    Description: Prefix for API, Lambda, log, alarm, and dashboard names only. Existing DynamoDB table names are supplied separately.
+    Description: Prefix for named application resources; the default matches the console runbook.
     AllowedPattern: '^[A-Za-z0-9][A-Za-z0-9_.-]{2,19}$'
-    ConstraintDescription: Use 3-20 letters, numbers, dots, underscores, or hyphens.
-  ExistingCognitoUserPoolId:
+    ConstraintDescription: Use 3-20 letters, numbers, dots, underscores, or hyphens, starting with a letter or number.
+  RepositoryUrl:
     Type: String
-    Default: us-east-1_7dYZw2Is6
-    Description: Existing Cognito User Pool ID in this Region; the stack reuses it and does not create a pool.
-    AllowedPattern: '^[A-Za-z0-9_-]+_[A-Za-z0-9]+$'
-    ConstraintDescription: Enter the existing Cognito User Pool ID.
-  ExistingCognitoAppClientId:
+    Default: https://github.com/retzed/Team_Follow-Up_AWS-Deployment
+    Description: HTTPS URL for the GitHub repository connected to Amplify Hosting.
+    AllowedPattern: '^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+  GitHubAccessToken:
     Type: String
-    Default: 7id8c2g27fvbh365atqntqurir
-    Description: Existing public browser app client ID; it must have no client secret and support the frontend sign-in flow.
-    AllowedPattern: '^[A-Za-z0-9]+$'
-    ConstraintDescription: Enter the existing Cognito app client ID.
-  ExistingItemsTableName:
+    NoEcho: true
+    MinLength: 1
+    Description: GitHub personal access token authorized for Amplify GitHub App access to RepositoryUrl. Never commit or save this value to samconfig.toml.
+  FrontendBranchName:
     Type: String
-    Default: TeamFollowUp-Items
-    Description: Existing Items table; this stack does not create or manage it.
-    AllowedPattern: '^[A-Za-z0-9_.-]{3,255}$'
-  ExistingActivityTableName:
+    Default: main
+    MinLength: 1
+    Description: Git branch Amplify builds and publishes.
+  BudgetNotificationEmail:
     Type: String
-    Default: TeamFollowUp-Activity
-    Description: Existing Activity table keyed by itemId + activityKey; this stack does not create or manage it.
-    AllowedPattern: '^[A-Za-z0-9_.-]{3,255}$'
-  ExistingUsersTableName:
-    Type: String
-    Default: TeamFollowUp-Users
-    Description: Existing Users table keyed by userId; this stack does not create or manage it.
-    AllowedPattern: '^[A-Za-z0-9_.-]{3,255}$'
-  ExistingArchiveTableName:
-    Type: String
-    Default: TeamFollowUp-Archive
-    Description: Existing Archive table keyed by archiveId; this stack does not create or manage it.
-    AllowedPattern: '^[A-Za-z0-9_.-]{3,255}$'
-  AllowedOrigin:
-    Type: String
-    Description: Exact HTTPS origin of the deployed Amplify site (scheme + host only; no path or trailing slash).
-    AllowedPattern: '^https://[A-Za-z0-9.-]+(:[0-9]+)?$'
-    ConstraintDescription: Enter the deployed Amplify HTTPS origin, for example https://main.abc123.amplifyapp.com.
-  LogRetentionDays:
-    Type: Number
-    Default: 30
-    AllowedValues: [7, 14, 30, 60, 90]
-    Description: CloudWatch log retention period.
+    NoEcho: true
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    ConstraintDescription: Enter an email address for AWS Budgets alerts. The value is private deployment configuration.
+    Description: Email recipient for the $1 monthly cost-budget alerts; not a spend cap.
+
 Globals:
   Function:
     Runtime: python3.12
@@ -59,34 +43,272 @@ Globals:
     MemorySize: 256
     Environment:
       Variables:
-        ITEMS_TABLE: !Ref ExistingItemsTableName
-        ACTIVITY_TABLE: !Ref ExistingActivityTableName
-        USERS_TABLE: !Ref ExistingUsersTableName
-        ARCHIVE_TABLE: !Ref ExistingArchiveTableName
+        ITEMS_TABLE: !Ref ItemsTable
+        ACTIVITY_TABLE: !Ref ActivityTable
+        USERS_TABLE: !Ref UsersTable
+        ARCHIVE_TABLE: !Ref ArchiveTable
+
 Resources:
+  # Identity resources are created by this template, not supplied as parameters.
+  TeamFollowUpUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${ResourceNamePrefix}-Cognito'
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      MfaConfiguration: OFF
+      Schema:
+        - Name: teamUserId
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '32'
+      UserPoolTags:
+        Project: TeamFollowUp
+        ManagedBy: CloudFormation
+
+  TeamFollowUpAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: Team_FollowUp
+      UserPoolId: !Ref TeamFollowUpUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      ReadAttributes:
+        - email
+        - email_verified
+        - custom:teamUserId
+      # The browser can read, but cannot modify, the custom team identity attribute.
+      WriteAttributes:
+        - email
+
+  # Physical table/key/index contract shared with the console implementation guide.
+  ItemsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub '${ResourceNamePrefix}-Items'
+      BillingMode: PROVISIONED
+      TableClass: STANDARD
+      AttributeDefinitions:
+        - AttributeName: itemId
+          AttributeType: S
+        - AttributeName: parentId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+        - AttributeName: assignedTo
+          AttributeType: S
+        - AttributeName: updatedAt
+          AttributeType: S
+        - AttributeName: workspaceKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: itemId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      DeletionProtectionEnabled: false
+      GlobalSecondaryIndexes:
+        - IndexName: ParentIdIndex
+          KeySchema:
+            - AttributeName: parentId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: AssignedToIndex
+          KeySchema:
+            - AttributeName: assignedTo
+              KeyType: HASH
+            - AttributeName: updatedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: WorkspaceIndex
+          KeySchema:
+            - AttributeName: workspaceKey
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+      Tags:
+        - Key: Project
+          Value: TeamFollowUp
+
+  ActivityTable:
+    Type: AWS::DynamoDB::Table
+    DependsOn: ItemsTable
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub '${ResourceNamePrefix}-Activity'
+      BillingMode: PROVISIONED
+      TableClass: STANDARD
+      AttributeDefinitions:
+        - AttributeName: itemId
+          AttributeType: S
+        - AttributeName: activityKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: itemId
+          KeyType: HASH
+        - AttributeName: activityKey
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      DeletionProtectionEnabled: false
+      Tags:
+        - Key: Project
+          Value: TeamFollowUp
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    DependsOn: ActivityTable
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub '${ResourceNamePrefix}-Users'
+      BillingMode: PROVISIONED
+      TableClass: STANDARD
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      DeletionProtectionEnabled: false
+      Tags:
+        - Key: Project
+          Value: TeamFollowUp
+
+  ArchiveTable:
+    Type: AWS::DynamoDB::Table
+    DependsOn: UsersTable
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub '${ResourceNamePrefix}-Archive'
+      BillingMode: PROVISIONED
+      TableClass: STANDARD
+      AttributeDefinitions:
+        - AttributeName: archiveId
+          AttributeType: S
+        - AttributeName: archivePK
+          AttributeType: S
+        - AttributeName: archiveSort
+          AttributeType: S
+        - AttributeName: archiveRootPK
+          AttributeType: S
+        - AttributeName: archiveRootSort
+          AttributeType: S
+      KeySchema:
+        - AttributeName: archiveId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      DeletionProtectionEnabled: false
+      GlobalSecondaryIndexes:
+        - IndexName: GSI_ArchiveIndex
+          KeySchema:
+            - AttributeName: archivePK
+              KeyType: HASH
+            - AttributeName: archiveSort
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: GSI_ArchiveRoot
+          KeySchema:
+            - AttributeName: archiveRootPK
+              KeyType: HASH
+            - AttributeName: archiveRootSort
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+      Tags:
+        - Key: Project
+          Value: TeamFollowUp
+
   ApiAccessLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/${TableNamePrefix}/apigateway/access'
-      RetentionInDays: !Ref LogRetentionDays
+      LogGroupName: !Sub '/${ResourceNamePrefix}/apigateway/access'
+      RetentionInDays: 30
+
+  ApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ResourceNamePrefix}-Api'
+      RetentionInDays: 30
 
   TeamFollowUpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
+      Name: !Sub '${ResourceNamePrefix}-Api'
       StageName: '$default'
       DefinitionBody:
         openapi: '3.0.1'
         info:
-          title: !Sub '${TableNamePrefix} API'
+          title: !Sub '${ResourceNamePrefix} API'
           version: '1.0'
         paths: {}
       AccessLogSettings:
         DestinationArn: !GetAtt ApiAccessLogGroup.Arn
         Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","method":"$context.httpMethod","routeKey":"$context.routeKey","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","integrationErrorMessage":"$context.integrationErrorMessage"}'
+      # The origin is computed from the Amplify branch and app's generated default domain.
+      # This remains an exact HTTPS origin; there is no wildcard CORS fallback.
       CorsConfiguration:
-        AllowOrigins: [!Ref AllowedOrigin]
-        AllowHeaders: [authorization, content-type]
-        AllowMethods: [GET, POST, PATCH, DELETE, OPTIONS]
+        AllowOrigins:
+          - !Sub 'https://${FrontendBranchName}.${FrontendApp.DefaultDomain}'
+        AllowHeaders:
+          - authorization
+          - content-type
+        AllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - DELETE
+          - OPTIONS
         MaxAge: 600
       Auth:
         DefaultAuthorizer: CognitoJwt
@@ -94,17 +316,14 @@ Resources:
           CognitoJwt:
             IdentitySource: '$request.header.Authorization'
             JwtConfiguration:
-              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${ExistingCognitoUserPoolId}'
-              audience: [!Ref ExistingCognitoAppClientId]
-  ApiFunctionLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/aws/lambda/${TableNamePrefix}-Api'
-      RetentionInDays: !Ref LogRetentionDays
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${TeamFollowUpUserPool}'
+              audience:
+                - !Ref TeamFollowUpAppClient
+
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub '${TableNamePrefix}-Api'
+      FunctionName: !Sub '${ResourceNamePrefix}-Api'
       CodeUri: backend/src/
       Handler: handler.lambda_handler
       LoggingConfig:
@@ -115,7 +334,7 @@ Resources:
       Policies:
         - Version: '2012-10-17'
           Statement:
-            - Sid: ReadExistingApplicationTables
+            - Sid: ReadApplicationTables
               Effect: Allow
               Action:
                 - dynamodb:GetItem
@@ -123,19 +342,19 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:Scan
               Resource:
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingItemsTableName}'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingItemsTableName}/index/*'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingActivityTableName}'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingActivityTableName}/index/*'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingUsersTableName}'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingUsersTableName}/index/*'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingArchiveTableName}'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingArchiveTableName}/index/*'
+                - !GetAtt ItemsTable.Arn
+                - !Sub '${ItemsTable.Arn}/index/*'
+                - !GetAtt ActivityTable.Arn
+                - !Sub '${ActivityTable.Arn}/index/*'
+                - !GetAtt UsersTable.Arn
+                - !Sub '${UsersTable.Arn}/index/*'
+                - !GetAtt ArchiveTable.Arn
+                - !Sub '${ArchiveTable.Arn}/index/*'
             - Sid: AllowPartialRestoreActivitySummaries
               Effect: Allow
               Action:
                 - dynamodb:BatchWriteItem
-              Resource: !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingActivityTableName}'
+              Resource: !GetAtt ActivityTable.Arn
             - Sid: AllowTransactionalItemOperationsOnly
               Effect: Allow
               Action:
@@ -144,9 +363,9 @@ Resources:
                 - dynamodb:DeleteItem
                 - dynamodb:ConditionCheckItem
               Resource:
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingItemsTableName}'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingActivityTableName}'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingArchiveTableName}'
+                - !GetAtt ItemsTable.Arn
+                - !GetAtt ActivityTable.Arn
+                - !GetAtt ArchiveTable.Arn
               Condition:
                 ForAnyValue:StringEquals:
                   dynamodb:EnclosingOperation:
@@ -156,9 +375,9 @@ Resources:
               Action:
                 - dynamodb:TransactWriteItems
               Resource:
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingItemsTableName}'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingActivityTableName}'
-                - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingArchiveTableName}'
+                - !GetAtt ItemsTable.Arn
+                - !GetAtt ActivityTable.Arn
+                - !GetAtt ArchiveTable.Arn
       Events:
         AllRoutes:
           Type: HttpApi
@@ -166,11 +385,12 @@ Resources:
             ApiId: !Ref TeamFollowUpApi
             Path: /{proxy+}
             Method: ANY
+
   ApiLambdaErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${TableNamePrefix}-Lambda-Errors'
-      AlarmDescription: The Team Follow-Up API Lambda returned an error during the evaluation period. Configure an SNS action after deployment if notifications are required.
+      AlarmName: !Sub '${ResourceNamePrefix}-Lambda-Errors'
+      AlarmDescription: The Team Follow-Up API Lambda returned an error during the evaluation period. Configure an SNS action separately if email/other notifications are required.
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:
@@ -182,11 +402,12 @@ Resources:
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
+
   ApiLambdaThrottlesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${TableNamePrefix}-Lambda-Throttles'
-      AlarmDescription: The Team Follow-Up API Lambda was throttled during the evaluation period. Configure an SNS action after deployment if notifications are required.
+      AlarmName: !Sub '${ResourceNamePrefix}-Lambda-Throttles'
+      AlarmDescription: The Team Follow-Up API Lambda was throttled during the evaluation period. Configure an SNS action separately if email/other notifications are required.
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:
@@ -198,11 +419,12 @@ Resources:
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
+
   ApiGateway5xxAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${TableNamePrefix}-ApiGateway-5xx'
-      AlarmDescription: API Gateway returned at least one 5xx response during the evaluation period. Configure an SNS action after deployment if notifications are required.
+      AlarmName: !Sub '${ResourceNamePrefix}-ApiGateway-5xx'
+      AlarmDescription: API Gateway returned at least one 5xx response during the evaluation period. Configure an SNS action separately if email/other notifications are required.
       Namespace: AWS/ApiGateway
       MetricName: 5xx
       Dimensions:
@@ -216,10 +438,11 @@ Resources:
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
+
   TeamFollowUpDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
-      DashboardName: !Sub '${TableNamePrefix}-Operations'
+      DashboardName: !Sub '${ResourceNamePrefix}-Operations'
       DashboardBody: !Sub |
         {
           "start": "-PT6H",
@@ -230,9 +453,9 @@ Resources:
                 "title": "Lambda invocations, errors, and throttles",
                 "view": "timeSeries", "region": "${AWS::Region}", "period": 300,
                 "metrics": [
-                  ["AWS/Lambda", "Invocations", "FunctionName", "${TableNamePrefix}-Api"],
-                  ["AWS/Lambda", "Errors", "FunctionName", "${TableNamePrefix}-Api"],
-                  ["AWS/Lambda", "Throttles", "FunctionName", "${TableNamePrefix}-Api"]
+                  ["AWS/Lambda", "Invocations", "FunctionName", "${ResourceNamePrefix}-Api"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "${ResourceNamePrefix}-Api"],
+                  ["AWS/Lambda", "Throttles", "FunctionName", "${ResourceNamePrefix}-Api"]
                 ]
               }
             },
@@ -252,33 +475,130 @@ Resources:
               "properties": {
                 "title": "Lambda duration",
                 "view": "timeSeries", "region": "${AWS::Region}", "period": 300,
-                "metrics": [["AWS/Lambda", "Duration", "FunctionName", "${TableNamePrefix}-Api", {"stat": "p95"}]]
+                "metrics": [["AWS/Lambda", "Duration", "FunctionName", "${ResourceNamePrefix}-Api", {"stat": "p95"}]]
               }
             }
           ]
         }
+
+  MonthlyCostBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub '${ResourceNamePrefix}-Monthly-Cost'
+        BudgetLimit:
+          Amount: 1
+          Unit: USD
+        TimeUnit: MONTHLY
+        BudgetType: COST
+        CostTypes:
+          UseAmortized: false
+          UseBlended: false
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 50
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+      ResourceTags:
+        - Key: Project
+          Value: TeamFollowUp
+
+  # App depends only on repository access; its branch is created after API/Cognito exist.
+  # CORS refers to the app's generated DefaultDomain but not to the branch resource, avoiding a dependency cycle.
+  FrontendApp:
+    Type: AWS::Amplify::App
+    Properties:
+      Name: !Sub '${ResourceNamePrefix}-frontend'
+      Description: Team Follow-Up static frontend hosted from GitHub.
+      Platform: WEB
+      Repository: !Ref RepositoryUrl
+      AccessToken: !Ref GitHubAccessToken
+      EnableBranchAutoDeletion: false
+      Tags:
+        - Key: Project
+          Value: TeamFollowUp
+
+  FrontendBranch:
+    Type: AWS::Amplify::Branch
+    Properties:
+      AppId: !GetAtt FrontendApp.AppId
+      BranchName: !Ref FrontendBranchName
+      Description: Team Follow-Up frontend production branch.
+      Stage: PRODUCTION
+      EnableAutoBuild: true
+      EnablePullRequestPreview: false
+      EnvironmentVariables:
+        - Name: TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID
+          Value: !Ref TeamFollowUpUserPool
+        - Name: TEAM_FOLLOW_UP_COGNITO_CLIENT_ID
+          Value: !Ref TeamFollowUpAppClient
+        - Name: TEAM_FOLLOW_UP_API_BASE_URL
+          Value: !Sub 'https://${TeamFollowUpApi}.execute-api.${AWS::Region}.amazonaws.com'
+        - Name: TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE
+          Value: custom:teamUserId
+      Tags:
+        - Key: Project
+          Value: TeamFollowUp
+
 Outputs:
   CognitoUserPoolId:
-    Description: Existing User Pool ID reused by the backend; set the same value in Amplify Hosting.
-    Value: !Ref ExistingCognitoUserPoolId
+    Description: User Pool ID created by this stack; set this in frontend configuration when not using Amplify branch variables.
+    Value: !Ref TeamFollowUpUserPool
   CognitoUserPoolClientId:
-    Description: Existing public app client ID reused by the backend; set the same value in Amplify Hosting.
-    Value: !Ref ExistingCognitoAppClientId
+    Description: Public browser app-client ID created by this stack.
+    Value: !Ref TeamFollowUpAppClient
+  ItemsTableName:
+    Description: Items table created by this stack.
+    Value: !Ref ItemsTable
+  ActivityTableName:
+    Description: Activity table created by this stack; primary key is itemId + activityKey.
+    Value: !Ref ActivityTable
+  UsersTableName:
+    Description: Users table created by this stack; profile lookup scans this small table.
+    Value: !Ref UsersTable
+  ArchiveTableName:
+    Description: Archive table created by this stack; primary key is archiveId with two GSIs.
+    Value: !Ref ArchiveTable
+  ApiBaseUrl:
+    Description: API Gateway HTTPS base URL used by the Amplify branch.
+    Value: !Sub 'https://${TeamFollowUpApi}.execute-api.${AWS::Region}.amazonaws.com'
+  AmplifyAppId:
+    Description: Amplify Hosting application ID.
+    Value: !GetAtt FrontendApp.AppId
+  FrontendUrl:
+    Description: Exact HTTPS URL for the configured Amplify branch; this origin is also used by API CORS.
+    Value: !Sub 'https://${FrontendBranchName}.${FrontendApp.DefaultDomain}'
   CloudWatchDashboardName:
     Description: CloudWatch operations dashboard.
     Value: !Ref TeamFollowUpDashboard
-  ApiBaseUrl:
-    Description: API Gateway HTTPS base URL; set TEAM_FOLLOW_UP_API_BASE_URL in Amplify Hosting.
-    Value: !Sub 'https://${TeamFollowUpApi}.execute-api.${AWS::Region}.amazonaws.com'
-  ItemsTableName:
-    Description: Existing Items table name; not created or managed by this stack.
-    Value: !Ref ExistingItemsTableName
-  ActivityTableName:
-    Description: Existing Activity table name; retains its itemId + activityKey primary key.
-    Value: !Ref ExistingActivityTableName
-  UsersTableName:
-    Description: Existing Users table name; profile lookup scans this small table because it has no Cognito-subject GSI.
-    Value: !Ref ExistingUsersTableName
-  ArchiveTableName:
-    Description: Existing Archive table name; not created or managed by this stack.
-    Value: !Ref ExistingArchiveTableName
+  MonthlyCostBudgetName:
+    Description: Notification-only monthly AWS cost budget.
+    Value: !Ref MonthlyCostBudget

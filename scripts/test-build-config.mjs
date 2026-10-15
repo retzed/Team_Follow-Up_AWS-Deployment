@@ -100,10 +100,12 @@ assert.ok(!('dataMode' in config), 'runtime config must not contain a database-m
 assert.ok(!('identityMap' in config.cognito), 'team identity must not be overridable by a browser-side map');
 
 const template = await readFile('backend/template.yaml', 'utf8');
-assert.match(template, /ArchiveTable:\s*\n\s+Type: AWS::DynamoDB::Table/, 'SAM template must provision Archive');
-assert.match(template, /ARCHIVE_TABLE:\s*!Ref ArchiveTable/, 'Lambda must receive the Archive table name');
-assert.match(template, /GSI_ArchiveIndex/, 'Archive table must define its archive index');
-assert.match(template, /GSI_ArchiveRoot/, 'Archive table must define its hierarchy index');
+assert.doesNotMatch(template, /Type:\s*AWS::DynamoDB::Table/, 'SAM must reuse existing DynamoDB tables, not create duplicates');
+assert.doesNotMatch(template, /Type:\s*AWS::Cognito::UserPool(?:Client)?/, 'SAM must reuse the existing Cognito pool/client, not create duplicates');
+assert.match(template, /ARCHIVE_TABLE:\s*!Ref ExistingArchiveTableName/, 'Lambda must receive the existing Archive table name');
+assert.match(template, /ExistingArchiveTableName:\s*\n\s+Type: String\s*\n\s+Default: TeamFollowUp-Archive/, 'SAM must default to the manually created Archive table');
+assert.match(template, /ExistingCognitoUserPoolId:\s*\n\s+Type: String\s*\n\s+Default: us-east-1_7dYZw2Is6/, 'SAM must reuse the existing Cognito pool');
+assert.match(template, /ExistingCognitoAppClientId:\s*\n\s+Type: String\s*\n\s+Default: 7id8c2g27fvbh365atqntqurir/, 'SAM must reuse the existing public app client');
 
 const schema = JSON.parse(await readFile('backend/table-schema.json', 'utf8'));
 assert.equal(schema.thisFileProvisionsAwsResources, false, 'table-schema.json is documentation, not infrastructure');

@@ -2501,12 +2501,12 @@ async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
    invalidateHierarchyIndex();
    dataLoadState.childrenLoaded.add(rootId);
    dataLoadState.rootErrors.delete(`children:${rootId}`);
-   renderParentList();
+   renderParentList({skipRemote:true});
    if(String(ui.selectedParentId)===rootId)renderDetail();
   }catch(error){
    if(hydrationRun!==workspaceHydrationGeneration)return;
    dataLoadState.rootErrors.set(`children:${rootId}`,String(error?.message||tr('loadFailed')));
-   renderParentList();
+   renderParentList({skipRemote:true});
    if(String(ui.selectedParentId)===rootId)renderDetail();
   }finally{
    if(rootChildrenRequests.get(rootId)===promise)rootChildrenRequests.delete(rootId);

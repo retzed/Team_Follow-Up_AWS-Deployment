@@ -1,6 +1,6 @@
 # Release notes
 
-## Console-first deployment model and complete automation template
+## AWS Console deployment model and complete automation template
 
 The project's primary AWS resource-creation method is the AWS Management Console. The full-stack CloudFormation/SAM template is retained as an optional automation/reference method, not as the normal deployment workflow.
 

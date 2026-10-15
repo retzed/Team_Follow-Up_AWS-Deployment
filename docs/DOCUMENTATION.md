@@ -355,7 +355,7 @@ erDiagram
         string actorUserId
         string action
         string kind
-        string eventTimestamp "stored as at"
+        string eventTimestamp
     }
     ARCHIVE_SNAPSHOT {
         string archiveId PK

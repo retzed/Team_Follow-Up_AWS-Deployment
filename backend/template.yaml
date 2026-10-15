@@ -60,7 +60,7 @@ Resources:
         - email
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
-      MfaConfiguration: OFF
+      MfaConfiguration: 'OFF'
       Schema:
         - Name: teamUserId
           AttributeDataType: String

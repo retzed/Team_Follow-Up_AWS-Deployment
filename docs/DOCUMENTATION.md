@@ -317,8 +317,8 @@ The following ERD describes the logical relationships. DynamoDB does **not** enf
 erDiagram
     COGNITO_ACCOUNT ||--|| TEAM_PROFILE : "subject maps to"
     TEAM_PROFILE ||--o{ WORK_ITEM : "creates or updates"
-    TEAM_PROFILE o|--o{ WORK_ITEM : "is assigned"
-    WORK_ITEM o|--o{ WORK_ITEM : "parent-child"
+    TEAM_PROFILE |o--o{ WORK_ITEM : "is assigned"
+    WORK_ITEM |o--o{ WORK_ITEM : "parent-child"
     WORK_ITEM ||--o{ ACTIVITY_EVENT : "has history"
     WORK_ITEM ||--o| ARCHIVE_SNAPSHOT : "may be archived as"
 

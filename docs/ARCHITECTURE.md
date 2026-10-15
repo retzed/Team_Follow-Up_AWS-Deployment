@@ -6,11 +6,11 @@ This document describes the intended **target AWS deployment**; committing the f
 
 - Region: **US East (N. Virginia), us-east-1**.
 - Cognito pool: **User pool - fnzspt**, ID **us-east-1_7dYZw2Is6**; app client **Team_FollowUp**, client ID **7id8c2g27fvbh365atqntqurir**; feature plan **Essentials**; email sign-in; self-registration disabled; MFA off.
-- DynamoDB tables: **TeamFollowUp-Items** (partition key **itemId**, with **ParentIdIndex**, **AssignedToIndex**, and **WorkspaceIndex**); **TeamFollowUp-Activity** (partition key **itemId**, sort key **activityKey**); and **TeamFollowUp-Users** (partition key **userId**). They use provisioned capacity, 1 RCU and 1 WCU on each base table; the three Items indexes also use 1 RCU and 1 WCU each. Point-in-time recovery, deletion protection, Streams, and auto scaling are disabled.
+- DynamoDB tables: **TeamFollowUp-Items** (partition key **itemId**, with **ParentIdIndex**, **AssignedToIndex**, and **WorkspaceIndex**); **TeamFollowUp-Activity** (partition key **itemId**, sort key **activityKey**); **TeamFollowUp-Users** (partition key **userId**); and **TeamFollowUp-Archive** (partition key **archiveId**, with **GSI_ArchiveIndex** on `archivePK`/`archiveSort` and **GSI_ArchiveRoot** on `archiveRootPK`/`archiveRootSort`). The four base tables use provisioned capacity of 1 RCU and 1 WCU each; the three Items indexes and two Archive indexes also use 1 RCU and 1 WCU each. Total configured capacity is **9 RCUs / 9 WCUs**. Point-in-time recovery, deletion protection, Streams, and auto scaling are disabled.
 - Cost monitoring: recurring **$1/month** budget named **TeamFollowUp-Monthly-Cost**, with 50%, 80%, and 100% actual-cost alerts plus a 100% forecast alert, using unblended costs.
-- Not yet deployed: Amplify Hosting, API Gateway, Lambda, CloudWatch dashboard/log groups/alarms, Cognito domain/callback configuration, Cognito team accounts, and UserProfiles mappings.
+- Not yet deployed/configured: Amplify Hosting, API Gateway, Lambda, CloudWatch dashboard/log groups/alarms, Cognito domain/callback configuration, Cognito team accounts, and UserProfiles mappings. The Archive table exists already, but was created manually and is not managed by a CloudFormation stack.
 
-**Compatibility blocker:** the current handler and SAM template expect four different DynamoDB tables and GSIs such as **GSI_ListUpdated** and **GSI_CognitoSub**, as well as a separate SAM-created Cognito pool. Those expectations do not match the console resources above. Do not deploy the current SAM template or point the handler at the console tables until the data model and resource ownership are reconciled. The remainder of this document is the desired architecture after that work is complete.
+**Compatibility blocker:** the manually created Archive table's primary key and both GSIs match the Archive contract expected by the handler/template, but it is provisioned rather than on-demand and is not CloudFormation-managed. With the default `TeamFollowUp` prefix, the SAM `ArchiveTable` resource would collide with the existing `TeamFollowUp-Archive`. The template also expects a separate Cognito pool and WorkItems/ActivityEvents/UserProfiles tables with names or key/index contracts that do not match the current Items/Activity/Users resources. Do not deploy the current SAM template or point the handler at the console tables until resource ownership, billing, and the complete data model are reconciled. The remainder of this document describes the target architecture, not a ready-to-deploy stack.
 
 ## 1. At a glance
 
@@ -117,7 +117,7 @@ The repository has no local authentication mode, mock data adapter, browser data
 
 ### Data protection
 
-- The three console-created DynamoDB tables currently have point-in-time recovery disabled. The target SAM template also defaults this option to disabled for the current cost-controlled lab. **Retention is not a backup**; do not enable recovery features without an explicit cost/recovery decision.
+- All four console-created DynamoDB tables currently have point-in-time recovery disabled. The target SAM template also defaults this option to disabled for the current cost-controlled lab. **Retention is not a backup**; do not enable recovery features without an explicit cost/recovery decision.
 - Lambda returns generic errors to clients. Request IDs, error types, and database error codes are logged for operators, but request bodies and authorization headers are intentionally excluded from access logs.
 - Deployment scripts are administrative tools. Run them from a trusted workstation or controlled CI job using short-lived AWS credentials and the minimum IAM actions documented in the deployment guide.
 
@@ -125,7 +125,7 @@ The repository has no local authentication mode, mock data adapter, browser data
 
 The stack creates log groups with configurable retention, a CloudWatch dashboard, and alarms for Lambda errors, Lambda throttles, and API Gateway 5xx responses. Alarm actions are not configured by default, so email or paging requires an SNS topic/subscription and explicit alarm actions.
 
-After the target backend is deployed, monitor Lambda logs and API Gateway access logs. The planned dashboard reports request volume, 5xx responses, Lambda duration, errors, and throttling. The target SAM template uses on-demand DynamoDB billing; the three current console tables instead use provisioned capacity of 1 RCU and 1 WCU each, plus the same capacity on each configured index. Point-in-time recovery, log ingestion/retention, and Cognito features can add costs. Check current regional pricing before changing the lab configuration.
+After the target backend is deployed, monitor Lambda logs and API Gateway access logs. The planned dashboard reports request volume, 5xx responses, Lambda duration, errors, and throttling. The target SAM template uses on-demand DynamoDB billing; the four current console tables instead use provisioned capacity of 1 RCU and 1 WCU each, plus the same capacity on each configured index. Point-in-time recovery, log ingestion/retention, and Cognito features can add costs. Check current regional pricing before changing the lab configuration.
 
 ## 6. Deployment boundary
 

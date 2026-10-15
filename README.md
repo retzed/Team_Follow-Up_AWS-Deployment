@@ -2,9 +2,9 @@
 
 An English/Arabic workspace for a team to manage projects, temporary jobs, tasks, and follow-ups. **This repository is AWS-only:** users sign in with Amazon Cognito and all application data is read from and written to DynamoDB through the authenticated API. There is no local authentication, demo database, or offline data store.
 
-> **Current AWS status (15 October 2026):** the Cognito pool and three DynamoDB tables have been created manually in **us-east-1**. Amplify Hosting and the API/Lambda backend have not yet been deployed. See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the exact console settings.
+> **Current AWS status (15 October 2026):** the Cognito pool and four DynamoDB tables—**Items**, **Activity**, **Users**, and **Archive**—have been created manually in **us-east-1**. Amplify Hosting and the API/Lambda backend have not yet been deployed. See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the exact console settings.
 >
-> **Deployment safety:** do not run the current SAM deployment step yet. The existing template provisions a separate Cognito pool and four DynamoDB tables with names, keys, and indexes that do not match the manually created resources. The backend must be reconciled with the current schema first.
+> **Deployment safety:** do not run the current SAM deployment step yet. The manually created `TeamFollowUp-Archive` table has the target Archive key/index schema, but its provisioned billing mode differs from the template and the default SAM prefix would collide with this existing table. The template also provisions a separate Cognito pool and WorkItems/ActivityEvents/UserProfiles tables that do not match the current Items/Activity/Users resources. Reconcile resource ownership, billing, and the other schemas before deployment.
 
 ## Start here
 

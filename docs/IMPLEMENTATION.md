@@ -36,7 +36,7 @@ The JavaScript Quick setup guide was selected for reference. The app client ID i
 
 ## 3. Amazon DynamoDB
 
-All three tables were created in **us-east-1**. Each uses the **Standard** table class, **Provisioned** capacity, **1 RCU and 1 WCU** on the base table, disabled auto scaling, disabled point-in-time recovery, disabled deletion protection, disabled DynamoDB Streams, and the default AWS-owned encryption key. No optional backups were enabled.
+All four tables were created manually in **us-east-1**. Each uses the **Standard** table class, **Provisioned** capacity, **1 RCU and 1 WCU** on the base table, disabled auto scaling, disabled point-in-time recovery, disabled deletion protection, disabled DynamoDB Streams, and the default AWS-owned encryption key. Each configured global secondary index also uses **1 RCU and 1 WCU** with an **All** projection. No optional backups were enabled.
 
 ### TeamFollowUp-Items
 
@@ -73,9 +73,26 @@ All three tables were created in **us-east-1**. Each uses the **Standard** table
 | Global secondary indexes | None |
 | Table class | Standard |
 
+### TeamFollowUp-Archive
+
+| Property | Configured value |
+|---|---|
+| Partition key | **archiveId** (String) |
+| Sort key | None |
+| Base table capacity | 1 RCU / 1 WCU |
+| Table class | Standard |
+| Billing mode | Provisioned |
+
+| Global secondary index | Partition key (String) | Sort key (String) | Projection | Capacity |
+|---|---|---|---|---|
+| **GSI_ArchiveIndex** | **archivePK** | **archiveSort** | All | 1 RCU / 1 WCU |
+| **GSI_ArchiveRoot** | **archiveRootPK** | **archiveRootSort** | All | 1 RCU / 1 WCU |
+
+This table stores archived copies while retaining the original item IDs and hierarchy relationships. `GSI_ArchiveIndex` supports the archive listing; `GSI_ArchiveRoot` indexes rows by their root project/job. The table was created manually, not by CloudFormation/SAM.
+
 ### Capacity summary
 
-The configured capacity totals **6 RCUs and 6 WCUs** across the three base tables and the three indexes on TeamFollowUp-Items: four read/write units for the Items table plus its indexes, one for Activity, and one for Users. Provisioned capacity can throttle requests that exceed the configured limits; auto scaling is deliberately off.
+The configured capacity totals **9 RCUs and 9 WCUs** across four base tables and five global secondary indexes: Items (1 + three GSIs = 4), Activity (1), Users (1), and Archive (1 + two GSIs = 3). Provisioned capacity can throttle requests that exceed the configured limits; auto scaling is deliberately off.
 
 ## 4. AWS Budgets cost monitor
 
@@ -101,7 +118,7 @@ As of the date above, these parts of the planned architecture have **not** been 
 - CloudWatch log groups, dashboard, and alarms.
 - Cognito hosted-login domain and callback/sign-out URLs.
 - Team Cognito accounts and corresponding DynamoDB profile mappings.
-- An Archive table.
+
 
 No production or live shared-data deployment has been completed.
 
@@ -110,11 +127,11 @@ No production or live shared-data deployment has been completed.
 The current repository's **backend/template.yaml** and **backend/src/handler.py** describe a more advanced target schema than the manually created tables:
 
 - The SAM template creates its own Cognito User Pool and client instead of using the existing pool/client above.
-- The SAM template defines four tables with the physical suffixes **WorkItems**, **ActivityEvents**, **UserProfiles**, and **Archive**, rather than the current console names **Items**, **Activity**, and **Users**.
-- The handler expects indexes such as **GSI_ListUpdated**, **GSI_ItemTimeline**, **GSI_CognitoSub**, and **GSI_ArchiveIndex**. Those indexes are not the same as the three current Items indexes; the current Activity and Users tables have no GSIs.
-- The Activity table primary key is currently **itemId + activityKey**, whereas the current handler's target ActivityEvents table uses **eventId** as its partition key.
+- The SAM template's default prefix produces **WorkItems**, **ActivityEvents**, **UserProfiles**, and **Archive** tables, while the manually created application tables are **Items**, **Activity**, and **Users**, plus the already-created **Archive** table.
+- The existing **TeamFollowUp-Archive** primary key and both GSIs match the Archive key/index contract in the SAM template and handler. However, the console table uses **Provisioned 1 RCU / 1 WCU** on the base table and each GSI, while the target template uses **on-demand** billing; the console table is also not currently managed by the SAM CloudFormation stack. The default SAM prefix would therefore collide with the existing physical table name.
+- The handler expects indexes such as **GSI_ListUpdated**, **GSI_ItemTimeline**, and **GSI_CognitoSub** on the other target tables. Those differ from the manually created Items indexes; the current Activity and Users tables have no GSIs. The Activity table primary key is **itemId + activityKey**, whereas the target ActivityEvents table uses **eventId** as its partition key.
 
-Therefore **do not run sam deploy or point the existing Lambda handler at the console-created tables yet**. Doing so would create duplicate resources or runtime query/write failures. The next implementation step must deliberately reconcile the SAM resource ownership, Lambda data model, and actual table/index schema before the app is connected. This record distinguishes what exists today from what the repository intends to provision.
+Therefore **do not run `sam deploy` or point the existing Lambda handler at the console-created tables yet**. The Archive table now exists and its key/index schema is verified from the repository's archive implementation, but resource ownership, billing mode, the other table names/keys/indexes, and Cognito integration still need to be reconciled. Deploying now would cause at least a physical-name collision for Archive or create duplicate parallel resources, and runtime query/write failures would remain possible.
 
 ## 7. Cost-conscious settings used
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Static contract tests for the deployable AWS SAM template."""
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -33,7 +34,86 @@ def fail(message):
     raise SystemExit(1)
 
 
+def validate_console_bootstrap():
+    """Keep the manually configured AWS resource inventory accurate and regression-tested."""
+    schema_path = ROOT / "backend" / "table-schema.json"
+    try:
+        with schema_path.open(encoding="utf-8") as stream:
+            schema = json.load(stream)
+    except (OSError, json.JSONDecodeError) as exc:
+        fail(f"Could not load backend/table-schema.json current bootstrap record: {exc}")
+
+    if schema.get("actualAwsResourcesCreated") is not False:
+        fail("table-schema.json is a documentation/schema reference, not an AWS provisioning mechanism.")
+
+    bootstrap = schema.get("currentConsoleBootstrap")
+    if not isinstance(bootstrap, dict) or bootstrap.get("region") != "us-east-1":
+        fail("Current console bootstrap must document the manually configured us-east-1 resources.")
+
+    table_rows = bootstrap.get("dynamodb", [])
+    tables = {row.get("name"): row for row in table_rows if isinstance(row, dict)}
+    expected_names = {
+        "TeamFollowUp-Items",
+        "TeamFollowUp-Activity",
+        "TeamFollowUp-Users",
+        "TeamFollowUp-Archive",
+    }
+    if set(tables) != expected_names:
+        fail("Current console bootstrap must list exactly the four manually created DynamoDB tables, including Archive.")
+
+    # These are the console settings reported for the manually created tables and indexes.
+    for name, table in tables.items():
+        if table.get("status") != "ACTIVE":
+            fail(f"{name} must be recorded as ACTIVE in the current console bootstrap.")
+        if table.get("billingMode") != "PROVISIONED" or table.get("tableClass") != "STANDARD":
+            fail(f"{name} must document the Standard/provisioned settings used in the console.")
+        if table.get("partitionKey", {}).get("type") != "S":
+            fail(f"{name} must record a String partition key.")
+        if table.get("provisionedThroughput") != {"readCapacityUnits": 1, "writeCapacityUnits": 1}:
+            fail(f"{name} must document 1 RCU / 1 WCU on the base table.")
+        for setting in ("autoScaling", "pointInTimeRecovery", "deletionProtection", "streams"):
+            if table.get(setting) is not False:
+                fail(f"{name} must record {setting}=false for the current low-cost bootstrap.")
+        if table.get("encryption") != "AWS-owned default key":
+            fail(f"{name} must document the AWS-owned default encryption key.")
+        for index in table.get("globalSecondaryIndexes", []):
+            if index.get("projection") != "ALL":
+                fail(f"{name}/{index.get('name')} must document an All projection.")
+            if index.get("readCapacityUnits") != 1 or index.get("writeCapacityUnits") != 1:
+                fail(f"{name}/{index.get('name')} must document 1 RCU / 1 WCU.")
+
+    archive = tables["TeamFollowUp-Archive"]
+    if archive.get("partitionKey") != {"name": "archiveId", "type": "S"} or archive.get("sortKey") is not None:
+        fail("TeamFollowUp-Archive must use archiveId (String) as its only primary key.")
+    archive_indexes = {
+        row.get("name"): (row.get("partitionKey"), row.get("sortKey"))
+        for row in archive.get("globalSecondaryIndexes", [])
+    }
+    expected_archive_indexes = {
+        "GSI_ArchiveIndex": ("archivePK", "archiveSort"),
+        "GSI_ArchiveRoot": ("archiveRootPK", "archiveRootSort"),
+    }
+    if archive_indexes != expected_archive_indexes:
+        fail("Archive bootstrap must define GSI_ArchiveIndex and GSI_ArchiveRoot with the expected key attributes.")
+
+    not_created = bootstrap.get("notYetCreated", [])
+    if any("archive table" in str(value).lower() for value in not_created):
+        fail("The Archive table is created; it must not remain in currentConsoleBootstrap.notYetCreated.")
+
+    target_archive = next((row for row in schema.get("tables", []) if row.get("name") == "TeamFollowUp-Archive"), None)
+    if not target_archive or target_archive.get("primaryKey", {}).get("partition") != "archiveId":
+        fail("Target SAM schema must continue documenting the Archive primary key.")
+    target_indexes = {row.get("name"): (row.get("pk"), row.get("sk")) for row in target_archive.get("gsis", [])}
+    if target_indexes != expected_archive_indexes:
+        fail("Target Archive key/index documentation must agree with the backend's archive access contract.")
+
+    capacity = bootstrap.get("capacitySummary", {})
+    if (capacity.get("readCapacityUnits"), capacity.get("writeCapacityUnits")) != (9, 9):
+        fail("Current bootstrap capacity summary must reflect 9 RCUs / 9 WCUs including Archive's two indexes.")
+
+
 def main():
+    validate_console_bootstrap()
     with TEMPLATE_PATH.open(encoding="utf-8") as stream:
         template = yaml.load(stream, Loader=CloudFormationLoader)
 
@@ -164,7 +244,7 @@ def main():
     if missing_indexes:
         fail("Handler references undefined DynamoDB indexes: " + ", ".join(sorted(missing_indexes)))
 
-    print("Infrastructure contract checks passed: Cognito, JWT authorization, restricted CORS, log retention, Lambda transaction IAM, four retained DynamoDB tables with required indexes, CloudWatch dashboard/alarms, and handler index names.")
+    print("Infrastructure checks passed: target SAM contract plus current four-table console bootstrap, Archive keys/indexes/capacity, Cognito/JWT, restricted CORS, Lambda IAM, and CloudWatch resources.")
 
 
 if __name__ == "__main__":

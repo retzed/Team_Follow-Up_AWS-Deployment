@@ -1,8 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: "Team Follow-Up target backend; not reconciled with the current console bootstrap. See docs/IMPLEMENTATION.md before deployment."
-# WARNING: This target stack creates its own Cognito pool and four differently shaped DynamoDB tables.
-# Do not deploy until resource ownership and table/index schemas are reconciled with the existing console resources.
+# WARNING: This target stack creates its own Cognito pool and target WorkItems, ActivityEvents, UserProfiles, and Archive resources.
+# TeamFollowUp-Archive already exists manually and has matching key/index definitions but different billing/resource ownership;
+# the default prefix would collide with it. The other table contracts and Cognito pool also differ from console resources.
+# Do not deploy until resource ownership, billing mode, and all data schemas are reconciled.
 Parameters:
   TableNamePrefix:
     Type: String

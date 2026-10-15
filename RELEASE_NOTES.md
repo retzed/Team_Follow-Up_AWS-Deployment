@@ -2,9 +2,9 @@
 
 ## Current AWS console bootstrap (15 October 2026)
 
-The Cognito and DynamoDB resources in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) have been created manually in us-east-1. The monthly cost budget has also been created. Amplify Hosting, API Gateway, Lambda, and CloudWatch observability resources have not yet been deployed.
+The Cognito pool, all four DynamoDB tables (Items, Activity, Users, and Archive), and the monthly cost budget have been created manually in us-east-1. Amplify Hosting, API Gateway, Lambda, and CloudWatch observability resources have not yet been deployed.
 
-**Do not deploy the current SAM template yet.** Its resource ownership and table/index contract differ from the console bootstrap: it creates a second Cognito pool and four differently shaped tables. The app's Lambda handler currently requires those target indexes, including **GSI_CognitoSub**, which are not present on the console-created tables. Reconcile the schema and template before live integration. The SAM template now defaults point-in-time recovery to disabled to match the current lab's cost preference.
+**Do not deploy the current SAM template yet.** The existing `TeamFollowUp-Archive` table has the same primary key and GSIs as the target Archive contract, but it uses provisioned billing and is not CloudFormation-managed; the default SAM prefix would collide with it. The template also creates a second Cognito pool and WorkItems/ActivityEvents/UserProfiles tables that do not match the other console tables. The handler's expected indexes, including **GSI_CognitoSub**, are not present on the current Users table. Reconcile resource ownership, billing, Cognito, and the remaining table schemas before live integration. The SAM template defaults point-in-time recovery to disabled.
 
 ## AWS-only behavior
 

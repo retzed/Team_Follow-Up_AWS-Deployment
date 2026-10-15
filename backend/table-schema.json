@@ -163,7 +163,7 @@
   "defaultTableNamePrefix": "TeamFollowUp",
   "notes": [
     "The tables array above documents the intended SAM target schema used by backend/template.yaml and backend/src/handler.py.",
-    "currentConsoleBootstrap records the actual manually created resources as of 2026-10-15; it is not a provisioning mechanism.",
+    "currentConsoleBootstrap records the actual four manually created DynamoDB tables and Cognito/budget settings as of 2026-10-15; it is documentation, not a provisioning mechanism.",
     "The SAM target stack has not been deployed. Its current table/index contract does not match the console bootstrap.",
     "The frontend has no local database or demo adapter; all application data is intended to flow through the Cognito-authenticated API once the schema is reconciled."
   ],
@@ -276,6 +276,44 @@
         "deletionProtection": false,
         "streams": false,
         "encryption": "AWS-owned default key"
+      },
+      {
+        "name": "TeamFollowUp-Archive",
+        "status": "ACTIVE",
+        "billingMode": "PROVISIONED",
+        "tableClass": "STANDARD",
+        "partitionKey": {
+          "name": "archiveId",
+          "type": "S"
+        },
+        "sortKey": null,
+        "provisionedThroughput": {
+          "readCapacityUnits": 1,
+          "writeCapacityUnits": 1
+        },
+        "globalSecondaryIndexes": [
+          {
+            "name": "GSI_ArchiveIndex",
+            "partitionKey": "archivePK",
+            "sortKey": "archiveSort",
+            "projection": "ALL",
+            "readCapacityUnits": 1,
+            "writeCapacityUnits": 1
+          },
+          {
+            "name": "GSI_ArchiveRoot",
+            "partitionKey": "archiveRootPK",
+            "sortKey": "archiveRootSort",
+            "projection": "ALL",
+            "readCapacityUnits": 1,
+            "writeCapacityUnits": 1
+          }
+        ],
+        "autoScaling": false,
+        "pointInTimeRecovery": false,
+        "deletionProtection": false,
+        "streams": false,
+        "encryption": "AWS-owned default key"
       }
     ],
     "costBudget": {
@@ -310,10 +348,16 @@
       "AWS Lambda API function",
       "CloudWatch log groups, dashboard, and alarms",
       "Cognito domain, callback URL, and sign-out URL",
-      "Cognito team accounts and their DynamoDB profile mappings",
-      "Archive table required by the current SAM target contract"
+      "Cognito team accounts and their DynamoDB profile mappings"
     ],
-    "compatibilityWarning": "This is the actual console bootstrap, not the current SAM target schema. The SAM template provisions a separate Cognito pool and four differently named DynamoDB tables with incompatible key/index definitions. Do not deploy the target template or connect the current handler to these tables until the schema and resource ownership have been reconciled."
+    "compatibilityWarning": "This records resources created manually in the console; it is not a provisioning mechanism. TeamFollowUp-Archive exists with archiveId as its String partition key and GSI_ArchiveIndex (archivePK/archiveSort) plus GSI_ArchiveRoot (archiveRootPK/archiveRootSort), all projected. Its provisioned billing mode differs from the target SAM template's on-demand billing, and the table is not managed by CloudFormation. With the default TeamFollowUp prefix, the SAM ArchiveTable resource would collide with this existing physical table. The SAM template also provisions a separate Cognito pool and WorkItems, ActivityEvents, and UserProfiles tables whose names, keys, or indexes do not match the console-created Items, Activity, and Users tables. Do not deploy the target template or connect the current handler until resource ownership, billing settings, and the data-model contract have been reconciled.",
+    "capacitySummary": {
+      "baseTables": 4,
+      "globalSecondaryIndexes": 5,
+      "readCapacityUnits": 9,
+      "writeCapacityUnits": 9,
+      "explanation": "Four base tables at 1 RCU/1 WCU each, plus three Items GSIs and two Archive GSIs at 1 RCU/1 WCU each."
+    }
   },
   "actualAwsResourcesCreated": false
 }

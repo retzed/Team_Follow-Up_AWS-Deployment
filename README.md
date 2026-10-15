@@ -54,7 +54,7 @@ python -m pip install -r backend/src/requirements.txt
 python backend/scripts/seed_load_test_data.py --region us-east-1
 ```
 
-The first command is a **dry run** and makes no changes. It prints the number of synthetic Projects, Jobs, Tasks, Follow-ups, and Activity events, plus an exact command using the displayed run ID. Review the count, then run that printed command to insert the data. The default workload creates multiple root items, several levels of children, and four history events per item; the counts can be adjusted with `--projects`, `--jobs`, `--tasks-per-project`, `--followups-per-task`, `--direct-followups-per-root`, and `--events-per-item`.
+The seeder runs in **dry-run mode** by default and makes no changes. It prints the number of synthetic Projects, Jobs, Tasks, Follow-ups, and Activity events, plus an exact command using the displayed run ID. Review the count, then run that printed command to insert the data. The default workload creates multiple root items, several levels of children, and four history events per item; the counts can be adjusted with `--projects`, `--jobs`, `--tasks-per-project`, `--followups-per-task`, `--direct-followups-per-root`, and `--events-per-item`.
 
 All generated item names start with **[LOAD TEST]**, and every ID is scoped to one unique run ID. Use the cleanup command printed after seeding to remove only that run:
 

@@ -41,7 +41,7 @@ assert.match(backend, /def current_profile\(event\):[\s\S]*?matches=\[row for ro
 assert.match(backend, /if item_type in \('project','job'\):[\s\S]*?candidate_rows=query_descendant_rows\(root_id\)[\s\S]*?elif item_type=='task':[\s\S]*?candidate_rows=query_children_rows\(item_id\)[\s\S]*?else:[\s\S]*?candidate_rows=\[\]/, 'Cascade traversal must use only the existing ParentIdIndex; leaf follow-up deletion needs no child query.');
 const template = await readFile('backend/template.yaml', 'utf8');
 assert.doesNotMatch(backend, /IndexName=['\"]GSI_(?:ApplicationTimeline|ItemTimeline|RootTimeline|ParentTimeline|ListUpdated|ListCreated|RootUpdated|AssignedUpdated|AssignedCreated|CognitoSub)['\"]/, 'Lambda must not assume GSIs absent from the current tables.');
-assert.doesNotMatch(template, /Type:\\s*AWS::DynamoDB::Table/, 'SAM must reuse existing tables instead of creating new tables with a conflicting schema.');
+assert.doesNotMatch(template, /Type:\s*AWS::DynamoDB::Table/, 'SAM must reuse existing tables instead of creating new tables with a conflicting schema.');
 assert.match(html, /id="applicationHistoryButton" data-action="global-history"/, 'Application-wide history must have a distinct entry point beside Archive.');
 assert.doesNotMatch(html, /historyItemQuery/, 'History uses one unified search control rather than a second item-only search.');
 assert.equal((html.match(/id="historyQuery" type="search"/g)||[]).length, 2, 'The same single query field is rendered by the mutually exclusive project and application history dialogs.');

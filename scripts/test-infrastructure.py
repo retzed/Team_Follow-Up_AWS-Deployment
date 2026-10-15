@@ -50,6 +50,24 @@ def validate_console_bootstrap():
     if not isinstance(bootstrap, dict) or bootstrap.get("region") != "us-east-1":
         fail("Current console bootstrap must document the manually configured us-east-1 resources.")
 
+    cognito = bootstrap.get("cognito", {})
+    if cognito.get("teamUserIdAttribute") != "custom:teamUserId":
+        fail("The current Cognito bootstrap must document the custom:teamUserId attribute.")
+    if "added per operator confirmation" not in str(cognito.get("teamUserIdAttributeStatus", "")).lower():
+        fail("Cognito bootstrap must reflect the operator-confirmed addition of custom:teamUserId.")
+    attribute_settings = cognito.get("teamUserIdAttributeSettings", {})
+    if (attribute_settings.get("dataType"), attribute_settings.get("minLength"),
+            attribute_settings.get("maxLength"), attribute_settings.get("mutable")) != ("String", 1, 32, True):
+        fail("Cognito bootstrap must record the instructed String/1-32/mutable teamUserId settings.")
+    app_client_permissions = cognito.get("teamUserIdAttributePermissions", {})
+    followup_permissions = app_client_permissions.get("Team_FollowUp", {})
+    if followup_permissions.get("read") != "not yet verified":
+        fail("Cognito bootstrap must keep the Team_FollowUp attribute-read permission marked as unverified until checked live.")
+    if "must be disabled" not in followup_permissions.get("write", ""):
+        fail("Cognito bootstrap must explicitly note that app-client write access to teamUserId must be disabled.")
+    if "must be disabled" not in app_client_permissions.get("allAppClients", {}).get("write", ""):
+        fail("Cognito bootstrap must require teamUserId write permission to be disabled on every app client.")
+
     table_rows = bootstrap.get("dynamodb", [])
     tables = {row.get("name"): row for row in table_rows if isinstance(row, dict)}
     expected_names = {

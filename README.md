@@ -4,12 +4,12 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 
 > **Current AWS status (15 October 2026):** the Cognito pool and four DynamoDB tables—**Items**, **Activity**, **Users**, and **Archive**—have been created manually in **us-east-1**. Amplify Hosting and the API/Lambda backend have not yet been deployed. See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the exact console settings.
 >
-> **Deployment status:** the handler, schema reference, and SAM template now target the four manually created DynamoDB tables and the existing Cognito pool/app client. SAM creates only the API, Lambda, IAM, and CloudWatch resources; it does not create duplicate tables or a new user pool. Before deploying, verify that `custom:teamUserId` exists and is readable in the existing Cognito pool/client, and supply the final Amplify HTTPS origin.
+> **Deployment status:** the handler, schema reference, and SAM template now target the four manually created DynamoDB tables and the existing Cognito pool/app client. SAM creates only the API, Lambda, IAM, and CloudWatch resources; it does not create duplicate tables or a new user pool. The operator confirmed that `custom:teamUserId` was added to the existing pool on 15 October 2026. Before deploying, verify that the `Team_FollowUp` app client can read the attribute and cannot write it, that no other app client can write it, assign unique `u1`–`u6` values to the team accounts, and supply the final Amplify HTTPS origin.
 
 ## Start here
 
 - **[AWS console implementation record](docs/IMPLEMENTATION.md)** — actual resources and settings currently configured in AWS.
-- **[Deployment guide](docs/DEPLOYMENT.md)** — target deployment workflow, including the current schema-reconciliation blocker.
+- **[Deployment guide](docs/DEPLOYMENT.md)** — target deployment workflow, Cognito team mapping, and pre-deployment verification.
 - **[Architecture guide](docs/ARCHITECTURE.md)** — request flow, security boundaries, data model, and operational design.
 - **[Release notes](RELEASE_NOTES.md)** — implementation and validation notes.
 

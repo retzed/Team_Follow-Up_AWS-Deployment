@@ -5,7 +5,7 @@ This document distinguishes AWS resources already created manually from the back
 ## 1. Current AWS state
 
 - **Region:** US East (N. Virginia), `us-east-1`.
-- **Cognito:** existing pool `us-east-1_7dYZw2Is6`, app client `7id8c2g27fvbh365atqntqurir`; email sign-in, self-registration disabled, MFA off. The custom `custom:teamUserId` attribute and app-client readable attributes still require verification.
+- **Cognito:** existing pool `us-east-1_7dYZw2Is6`, app client `7id8c2g27fvbh365atqntqurir`; email sign-in, self-registration disabled, MFA off. The operator confirmed `custom:teamUserId` was added on 15 October 2026; app-client Read/Write permissions remain to be verified.
 - **DynamoDB:** four manually created Standard tables with provisioned 1 RCU / 1 WCU per base table and per GSI. Three Items GSIs plus two Archive GSIs means **9 RCUs and 9 WCUs** configured.
 - **Not yet deployed:** Amplify Hosting, API Gateway, Lambda, CloudWatch log groups/dashboard/alarms, Cognito hosted-login domain and callback URLs, team Cognito accounts, and their Users-table mappings.
 - **Budget:** `TeamFollowUp-Monthly-Cost`, USD $1/month, with actual 50/80/100% and forecast 100% alerts. This is a notification budget, not a spend cap.
@@ -65,7 +65,7 @@ Activity is **not** an eventId-keyed table. Every event is stored under `itemId`
 - API Gateway uses the existing Cognito pool issuer and app-client ID as JWT audience. CORS permits only the exact HTTPS `AllowedOrigin` supplied at deployment.
 - Lambda treats Cognito `sub` as the authenticated identity and scans `TeamFollowUp-Users` for the corresponding `cognitoSub`. It denies unknown, duplicate, or disabled mappings.
 - Lambda read permissions are scoped to the four configured tables and their indexes. Transactional writes are scoped to Items, Activity, and Archive. Direct batch-write permission exists only for partial-restore activity summaries on Activity.
-- `custom:teamUserId` must exist and be readable by the existing browser app client for the identity-mapping workflow. Verify this before creating/inviting the team accounts.
+- The `custom:teamUserId` attribute was added according to operator confirmation. Before creating/inviting team accounts, verify that the existing browser app client can read it and that **every** app client in the pool is denied Write permission for it. The frontend uses this claim to resolve the signed-in team identity; only trusted administration should set or correct its value.
 - The frontend receives only public Cognito IDs, API URL, and custom-attribute name. Never put AWS access keys, client secrets, or private Cognito subject values in frontend files or Amplify environment variables.
 
 ## 6. Monitoring, recovery, and cost
@@ -76,7 +76,7 @@ All existing DynamoDB tables have point-in-time recovery disabled. Activity and 
 
 ## 7. Deployment boundary
 
-1. Verify the existing Cognito pool/client settings, custom attribute, team account mappings, and all required index statuses.
+1. Verify the existing Cognito pool/client settings and the `custom:teamUserId` Read/Write permissions, then create the unique team account mappings and confirm all required index statuses.
 2. Create Amplify Hosting and record the final HTTPS origin.
 3. Build and deploy the SAM backend with the existing pool/client/table-name parameters and that `AllowedOrigin`. Review the change set to confirm no Cognito pool or DynamoDB table is being created.
 4. Set Amplify environment variables using the existing Cognito IDs and the deployed API output.

@@ -11,7 +11,7 @@ The Lambda handler now uses the actual table keys and indexes:
 - **Users:** `userId` primary key, with a small table scan matching Cognito `sub` to `cognitoSub`; no Cognito-subject GSI is assumed.
 - **Archive:** `archiveId` plus `GSI_ArchiveIndex` and `GSI_ArchiveRoot`.
 
-The SAM template parameterizes and reuses the existing Cognito pool/client and four table names. It provisions only API Gateway, Lambda, scoped IAM, and CloudWatch resources. It does not create duplicate pools/tables or manage existing data resources. Before deployment, verify that `custom:teamUserId` exists and is readable by the existing browser app client, the Items/Archive GSIs are ACTIVE, all six Cognito accounts/profile mappings are set up, and the final Amplify HTTPS origin is ready.
+The SAM template parameterizes and reuses the existing Cognito pool/client and four table names. It provisions only API Gateway, Lambda, scoped IAM, and CloudWatch resources. It does not create duplicate pools/tables or manage existing data resources. The operator confirmed that `custom:teamUserId` was added to the existing pool on 15 October 2026 (String, 1–32 characters, mutable per the console walkthrough). Before deployment, verify that the existing browser app client can read the attribute and cannot write it, that no other app client can write it, the Items/Archive GSIs are ACTIVE, all six Cognito accounts have unique `u1`–`u6` values and Users-table profile mappings, and the final Amplify HTTPS origin is ready.
 
 ## AWS-only behavior
 

@@ -6,7 +6,7 @@ This runbook deploys the shared Team Follow-Up application using AWS resources a
 
 ## Deployment order
 
-1. Verify the existing Cognito app client/custom attribute and DynamoDB indexes.
+1. Verify the already-added Cognito custom attribute's app-client permissions and the DynamoDB indexes.
 2. Create/map the six Cognito team accounts and seed the existing Users table.
 3. Create Amplify Hosting and copy its final HTTPS origin.
 4. Run repository checks and deploy SAM against the existing resources.
@@ -40,12 +40,13 @@ The `TableNamePrefix` parameter names the API, Lambda, log groups, dashboard, an
 
 In **Amazon Cognito → User pools**, select that exact pool and verify:
 
-- The custom attribute `custom:teamUserId` exists. Its existence was not independently confirmed during initial setup.
-- The `Team_FollowUp` app client is a browser/public client with **no client secret**.
-- The app client can read `custom:teamUserId` and supports the sign-in/token flow used by the frontend.
+- The custom attribute `custom:teamUserId` appears in the schema. The operator confirmed it was added on **15 October 2026**; this repository has not queried the live AWS configuration.
+- Its intended schema settings are **String**, minimum length **1**, maximum length **32**, and **Mutable** enabled.
+- Under **App clients → Team_FollowUp → Attribute permissions → Edit**, enable **Read** and disable **Write** for `custom:teamUserId`. Ensure **Write** is disabled for this attribute on every other app client in the pool as well. The attribute is mutable at the pool level, so browser clients must not be allowed to change the team ID.
+- The `Team_FollowUp` app client is a browser/public client with **no client secret** and supports the sign-in/token flow used by the frontend.
 - Self-registration remains disabled.
 
-If the custom attribute is absent, stop and resolve the pool schema before creating accounts or deploying. Do not create a second Cognito pool to bypass this prerequisite.
+If the attribute does not appear, first check that you selected the correct pool and Region; do not create a duplicate attribute under another name or create a second Cognito pool. Do not proceed to account setup or deployment until the app-client permissions are correct.
 
 ### DynamoDB — actual table contract
 
@@ -80,7 +81,11 @@ Create one administrator-managed account for each team member in the existing po
 | `u5` | Haneen | AWS Engineer |
 | `u6` | Dina | AWS Engineer |
 
-Role labels are descriptive only; they do not grant extra privileges. Each team ID must map to exactly one Cognito account.
+Role labels are descriptive only; they do not grant extra privileges. Each team ID must map to exactly one Cognito account. Adding the schema attribute does **not** populate it on any existing user; set the value separately on each account using the Cognito user-details editor or an administrator-controlled command. For example, to assign `u1` to a specific Cognito username:
+
+    aws cognito-idp admin-update-user-attributes --user-pool-id us-east-1_7dYZw2Is6 --username "<exact-cognito-username>" --user-attributes Name=custom:teamUserId,Value=u1 --region us-east-1
+
+Repeat with the correct Cognito username and unique value (`u2` through `u6`) for the other five accounts. Use trusted administrator credentials for this command; never put Cognito usernames or subject values into frontend configuration or commit them to the repository.
 
 Install the Python dependency:
 

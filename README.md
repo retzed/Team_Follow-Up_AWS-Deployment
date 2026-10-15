@@ -43,27 +43,6 @@ The implementation is described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md
 - `backend/scripts/`: trusted administration scripts for profile seeding and legacy migration diagnostics.
 - `docs/`: architecture, deployment, implementation snapshot and complete documentation.
 
-## Test progressive loading with synthetic data
-
-The AWS app intentionally does not insert browser-side or hard-coded sample records at startup. To exercise the lazy child-item queries and the on-demand item/application-wide Activity popups with a larger workspace, use the removable DynamoDB seeder at `backend/scripts/seed_load_test_data.py`.
-
-Install the backend's Python dependencies and configure AWS CLI credentials for a test account/region first:
-
-```powershell
-python -m pip install -r backend/src/requirements.txt
-python backend/scripts/seed_load_test_data.py --region us-east-1
-```
-
-The seeder runs in **dry-run mode** by default and makes no changes. The printed apply command uses `--run-id` to reuse the same exact ID you reviewed during the dry run. It prints the number of synthetic Projects, Jobs, Tasks, Follow-ups, and Activity events, plus an exact command using the displayed run ID. Review the count, then run that printed command to insert the data. The default workload creates **14 work items and 28 Activity events**: two Projects with Tasks and both nested/direct Follow-ups, plus one Job with a direct Follow-up. Each item gets two timestamped history events, enough to make the item-history requests take long enough to observe loading without defaulting to an unnecessarily large write. Adjust the workload with `--projects`, `--jobs`, `--tasks-per-project`, `--followups-per-task`, `--direct-followups-per-root`, and `--events-per-item` when you want a heavier stress test.
-
-All generated item names start with **[LOAD TEST]**, and every ID is scoped to one unique run ID. Use the cleanup command printed after seeding to remove only that run:
-
-```powershell
-python backend/scripts/seed_load_test_data.py --region us-east-1 --cleanup-run-id <run-id> --apply
-```
-
-The seeder scans the active Items/Activity/Archive tables for cleanup and requires permission to read Users and write/delete matching records. It defaults to the current console table names, which can be overridden with the corresponding `--items-table`, `--activity-table`, `--users-table`, and `--archive-table` options. **Use a test account or test tables only.** With low provisioned write capacity, creating a larger dataset can take several minutes; the script does not alter table capacity or create extra indexes.
-
 ## System requirements and development setup
 
 ### Hardware recommendations
@@ -117,7 +96,6 @@ This verifies the frontend, backend helper tests, infrastructure contract, Pytho
 
 **Related project:** [Team Follow-Up browser-local demo](https://github.com/retzed/Team_Follow-Up) is a separate static demonstration. It does not use this repository's Cognito/API/DynamoDB runtime.
 
-
 ## Local validation
 
 Requirements: Node.js 24 and Python 3.12. Install backend test dependencies, then run the regression and infrastructure-contract checks:
@@ -159,7 +137,6 @@ The console-first Amplify branch needs these values before a successful frontend
 - `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE=custom:teamUserId` (the default)
 
 They are public browser configuration values, not secrets. Do not add AWS credentials, GitHub access tokens, Cognito client secrets, real Cognito `sub` values, or billing-recipient email addresses to source files or Amplify environment variables. A passing CI run is evidence of code/build-contract validation only, not proof of a live AWS deployment.
-
 
 ### Configuration rules
 

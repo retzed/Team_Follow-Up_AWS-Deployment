@@ -160,10 +160,159 @@
       ]
     }
   ],
-  "actualAwsResourcesCreated": false,
   "defaultTableNamePrefix": "TeamFollowUp",
   "notes": [
-    "Infrastructure in backend/template.yaml creates the real tables when explicitly deployed.",
-    "The frontend has no local database or demo adapter; all application data is read and written through the Cognito-authenticated API."
-  ]
+    "The tables array above documents the intended SAM target schema used by backend/template.yaml and backend/src/handler.py.",
+    "currentConsoleBootstrap records the actual manually created resources as of 2026-10-15; it is not a provisioning mechanism.",
+    "The SAM target stack has not been deployed. Its current table/index contract does not match the console bootstrap.",
+    "The frontend has no local database or demo adapter; all application data is intended to flow through the Cognito-authenticated API once the schema is reconciled."
+  ],
+  "samTargetResourcesDeployed": false,
+  "currentConsoleBootstrap": {
+    "asOf": "2026-10-15",
+    "region": "us-east-1",
+    "cognito": {
+      "userPoolDisplayName": "User pool - fnzspt",
+      "userPoolId": "us-east-1_7dYZw2Is6",
+      "appClientName": "Team_FollowUp",
+      "appClientId": "7id8c2g27fvbh365atqntqurir",
+      "featurePlan": "Essentials",
+      "signIn": "email",
+      "selfRegistration": "disabled",
+      "mfa": "off",
+      "domainAndCallbackUrls": "not configured yet",
+      "teamAccountsCreated": false,
+      "teamUserIdAttribute": "custom:teamUserId",
+      "teamUserIdAttributeStatus": "not yet verified in this pool"
+    },
+    "dynamodb": [
+      {
+        "name": "TeamFollowUp-Items",
+        "status": "ACTIVE",
+        "billingMode": "PROVISIONED",
+        "tableClass": "STANDARD",
+        "partitionKey": {
+          "name": "itemId",
+          "type": "S"
+        },
+        "sortKey": null,
+        "provisionedThroughput": {
+          "readCapacityUnits": 1,
+          "writeCapacityUnits": 1
+        },
+        "globalSecondaryIndexes": [
+          {
+            "name": "ParentIdIndex",
+            "partitionKey": "parentId",
+            "sortKey": "createdAt",
+            "projection": "ALL",
+            "readCapacityUnits": 1,
+            "writeCapacityUnits": 1
+          },
+          {
+            "name": "AssignedToIndex",
+            "partitionKey": "assignedTo",
+            "sortKey": "updatedAt",
+            "projection": "ALL",
+            "readCapacityUnits": 1,
+            "writeCapacityUnits": 1
+          },
+          {
+            "name": "WorkspaceIndex",
+            "partitionKey": "workspaceKey",
+            "sortKey": "createdAt",
+            "projection": "ALL",
+            "readCapacityUnits": 1,
+            "writeCapacityUnits": 1
+          }
+        ],
+        "autoScaling": false,
+        "pointInTimeRecovery": false,
+        "deletionProtection": false,
+        "streams": false,
+        "encryption": "AWS-owned default key"
+      },
+      {
+        "name": "TeamFollowUp-Activity",
+        "status": "ACTIVE",
+        "billingMode": "PROVISIONED",
+        "tableClass": "STANDARD",
+        "partitionKey": {
+          "name": "itemId",
+          "type": "S"
+        },
+        "sortKey": {
+          "name": "activityKey",
+          "type": "S"
+        },
+        "provisionedThroughput": {
+          "readCapacityUnits": 1,
+          "writeCapacityUnits": 1
+        },
+        "globalSecondaryIndexes": [],
+        "autoScaling": false,
+        "pointInTimeRecovery": false,
+        "deletionProtection": false,
+        "streams": false,
+        "encryption": "AWS-owned default key"
+      },
+      {
+        "name": "TeamFollowUp-Users",
+        "status": "ACTIVE",
+        "billingMode": "PROVISIONED",
+        "tableClass": "STANDARD",
+        "partitionKey": {
+          "name": "userId",
+          "type": "S"
+        },
+        "sortKey": null,
+        "provisionedThroughput": {
+          "readCapacityUnits": 1,
+          "writeCapacityUnits": 1
+        },
+        "globalSecondaryIndexes": [],
+        "autoScaling": false,
+        "pointInTimeRecovery": false,
+        "deletionProtection": false,
+        "streams": false,
+        "encryption": "AWS-owned default key"
+      }
+    ],
+    "costBudget": {
+      "name": "TeamFollowUp-Monthly-Cost",
+      "amountUsd": 1,
+      "period": "monthly recurring",
+      "costMetric": "Unblended costs",
+      "alerts": [
+        {
+          "thresholdPercent": 50,
+          "type": "ACTUAL"
+        },
+        {
+          "thresholdPercent": 80,
+          "type": "ACTUAL"
+        },
+        {
+          "thresholdPercent": 100,
+          "type": "ACTUAL"
+        },
+        {
+          "thresholdPercent": 100,
+          "type": "FORECASTED"
+        }
+      ],
+      "notifications": "email configured in AWS console; recipient intentionally not stored in repository",
+      "isSpendingCap": false
+    },
+    "notYetCreated": [
+      "Amplify Hosting app and live website URL",
+      "API Gateway HTTP API",
+      "AWS Lambda API function",
+      "CloudWatch log groups, dashboard, and alarms",
+      "Cognito domain, callback URL, and sign-out URL",
+      "Cognito team accounts and their DynamoDB profile mappings",
+      "Archive table required by the current SAM target contract"
+    ],
+    "compatibilityWarning": "This is the actual console bootstrap, not the current SAM target schema. The SAM template provisions a separate Cognito pool and four differently named DynamoDB tables with incompatible key/index definitions. Do not deploy the target template or connect the current handler to these tables until the schema and resource ownership have been reconciled."
+  }
 }

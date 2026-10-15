@@ -1,6 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: "Team Follow-Up backend - Cognito, HTTP API, Python Lambda, DynamoDB tables, and CloudWatch observability."
+Description: "Team Follow-Up target backend; not reconciled with the current console bootstrap. See docs/IMPLEMENTATION.md before deployment."
+# WARNING: This target stack creates its own Cognito pool and four differently shaped DynamoDB tables.
+# Do not deploy until resource ownership and table/index schemas are reconciled with the existing console resources.
 Parameters:
   TableNamePrefix:
     Type: String
@@ -20,7 +22,7 @@ Parameters:
     Description: CloudWatch log retention period.
   EnablePointInTimeRecovery:
     Type: String
-    Default: 'true'
+    Default: 'false'
     AllowedValues: ['true', 'false']
     Description: Enable DynamoDB point-in-time recovery for protection against accidental changes (additional charges apply).
 Conditions:

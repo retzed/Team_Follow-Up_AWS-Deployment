@@ -1,8 +1,10 @@
 # Deployment runbook
 
-This runbook takes the private repository from a clean checkout to a live shared application. Follow the steps in order. The frontend and AWS backend are deployed separately: **Amplify hosts the website; AWS SAM deploys the API, identity provider, data tables, and monitoring resources.**
+This runbook describes the intended path from the repository to a live shared application. The frontend and AWS backend are deployed separately: **Amplify hosts the website; AWS SAM is the current target mechanism for the API and monitoring resources.** The actual console bootstrap already created for this project is recorded in [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
-> **AWS-only:** this repository has no demo sign-in, local database, seeded workspace, or offline data mode. The frontend requires the deployed Cognito/API configuration and fails closed without it. Never commit credentials or real Cognito subject mappings, and do not delete a stack as a way to clear data. The data tables and user pool are retained by CloudFormation.
+> **AWS-only:** this repository has no demo sign-in, local database, seeded workspace, or offline data mode. The frontend requires the deployed Cognito/API configuration and fails closed without it. Never commit credentials or real Cognito subject mappings, and do not delete a stack as a way to clear data. The target SAM template retains the resources it creates.
+>
+> **Important current-state warning:** the console-created resources do **not** match the target SAM schema. The existing pool is **us-east-1_7dYZw2Is6**; the console tables are **TeamFollowUp-Items**, **TeamFollowUp-Activity**, and **TeamFollowUp-Users**. The template instead creates its own pool and **WorkItems**, **ActivityEvents**, **UserProfiles**, and **Archive** tables with different key/index definitions. **Do not follow Step 4 or configure the app against these tables until the Lambda/template/data model is reconciled.** Doing so now would create duplicate resources and still would not make the handler compatible. Keep this document's stack-deployment steps as a target runbook, not as permission to deploy the current template.
 
 ## Deployment plan
 
@@ -100,7 +102,7 @@ In the guided prompts, use values like these:
 | `TableNamePrefix` | `TeamFollowUpDev` |
 | `AllowedOrigin` | The exact HTTPS origin copied from Amplify |
 | `LogRetentionDays` | `30` |
-| `EnablePointInTimeRecovery` | `true` for team/production data |
+| `EnablePointInTimeRecovery` | `false` for this cost-controlled lab; enable only after an explicit cost/recovery decision |
 | Confirm changes before deploy | `Y` |
 | Allow SAM CLI to create IAM roles / capabilities | Accept the required IAM capability when prompted |
 
@@ -114,7 +116,7 @@ The stack creates:
 - Four on-demand, server-side-encrypted DynamoDB tables with the indexes used by the handler.
 - CloudWatch log groups, a dashboard, and alarms for Lambda errors/throttles and API Gateway 5xx responses.
 
-Point-in-time recovery is enabled by default and may incur charges. WorkItems, ActivityEvents, UserProfiles, Archive, and the Cognito User Pool use CloudFormation retain policies. Stack removal therefore does not remove those resources; see **Operations and recovery** before cleanup.
+Point-in-time recovery is disabled by default in this repository's target template to match the current cost-controlled lab choice. Enabling it can incur charges. WorkItems, ActivityEvents, UserProfiles, Archive, and the SAM-managed Cognito User Pool use CloudFormation retain policies. Stack removal therefore does not remove those target-stack resources; see **Operations and recovery** before cleanup.
 
 ### Read the stack outputs
 
@@ -257,7 +259,7 @@ Check the projected number of rows. Then repeat without `--dry-run` to write the
 ### Monitoring, backup, and cost
 
 - Configure an SNS topic/subscription and add notification actions to the alarms if the team needs emails or paging. Alarms are created without notification actions by default.
-- Keep point-in-time recovery enabled for team/production data; periodically verify that the recovery setting is still enabled. For a planned recovery, restore to a new table and follow a tested cutover plan.
+- For this Free account plan lab, keep point-in-time recovery and optional backups disabled as currently configured. They are recovery features, not required for the demo, and can add charges. Revisit them only if the project's recovery requirements and budget change.
 - Review regional pricing and enable AWS Budgets before production. DynamoDB on-demand reads/writes, point-in-time recovery, Cognito usage, Lambda/API requests, and CloudWatch ingestion/storage can all add costs.
 - Access logs omit authorization headers and request bodies. Do not add secrets or sensitive work-item contents to logs.
 

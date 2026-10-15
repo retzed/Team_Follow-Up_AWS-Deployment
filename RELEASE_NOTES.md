@@ -1,5 +1,11 @@
 # Repository and deployment notes
 
+## Current AWS console bootstrap (15 October 2026)
+
+The Cognito and DynamoDB resources in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) have been created manually in us-east-1. The monthly cost budget has also been created. Amplify Hosting, API Gateway, Lambda, and CloudWatch observability resources have not yet been deployed.
+
+**Do not deploy the current SAM template yet.** Its resource ownership and table/index contract differ from the console bootstrap: it creates a second Cognito pool and four differently shaped tables. The app's Lambda handler currently requires those target indexes, including **GSI_CognitoSub**, which are not present on the console-created tables. Reconcile the schema and template before live integration. The SAM template now defaults point-in-time recovery to disabled to match the current lab's cost preference.
+
 ## AWS-only behavior
 
 - Frontend sign-in is handled exclusively by Amazon Cognito. There is no local-auth fallback, seeded sample workspace, demo reset action, browser-side identity map, or local work-data database.

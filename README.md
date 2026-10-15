@@ -2,13 +2,18 @@
 
 An English/Arabic workspace for a team to manage projects, temporary jobs, tasks, and follow-ups. **This repository is AWS-only:** users sign in with Amazon Cognito and all application data is read from and written to DynamoDB through the authenticated API. There is no local authentication, demo database, or offline data store.
 
+> **Current AWS status (15 October 2026):** the Cognito pool and three DynamoDB tables have been created manually in **us-east-1**. Amplify Hosting and the API/Lambda backend have not yet been deployed. See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the exact console settings.
+>
+> **Deployment safety:** do not run the current SAM deployment step yet. The existing template provisions a separate Cognito pool and four DynamoDB tables with names, keys, and indexes that do not match the manually created resources. The backend must be reconciled with the current schema first.
+
 ## Start here
 
-- **[Deployment guide](docs/DEPLOYMENT.md)** — setup from a new AWS environment through go-live and verification.
+- **[AWS console implementation record](docs/IMPLEMENTATION.md)** — actual resources and settings currently configured in AWS.
+- **[Deployment guide](docs/DEPLOYMENT.md)** — target deployment workflow, including the current schema-reconciliation blocker.
 - **[Architecture guide](docs/ARCHITECTURE.md)** — request flow, security boundaries, data model, and operational design.
 - **[Release notes](RELEASE_NOTES.md)** — implementation and validation notes.
 
-## What runs on AWS?
+## Target architecture (not yet fully deployed)
 
 - **Amplify Hosting** builds and serves the frontend.
 - **Cognito** authenticates team members and issues tokens.
@@ -16,7 +21,7 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 - **DynamoDB** is the shared source of truth for work items, activity history, team profiles, and archived items.
 - **CloudWatch** collects logs, metrics, alarms, and dashboard data.
 
-The AWS backend is defined in `backend/template.yaml` and deployed with AWS SAM. Amplify deploys the frontend separately. A successful build or GitHub Actions run validates the package; it does **not** deploy the backend or prove that an AWS environment is configured.
+The intended backend is defined in `backend/template.yaml` and deployed with AWS SAM; Amplify will deploy the frontend separately. The SAM template currently describes a different resource schema from the console bootstrap recorded in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md). A successful build or GitHub Actions run validates the package; it does **not** deploy the backend or prove that an AWS environment is configured. Do not deploy that template until the schema and existing Cognito pool are reconciled.
 
 ## Repository guide
 

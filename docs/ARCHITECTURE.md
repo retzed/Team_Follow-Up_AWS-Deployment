@@ -1,6 +1,16 @@
 # Architecture and request flow
 
-This document describes the intended **live AWS deployment**. It is a design and operating reference; committing the files does not create AWS resources.
+This document describes the intended **target AWS deployment**; committing the files does not create AWS resources. The sections and diagrams below describe the target SAM stack, not the current manual console bootstrap.
+
+## Current console state (15 October 2026)
+
+- Region: **US East (N. Virginia), us-east-1**.
+- Cognito pool: **User pool - fnzspt**, ID **us-east-1_7dYZw2Is6**; app client **Team_FollowUp**, client ID **7id8c2g27fvbh365atqntqurir**; feature plan **Essentials**; email sign-in; self-registration disabled; MFA off.
+- DynamoDB tables: **TeamFollowUp-Items** (partition key **itemId**, with **ParentIdIndex**, **AssignedToIndex**, and **WorkspaceIndex**); **TeamFollowUp-Activity** (partition key **itemId**, sort key **activityKey**); and **TeamFollowUp-Users** (partition key **userId**). They use provisioned capacity, 1 RCU and 1 WCU on each base table; the three Items indexes also use 1 RCU and 1 WCU each. Point-in-time recovery, deletion protection, Streams, and auto scaling are disabled.
+- Cost monitoring: recurring **$1/month** budget named **TeamFollowUp-Monthly-Cost**, with 50%, 80%, and 100% actual-cost alerts plus a 100% forecast alert, using unblended costs.
+- Not yet deployed: Amplify Hosting, API Gateway, Lambda, CloudWatch dashboard/log groups/alarms, Cognito domain/callback configuration, Cognito team accounts, and UserProfiles mappings.
+
+**Compatibility blocker:** the current handler and SAM template expect four different DynamoDB tables and GSIs such as **GSI_ListUpdated** and **GSI_CognitoSub**, as well as a separate SAM-created Cognito pool. Those expectations do not match the console resources above. Do not deploy the current SAM template or point the handler at the console tables until the data model and resource ownership are reconciled. The remainder of this document is the desired architecture after that work is complete.
 
 ## 1. At a glance
 
@@ -71,7 +81,7 @@ API Gateway authentication is the first gate, but the Lambda handler also requir
 
 ## 3. DynamoDB model and access patterns
 
-The SAM template creates four on-demand, server-side-encrypted tables. Their physical names use `<TableNamePrefix>-<suffix>`; the default prefix is `TeamFollowUp`. Use a different prefix for each environment, such as `TeamFollowUpDev` and `TeamFollowUpProd`.
+The **target SAM template** defines four on-demand, server-side-encrypted tables. Their physical names use `<TableNamePrefix>-<suffix>`; the default prefix is `TeamFollowUp`. This is not the current console table layout listed above. Use a different prefix for each environment only after the existing resources and backend contract have been reconciled.
 
 | Logical table | Primary key | Secondary indexes |
 |---|---|---|
@@ -107,7 +117,7 @@ The repository has no local authentication mode, mock data adapter, browser data
 
 ### Data protection
 
-- DynamoDB tables and the Cognito User Pool are retained if the CloudFormation stack is removed or an update replaces a resource. **Retain does not mean backup or recovery is automatic**; point-in-time recovery is enabled by default and should be checked after deployment.
+- The three console-created DynamoDB tables currently have point-in-time recovery disabled. The target SAM template also defaults this option to disabled for the current cost-controlled lab. **Retention is not a backup**; do not enable recovery features without an explicit cost/recovery decision.
 - Lambda returns generic errors to clients. Request IDs, error types, and database error codes are logged for operators, but request bodies and authorization headers are intentionally excluded from access logs.
 - Deployment scripts are administrative tools. Run them from a trusted workstation or controlled CI job using short-lived AWS credentials and the minimum IAM actions documented in the deployment guide.
 
@@ -115,7 +125,7 @@ The repository has no local authentication mode, mock data adapter, browser data
 
 The stack creates log groups with configurable retention, a CloudWatch dashboard, and alarms for Lambda errors, Lambda throttles, and API Gateway 5xx responses. Alarm actions are not configured by default, so email or paging requires an SNS topic/subscription and explicit alarm actions.
 
-Monitor both Lambda logs and API Gateway access logs. The dashboard reports request volume, 5xx responses, Lambda duration, errors, and throttling. DynamoDB uses on-demand billing; point-in-time recovery, log ingestion/retention, and Cognito features can add costs. Check the current price for the selected Region before production use.
+After the target backend is deployed, monitor Lambda logs and API Gateway access logs. The planned dashboard reports request volume, 5xx responses, Lambda duration, errors, and throttling. The target SAM template uses on-demand DynamoDB billing; the three current console tables instead use provisioned capacity of 1 RCU and 1 WCU each, plus the same capacity on each configured index. Point-in-time recovery, log ingestion/retention, and Cognito features can add costs. Check current regional pricing before changing the lab configuration.
 
 ## 6. Deployment boundary
 

@@ -834,8 +834,7 @@ Editor fields and available controls depend on item type. Projects/jobs are top-
 +-----------------------------------------------------------+
 ~~~
 
-<img width="1468" height="846" alt="image" src="https://github.com/user-attachments/assets/2f3abb9a-8fc1-4c24-b138-e8b66530544d" />
-
+<img width="1452" height="842" alt="image" src="https://github.com/user-attachments/assets/fc2accf5-f71e-4979-9196-5af6a68dc46d" />
 
 
 The exact available scope depends on the screen: item history can be limited to the selected item or expanded to relevant descendants; application history spans the application. The implementation sorts events newest first. Activity records are append-only through the API.

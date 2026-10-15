@@ -790,7 +790,7 @@ These are structural wireframes rather than pixel-perfect screenshots. The curre
 +-----------------------------------+
 ~~~
 
-<img width="924" height="1600" alt="WhatsApp Image 2026-10-15 at 7 26 49 AM" src="https://github.com/user-attachments/assets/949f8e86-2de5-4984-8d3e-750357d751d4" />
+<img width="449" height="828" alt="image" src="https://github.com/user-attachments/assets/996db1e6-1ef7-441c-916e-ab61ea4c2259" />
 
 
 #### Item editor

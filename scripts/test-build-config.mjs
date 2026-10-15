@@ -124,9 +124,11 @@ assert.match(template, /ARCHIVE_TABLE:\s*!Ref ArchiveTable/, 'Lambda must receiv
 assert.match(template, /ResourceNamePrefix:\s*\n\s+Type: String\s*\n\s+Default: TeamFollowUp/, 'Template must default to the console workflow's physical resource naming contract');
 assert.doesNotMatch(template, /ExistingCognitoUserPoolId|ExistingCognitoAppClientId|ExistingItemsTableName|ExistingActivityTableName|ExistingUsersTableName|ExistingArchiveTableName|AllowedOrigin:/, 'Full-stack template must not depend on pre-created resources or a pre-known website origin');
 assert.match(template, /Name: custom:teamUserId|Name: teamUserId/, 'Template must create the custom team identity schema attribute');
-assert.match(template, /ReadAttributes:[\s\S]*custom:teamUserId/, 'Browser client must read the team ID attribute');
-assert.match(template, /WriteAttributes:[\s\S]*\n\s+- email\n/, 'Browser client write attributes must be explicitly limited');
-assert.doesNotMatch(template, /WriteAttributes:[\s\S]*custom:teamUserId/, 'Browser client must not write its authorization-relevant team ID');
+const clientBlock = template.match(/  TeamFollowUpAppClient:[\s\S]*?\n  ItemsTable:/)?.[0] || '';
+assert.ok(clientBlock, 'Template must define a Cognito app client before its DynamoDB resources');
+assert.match(clientBlock, /ReadAttributes:[\s\S]*custom:teamUserId/, 'Browser client must read the team ID attribute');
+assert.match(clientBlock, /WriteAttributes:[\s\S]*\n\s+- email\n/, 'Browser client write attributes must be explicitly limited');
+assert.doesNotMatch(clientBlock, /WriteAttributes:[\s\S]*custom:teamUserId/, 'Browser client must not write its authorization-relevant team ID');
 assert.match(template, /DeletionPolicy: Retain/, 'Table data must be retained on stack deletion');
 assert.match(template, /RetentionInDays: 30/, 'CloudWatch logs must have explicit 30-day retention');
 

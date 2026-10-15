@@ -905,7 +905,7 @@ These values do not grant AWS account access. Never put AWS access keys, Cognito
 - Transport: HTTPS.
 - Authentication: **Authorization: Bearer <Cognito access token>**.
 - Request/response format: JSON.
-- CORS: the deployed HTTP API is configured for one exact HTTPS origin through **AllowedOrigin**, plus Authorization and Content-Type headers.
+- CORS: the deployed HTTP API is configured for one exact HTTPS Amplify origin, plus Authorization and Content-Type headers. The optional template derives the same origin from the generated Amplify branch.
 - The backend validates the token mapping and derives the actor identity server-side. A caller cannot use an arbitrary request-body user ID to impersonate another teammate.
 
 The Lambda receives the proxy path and dispatches based on HTTP method and route. Routes below describe the current handler.
@@ -1045,7 +1045,7 @@ The repository's **npm run test:all** command runs the frontend and backend cont
 | **npm run test:history-structure** | Activity/history structure regression. |
 | **npm run test:ui-refinements** | UI behavior/refinements regression. |
 | **npm run test:backend** | Python unittest suite for backend helpers, validation, identity mapping, transactional behaviors, and deployment scripts. |
-| **npm run test:infrastructure** | Validates SAM resource ownership, table names/keys/indexes, permissions, Cognito parameters, and documented bootstrap state. |
+| **npm run test:infrastructure** | Validates the from-scratch SAM resource set, Cognito settings, table names/keys/indexes, IAM scope, CORS wiring, Amplify variables, budget alerts, and the separate current-account snapshot. |
 | GitHub Actions workflow | Executes the automated checks, Python compilation, SAM validation/lint, and Lambda build. |
 
 Run locally from the repository root using Node.js 24 and Python 3.12:
@@ -1089,97 +1089,151 @@ The project should not be considered accepted until representatives can:
 
 ## 11. Deployment and operations
 
-### 11.1 Deployment strategy
+### 11.1 Deployment policy and order
 
-The frontend and backend deploy independently. The repository is the source of truth, and CI validates build/template/test contracts before deployment. Resource creation should be staged so the live origin is known before final CORS is configured.
+**Primary method: AWS Management Console.** The normal project workflow creates and configures each AWS resource manually. Do not use `sam deploy` for the project's normal deployment. GitHub Actions verifies code and template contracts but never deploys resources.
+
+**Alternative method: full-stack CloudFormation/SAM template.** `backend/template.yaml` is maintained for optional automation in a fresh environment. It creates Cognito, all DynamoDB tables/indexes, API Gateway, Lambda/IAM, CloudWatch, Amplify Hosting and the monthly budget. It does not assume a pool, table, or Amplify origin already exists.
+
+The console workflow is staged as follows:
 
 ~~~mermaid
 flowchart TD
-    Code[Commit to main]
-    CI[GitHub Actions<br/>tests, SAM validation, build]
-    Identity[Verify Cognito attribute/client and map team users]
-    Hosting[Create Amplify Hosting<br/>capture final HTTPS origin]
-    Backend[Build and deploy SAM backend]
-    Config[Set Amplify public environment values]
-    Smoke[End-to-end smoke and acceptance tests]
-    Monitor[Check CloudWatch dashboard and alarms]
+    Code[Commit reviewed source]
+    CI[GitHub Actions<br/>tests, template validation/build]
+    Account[Confirm AWS account and us-east-1]
+    Cognito[Create or verify Cognito pool/client]
+    Data[Create or verify four DynamoDB tables<br/>and five GSIs]
+    Budget[Create or verify monthly cost budget]
+    Team[Create team accounts and map Users rows]
+    Hosting[Create Amplify Hosting<br/>capture exact HTTPS branch origin]
+    Lambda[Create Lambda role/function<br/>package handler and set table variables]
+    API[Create HTTP API<br/>JWT authorizer, route, CORS, logs]
+    Config[Set Amplify public environment variables]
+    Ops[Create CloudWatch dashboard and alarms]
+    Tests[Acceptance and two-session sharing tests]
 
     Code --> CI
-    CI -->|Pass| Identity
-    Identity --> Hosting
-    Hosting --> Backend
-    Backend --> Config
-    Config --> Smoke
-    Smoke --> Monitor
-    CI -->|Fail| Fix[Fix and recommit]
+    CI -->|pass| Account
+    CI -->|fail| Fix[Fix and recommit]
     Fix --> Code
+    Account --> Cognito --> Data --> Budget --> Team --> Hosting --> Lambda --> API --> Config --> Ops --> Tests
 ~~~
 
-The operational order should follow [DEPLOYMENT.md](DEPLOYMENT.md). Review the SAM CloudFormation change set before approving it: the expected stack owns API Gateway, Lambda, IAM, CloudWatch log groups, dashboard, and alarms only. It should **not** create a second Cognito pool or any of the four existing DynamoDB tables.
+In the account-specific snapshot dated 15 October 2026, Cognito, the four DynamoDB tables and the budget had already been created manually. In that account, verify/reuse them instead of duplicating them. The remaining steps continue with administrator team mappings, Amplify Hosting, Lambda/API, environment configuration and CloudWatch operations. The order for a brand-new environment starts with creating each resource; it does not depend on the snapshot.
 
-### 11.2 Cognito account/profile bootstrap
+### 11.2 Cognito accounts and profile mapping
 
-Expected team IDs and labels in the current seed script:
+The target team IDs are:
 
 | Team ID | Display name | Descriptive role |
 |---|---|---|
-| u1 | Marwa | Team Leader |
-| u2 | Zyad | AWS Engineer |
-| u3 | Nadine | AWS Engineer |
-| u4 | Omar | AWS Engineer |
-| u5 | Haneen | AWS Engineer |
-| u6 | Dina | AWS Engineer |
+| `u1` | Marwa | Team Leader |
+| `u2` | Zyad | AWS Engineer |
+| `u3` | Nadine | AWS Engineer |
+| `u4` | Omar | AWS Engineer |
+| `u5` | Haneen | AWS Engineer |
+| `u6` | Dina | AWS Engineer |
 
-After administrator-managed user accounts are created, assign a unique **custom:teamUserId** to each and ensure each subject maps to the same **userId** in Users. Use the supplied script first in dry-run mode, then write only after reviewing its output:
+Through Cognito's administrator interface, create one account per member and assign unique `custom:teamUserId` values `u1`–`u6`. The app's role labels are descriptive, not privileges. The public app client must have no client secret, must support SRP authentication, must be able to read `custom:teamUserId`, and must not be able to write it. Check Write restrictions on every app client in the pool. The frontend uses direct Cognito SRP sign-in; hosted-login domains/callback URLs are not part of this design.
+
+After accounts exist, install the trusted administration script's dependency:
 
 ~~~bash
 python -m pip install -r backend/requirements.txt
-python backend/scripts/seed_user_profiles_from_cognito.py --user-pool-id us-east-1_7dYZw2Is6 --table TeamFollowUp-Users --region us-east-1 --dry-run
 ~~~
 
-When the dry run shows all six expected users with correct enabled states, repeat the command without **--dry-run**. The write path overwrites the corresponding six profile rows, so review carefully. Do not paste real Cognito sub values or private credentials into the repository.
+Run a dry run first, replacing `<POOL_ID>` with the real pool ID from the console or (for the alternate template) the `CognitoUserPoolId` output:
 
-### 11.3 AWS SAM backend deployment
+~~~bash
+python backend/scripts/seed_user_profiles_from_cognito.py --user-pool-id <POOL_ID> --table TeamFollowUp-Users --region us-east-1 --dry-run
+~~~
 
-The existing resource parameters in **backend/template.yaml** refer to:
+Confirm the six expected IDs/names and enabled states, then repeat without `--dry-run` to write the corresponding `cognitoSub` profile mappings. The script can overwrite the six matching Users profile rows; review before running the write operation. Use administrator credentials with Cognito `ListUsers` and DynamoDB `BatchWriteItem` permission on Users. Do not grant those administration permissions to the application Lambda, and do not commit real `sub` values or usernames.
 
-| Parameter | Expected value |
+### 11.3 Console-first Amplify, Lambda and API setup
+
+Follow the full service-by-service procedure in [`DEPLOYMENT.md`](DEPLOYMENT.md). The key settings are summarized here as a design cross-check.
+
+**Amplify Hosting:** connect the GitHub repository and intended branch. Use the repository `amplify.yml`, Node.js 24, the `node scripts/build.mjs` build command, and `dist/` output. Record the final branch HTTPS origin (scheme + host only; no path/trailing slash). The first build may fail until the API base URL is configured.
+
+**Lambda:** create a Python 3.12 function named `TeamFollowUp-Api`, 256 MB memory, 20-second timeout, handler `handler.lambda_handler`. Package `backend/src/handler.py` with the dependencies from `backend/src/requirements.txt` at the ZIP root. Create a dedicated execution role with `AWSLambdaBasicExecutionRole` plus the least-privilege policy in [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json), replacing the account-ID placeholder. Set environment variables:
+- `ITEMS_TABLE=TeamFollowUp-Items`
+- `ACTIVITY_TABLE=TeamFollowUp-Activity`
+- `USERS_TABLE=TeamFollowUp-Users`
+- `ARCHIVE_TABLE=TeamFollowUp-Archive`
+
+Create or verify `/aws/lambda/TeamFollowUp-Api` with 30-day retention. Never grant the function Cognito user-management permissions.
+
+**API Gateway:** create an HTTP API with Lambda integration and an `ANY /{proxy+}` route at the auto-deployed `$default` stage. Configure a JWT authorizer with identity source `$request.header.Authorization`, issuer `https://cognito-idp.us-east-1.amazonaws.com/<POOL_ID>`, and audience equal to the public app-client ID. Attach the authorizer to every application route. The CORS allow-origin must be exactly the Amplify branch HTTPS origin; do not use `*`. Allow only `authorization` and `content-type` headers, the used HTTP methods (GET, POST, PATCH, DELETE, OPTIONS), and a 600-second max age. Enable 30-day API access logging without logging bearer tokens or Authorization headers.
+
+**Amplify environment variables:** once the API has an invoke URL, set `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, `TEAM_FOLLOW_UP_API_BASE_URL` (API origin only), and `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE=custom:teamUserId`. Save and trigger a successful build. All four values are public browser configuration, not secrets.
+
+### 11.4 CloudWatch observability
+
+Create API Gateway access logs and Lambda logs with 30-day retention. Create dashboard `TeamFollowUp-Operations` with time-series widgets for:
+
+1. Lambda invocations, errors and throttles.
+2. API Gateway request count and 5xx responses.
+3. Lambda duration with p95 statistic.
+
+Create three CloudWatch alarms, each with Sum statistic, 300-second period, one evaluation period, threshold greater than or equal to 1, and missing-data treatment not breaching:
+
+| Alarm | Metric | Dimensions |
+|---|---|---|
+| `TeamFollowUp-Lambda-Errors` | `AWS/Lambda` / `Errors` | FunctionName = `TeamFollowUp-Api` |
+| `TeamFollowUp-Lambda-Throttles` | `AWS/Lambda` / `Throttles` | FunctionName = `TeamFollowUp-Api` |
+| `TeamFollowUp-ApiGateway-5xx` | `AWS/ApiGateway` / `5xx` | ApiId = actual API ID; Stage = `$default` |
+
+The cost budget's email alerts are distinct from CloudWatch alarms. CloudWatch alarm actions are not wired to email by default; configure and test SNS/notification actions separately if required.
+
+### 11.5 Optional full-stack CloudFormation/SAM automation
+
+This is an **alternative**, not the normal deployment procedure. The complete template in `backend/template.yaml` creates:
+- Cognito pool and public app client with `custom:teamUserId` and limited client attribute write permissions.
+- Four DynamoDB tables and five GSIs matching Section 4.2, with 1 RCU / 1 WCU for each table/index.
+- API Gateway HTTP API/JWT authorizer, Lambda and scoped execution permissions.
+- API/Lambda log groups, dashboard, and three alarms.
+- Amplify Hosting app/branch and its public runtime variables.
+- A $1 monthly cost budget with actual 50/80/100% and forecast 100% email alerts.
+
+It requires these deployment-time values:
+
+| Parameter | Purpose |
 |---|---|
-| ExistingCognitoUserPoolId | us-east-1_7dYZw2Is6 |
-| ExistingCognitoAppClientId | 7id8c2g27fvbh365atqntqurir |
-| ExistingItemsTableName | TeamFollowUp-Items |
-| ExistingActivityTableName | TeamFollowUp-Activity |
-| ExistingUsersTableName | TeamFollowUp-Users |
-| ExistingArchiveTableName | TeamFollowUp-Archive |
-| TableNamePrefix | TeamFollowUp |
-| AllowedOrigin | Exact deployed Amplify HTTPS origin, without path or trailing slash |
+| `ResourceNamePrefix` | Resource name prefix, default `TeamFollowUp`. |
+| `RepositoryUrl` | Repository URL to connect to Amplify. |
+| `GitHubAccessToken` | Private token used for GitHub repository access by Amplify. |
+| `FrontendBranchName` | Branch to publish, default `main`. |
+| `BudgetNotificationEmail` | Recipient for budget alert emails. |
 
-After installing AWS CLI v2, SAM CLI, Python 3.12, and Node.js 24, authenticate with a trusted named AWS profile. Verify the account/Region and current table/index status, then run tests and build the SAM template. Use **sam deploy --guided** with the built template and review the change set before approving it. Keep the deployment in **us-east-1** unless the resources and configuration are deliberately migrated together.
+The template derives the HTTPS CORS origin from the generated Amplify app domain and injects the created pool/client IDs and API URL into the branch. It does not ask for existing Cognito IDs, table names, or an Amplify origin. At the default prefix it creates the same physical table names used in the console guide. **Do not deploy it with that default prefix into the current account/Region while the manually created resources of those names exist.** CloudFormation does not automatically adopt them. Use a clean account/environment or a deliberate unique prefix.
 
-### 11.4 Amplify Hosting
+For optional validation/build only (no infrastructure deployment), install the dev requirements and run:
 
-Configure Amplify to build the repository's **dist/** output according to **amplify.yml**. The build script needs the public Cognito pool ID, public app client ID, and deployed API base URL. Configure the exact final HTTPS site origin as the SAM **AllowedOrigin** parameter. Once the first hosting URL exists, update/deploy the backend CORS setting with that origin, then publish the frontend with the API Gateway output. Do not substitute a placeholder or broad wildcard origin.
+~~~bash
+python -m pip install -r backend/requirements-dev.txt
+npm run test:all
+python -m compileall -q backend/src backend/scripts scripts/test-infrastructure.py
+sam validate --lint --template-file backend/template.yaml
+sam build --template-file backend/template.yaml
+~~~
 
-### 11.5 Monitoring and incident handling
+For an intentional full-stack automation experiment in a fresh environment, use `sam deploy --guided --template-file backend/template.yaml`, review the CloudFormation changeset, and understand the resources it will create. Both `GitHubAccessToken` and `BudgetNotificationEmail` are marked `NoEcho`, but should still be entered privately and **not** persisted to `samconfig.toml` or committed to Git. The budget recipient must still be present on the resulting AWS Budget resource. Review the changeset before confirmation.
 
-The SAM template defines:
+The table resources in the template use both `DeletionPolicy: Retain` and `UpdateReplacePolicy: Retain`. Deleting the stack therefore does not automatically delete table data; a later deployment with the same names will fail until retained tables have been deliberately inspected and reconciled. The template is a starting automation reference and should be validated in a disposable/fresh environment before use.
 
-- API Gateway access logging.
-- Lambda application/system logs with configured retention.
-- An operations dashboard displaying Lambda invocations/errors/throttles, API request count/5xx metrics, and Lambda p95 duration.
-- CloudWatch alarms when Lambda errors, Lambda throttles, or API Gateway 5xx counts meet the configured threshold.
+### 11.6 Releases, troubleshooting and recovery
 
-SNS/alarm notification actions are not configured by default. An alarm being created does not mean an email or external notification will be sent. Configure notification targets and test them separately if required.
-
-### 11.6 Rollback and recovery guidance
-
-- **Frontend problem:** revert the offending Git commit and redeploy Amplify.
-- **Backend problem:** inspect CloudWatch logs and CloudFormation events; if the SAM update fails, use CloudFormation's rollback result before attempting another deployment.
-- **Data conflict:** refresh the affected item before retrying an update after HTTP 409.
-- **Archive/restore conflict:** refresh workspace and Archive; inspect returned restoredIds where provided. Restore may have progressed in earlier transaction chunks.
-- **Lost or corrupted table data:** Archive is application-level recoverability, not a backup of all database state. Because point-in-time recovery is disabled on existing tables, enable an appropriate recovery strategy before relying on the system for production-critical data.
-
-Do not delete the existing manually created Cognito/DynamoDB resources as part of backend rollback: they are not owned by the SAM stack.
+- **Frontend build fails:** verify all four public Amplify variables and select the correct Node.js 24 build image; then restart the build.
+- **Browser CORS failure:** compare the browser's scheme + hostname with the configured exact CORS origin. For the console workflow, adjust CORS in API Gateway; for an optional template stack, update/redeploy the template. Do not use a wildcard as a shortcut.
+- **API 401/403:** verify JWT issuer, audience, Authorization bearer token and route authorizer. For authenticated identity-mapping failures, verify that unique `custom:teamUserId` and enabled Users `userId`/`cognitoSub` mappings agree.
+- **Lambda access error:** verify table environment variables, current table/GSI statuses and the function's table-scoped IAM policy.
+- **HTTP 409 concurrency conflict:** refresh the item before retrying the stale change.
+- **Archive/restore conflict:** refresh workspace and Archive and inspect restored IDs. Restore may have committed earlier chunks.
+- **Template deployment failure:** inspect CloudFormation stack events and rollback status. For a console-created resource, review the individual service's console events/configuration; there is no CloudFormation stack to roll back.
+- **Lost table data:** application-level Archive is not a full database backup. Point-in-time recovery is disabled in the documented baseline; select an appropriate recovery/backup strategy before production-critical use.
+- **Cost warning:** inspect Billing and Cost Explorer and unused resources. The $1 budget is notification-only and does not stop spend.
 
 ## 12. Known limitations, risks, and next steps
 

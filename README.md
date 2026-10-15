@@ -6,7 +6,7 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 
 ## Deployment approach
 
-**Primary method: AWS Management Console.** Create and configure project AWS resources manually in the console. Do not use SAM to deploy resources as part of the normal project workflow. The [console-first deployment runbook](docs/DEPLOYMENT.md) is the operational guide.
+**Primary method: AWS Management Console.** Create and configure project AWS resources manually in the console. Do not use SAM to deploy resources as part of the normal project workflow. The [console deployment runbook](docs/DEPLOYMENT.md) is the operational guide.
 
 **Optional automation reference: full-stack CloudFormation/SAM.** [`backend/template.yaml`](backend/template.yaml) is kept as an alternative way to provision a new environment from scratch. Follow the [step-by-step automated deployment runbook](docs/AUTOMATED_DEPLOYMENT.md) to prepare credentials, validate/build, review the changeset, deploy, seed team profiles, test, update, and clean up the stack. It creates a Cognito pool/client, all four DynamoDB tables and five GSIs, API Gateway HTTP API, Lambda and scoped IAM, CloudWatch log groups/dashboard/alarms, Amplify Hosting app/branch, and the $1 monthly cost budget. It no longer expects pre-existing Cognito IDs, DynamoDB tables, or a pre-known Amplify origin. The default prefix matches the console table names, so do **not** deploy it into the current account/Region while those manually created resources still exist. Use a fresh environment or a different prefix for template experiments.
 

@@ -321,15 +321,15 @@ flowchart LR
     ACTIVITY["Activity Event<br/>itemId (PK)<br/>activityKey (SK)<br/>eventId, actorUserId<br/>action, kind, at"]
     ARCHIVE["Archive Snapshot<br/>archiveId (PK)<br/>itemId, archiveRootId<br/>archiveParentId<br/>archivedAt, archivedByUserId"]
 
-    COGNITO -->|"1:1 subject mapping"| TEAM
-    TEAM -->|"1:N creates or updates"| ITEM
-    TEAM -->|"optional assignee; many items"| ITEM
-    ITEM -->|"parent-child (1:N)"| ITEM
-    ITEM -->|"1:N activity history"| ACTIVITY
-    ITEM -->|"zero-or-one archive snapshot"| ARCHIVE
+    COGNITO -->|1:1 subject mapping| TEAM
+    TEAM -->|1:N creates or updates| ITEM
+    TEAM -->|optional assignee, many items| ITEM
+    ITEM -->|parent-child 1:N| ITEM
+    ITEM -->|1:N activity history| ACTIVITY
+    ITEM -->|zero or one archive snapshot| ARCHIVE
 ~~~
 
-The ERD focuses on entity relationships; the activity event timestamp's physical DynamoDB attribute name is `at`, as documented in the Activity events attribute table below. The **Team Profile** table and the Cognito identity are separate records joined by identity values. WorkItem attribution fields also reference team IDs. Activity rows point to an item ID and preserve snapshots of item/root names and types so history remains understandable when active items are renamed or archived. Archive rows retain item IDs and hierarchy metadata to support restore.
+This diagram focuses on entity relationships; the activity event timestamp's physical DynamoDB attribute name is `at`, as documented in the Activity events attribute table below. The **Team Profile** table and the Cognito identity are separate records joined by identity values. WorkItem attribution fields also reference team IDs. Activity rows point to an item ID and preserve snapshots of item/root names and types so history remains understandable when active items are renamed or archived. Archive rows retain item IDs and hierarchy metadata to support restore.
 
 ### 4.2 Physical schema: current DynamoDB tables
 

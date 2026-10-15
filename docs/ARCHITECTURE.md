@@ -62,7 +62,7 @@ flowchart LR
 | DynamoDB Users | Team profile and Cognito subject mapping. Partition key `userId`; no GSIs. | Create table; seed profiles after Cognito accounts exist. | `UsersTable`. |
 | DynamoDB Archive | Archived copies/hierarchy metadata. Partition key `archiveId`; GSIs `GSI_ArchiveIndex`, `GSI_ArchiveRoot`. | Create table and two indexes. | `ArchiveTable`. |
 | API Gateway HTTP API | Authenticated JSON endpoints, Cognito JWT authorizer, access logs and CORS. | Create API, Lambda integration, route and authorizer in the console. | `TeamFollowUpApi` with the same JWT/CORS contract. |
-| Lambda | Python 3.12 handler, 256 MB, 20-second timeout, structured JSON logs. | Create execution role/policy, package `backend/src`, upload ZIP and configure four table names. | `ApiFunction` plus tightly scoped IAM policy. |
+| Lambda | Python 3.12 handler, 256 MB, 20-second timeout, structured JSON logs. | Create execution role/policy, package `backend/src`, upload ZIP and configure four table names. | `ApiExecutionRole` plus `ApiFunction`; the role uses the same default name, AWSLambdaBasicExecutionRole managed policy, and four-statement table-scoped DynamoDB policy as the console workflow. |
 | CloudWatch | 30-day API/Lambda access logs, dashboard, Lambda error/throttle alarms, API 5xx alarm. | Create log groups, dashboard and alarms. | Log groups, `TeamFollowUpDashboard` and three alarms. |
 | AWS Budgets | USD $1 monthly cost budget; actual thresholds at 50%, 80%, 100%, plus forecast 100%; email notifications only. | Create budget and enter the notification email. | `MonthlyCostBudget`; recipient is a deployment parameter, not committed. |
 

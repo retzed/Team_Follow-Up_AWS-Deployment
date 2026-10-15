@@ -10,9 +10,9 @@ from unittest.mock import patch
 
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
-os.environ.setdefault("WORK_ITEMS_TABLE", "UnitTest-Items")
+os.environ.setdefault("ITEMS_TABLE", "UnitTest-Items")
 os.environ.setdefault("ACTIVITY_TABLE", "UnitTest-Activity")
-os.environ.setdefault("USER_PROFILES_TABLE", "UnitTest-Users")
+os.environ.setdefault("USERS_TABLE", "UnitTest-Users")
 os.environ.setdefault("ARCHIVE_TABLE", "UnitTest-Archive")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 

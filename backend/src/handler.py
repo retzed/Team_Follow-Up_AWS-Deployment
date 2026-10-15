@@ -44,9 +44,9 @@ def commit_item_with_events(item, events, condition=None, expected_version=None)
     ddb.meta.client.transact_write_items(TransactItems=writes)
 
 ddb = boto3.resource('dynamodb')
-WORK = ddb.Table(os.environ['WORK_ITEMS_TABLE'])
+WORK = ddb.Table(os.environ['ITEMS_TABLE'])
 ACTIVITY = ddb.Table(os.environ['ACTIVITY_TABLE'])
-USERS = ddb.Table(os.environ['USER_PROFILES_TABLE'])
+USERS = ddb.Table(os.environ['USERS_TABLE'])
 ARCHIVE = ddb.Table(os.environ['ARCHIVE_TABLE'])
 
 

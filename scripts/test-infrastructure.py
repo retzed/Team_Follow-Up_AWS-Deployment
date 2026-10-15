@@ -195,9 +195,9 @@ def main():
             fail(f"{parameter_name} default differs from the current console bootstrap; update both deliberately.")
     variables = template.get("Globals", {}).get("Function", {}).get("Environment", {}).get("Variables", {})
     expected_variables = {
-        "WORK_ITEMS_TABLE": "ExistingItemsTableName",
+        "ITEMS_TABLE": "ExistingItemsTableName",
         "ACTIVITY_TABLE": "ExistingActivityTableName",
-        "USER_PROFILES_TABLE": "ExistingUsersTableName",
+        "USERS_TABLE": "ExistingUsersTableName",
         "ARCHIVE_TABLE": "ExistingArchiveTableName",
     }
     for variable, parameter_name in expected_variables.items():

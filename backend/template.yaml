@@ -59,9 +59,9 @@ Globals:
     MemorySize: 256
     Environment:
       Variables:
-        WORK_ITEMS_TABLE: !Ref ExistingItemsTableName
+        ITEMS_TABLE: !Ref ExistingItemsTableName
         ACTIVITY_TABLE: !Ref ExistingActivityTableName
-        USER_PROFILES_TABLE: !Ref ExistingUsersTableName
+        USERS_TABLE: !Ref ExistingUsersTableName
         ARCHIVE_TABLE: !Ref ExistingArchiveTableName
 Resources:
   ApiAccessLogGroup:

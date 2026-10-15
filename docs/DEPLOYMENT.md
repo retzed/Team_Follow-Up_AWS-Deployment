@@ -50,6 +50,7 @@ Create an app client named **`Team_FollowUp`** in the pool:
 - Authentication flows: enable **SRP** (`ALLOW_USER_SRP_AUTH`) and refresh tokens (`ALLOW_REFRESH_TOKEN_AUTH`).
 - Read attributes: include `email`, `email_verified`, and `custom:teamUserId`.
 - Write attributes: do **not** include `custom:teamUserId`. The target template explicitly limits browser writes to `email`.
+- Prevent user-existence errors: enabled.
 - Keep self-registration disabled at the pool. User accounts are provisioned by a trusted administrator.
 
 If more app clients exist in the pool, ensure none of them can write `custom:teamUserId`. The current operator confirmed Read enabled and Write disabled for the `Team_FollowUp` client on 15 October 2026; permission settings on other clients remained unverified in the implementation snapshot. Record the pool ID and app-client ID privately; they are public frontend configuration values, but must not be guessed or replaced by a client secret.
@@ -157,7 +158,7 @@ Review the six expected IDs/names and mapping results. Only then repeat without 
 
 ### 7.1 Create the execution role
 
-Create a role for **Lambda** with the AWS managed policy **`AWSLambdaBasicExecutionRole`** for CloudWatch logging. Add an inline policy based on [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json). Replace its account-ID placeholder and, if you deliberately use another table prefix, update all four table names consistently before saving. The custom policy is intentionally scoped to the four tables and indexes used by the handler; it does not grant Cognito administration or broad DynamoDB CRUD access.
+Create an IAM role named **`TeamFollowUp-Api-ExecutionRole`** for the **Lambda** service. This is the same default role name created by the optional full-stack template. Attach the AWS managed policy **`AWSLambdaBasicExecutionRole`** for CloudWatch logging. Add an inline policy based on [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json). Replace its account-ID placeholder and, if you deliberately use another table prefix, update all four table names consistently before saving. The custom policy is intentionally scoped to the four tables and indexes used by the handler; it does not grant Cognito administration or broad DynamoDB CRUD access. The template creates the same named role with an equivalent trust policy, managed logging policy and table-scoped DynamoDB permissions.
 
 ### 7.2 Package the handler ZIP
 

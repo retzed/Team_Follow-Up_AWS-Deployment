@@ -1157,7 +1157,7 @@ Follow the full service-by-service procedure in [`DEPLOYMENT.md`](DEPLOYMENT.md)
 
 **Amplify Hosting:** connect the GitHub repository and intended branch. Use the repository `amplify.yml`, Node.js 24, the `node scripts/build.mjs` build command, and `dist/` output. Record the final branch HTTPS origin (scheme + host only; no path/trailing slash). The first build may fail until the API base URL is configured.
 
-**Lambda:** create a Python 3.12 function named `TeamFollowUp-Api`, 256 MB memory, 20-second timeout, handler `handler.lambda_handler`. Package `backend/src/handler.py` with the dependencies from `backend/src/requirements.txt` at the ZIP root. Create a dedicated execution role with `AWSLambdaBasicExecutionRole` plus the least-privilege policy in [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json), replacing the account-ID placeholder. Set environment variables:
+**Lambda:** create a Python 3.12 function named `TeamFollowUp-Api`, 256 MB memory, 20-second timeout, handler `handler.lambda_handler`. Package `backend/src/handler.py` with the dependencies from `backend/src/requirements.txt` at the ZIP root. Create an IAM role named `TeamFollowUp-Api-ExecutionRole` trusted by Lambda, attach `AWSLambdaBasicExecutionRole`, and add the least-privilege policy in [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json) after replacing the account-ID placeholder. This matches the explicit `ApiExecutionRole` in the optional template. Set environment variables:
 - `ITEMS_TABLE=TeamFollowUp-Items`
 - `ACTIVITY_TABLE=TeamFollowUp-Activity`
 - `USERS_TABLE=TeamFollowUp-Users`

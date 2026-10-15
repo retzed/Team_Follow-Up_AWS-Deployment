@@ -41,6 +41,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--direct-followups-per-root", type=int, default=3)
     parser.add_argument("--events-per-item", type=int, default=4)
     parser.add_argument(
+        "--run-id",
+        help="Reuse a run ID from a dry run so the apply command creates the exact reviewed dataset.",
+    )
+    parser.add_argument(
         "--cleanup-run-id",
         help="Remove only records belonging to this exact run ID (shown after a seed run).",
     )
@@ -65,6 +69,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("Create at least one root item, or use --cleanup-run-id.")
     if args.cleanup_run_id and not RUN_ID_RE.fullmatch(args.cleanup_run_id):
         parser.error("--cleanup-run-id must exactly match a run ID printed by this script.")
+    if args.run_id and not RUN_ID_RE.fullmatch(args.run_id):
+        parser.error("--run-id must use YYYYMMDD-HHMMSS- plus 8 lowercase hex characters.")
+    if args.run_id and args.cleanup_run_id:
+        parser.error("Use --run-id to seed or --cleanup-run-id to remove a run, not both.")
     return args
 
 
@@ -271,7 +279,7 @@ def main():
         raise SystemExit(
             "No enabled team profiles were found in the Users table. Seed the user-profile mappings first."
         )
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8]
+    run_id = args.run_id or (datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8])
     items, events = make_workload(handler, users, run_id, args)
     print(f"Region: {args.region}")
     print(f"Run ID: {run_id}")
@@ -281,13 +289,32 @@ def main():
     print("All generated item names begin with [LOAD TEST].")
     print("No records will be written without --apply.")
     if not args.apply:
-        print("\nDry run only. After reviewing the counts, run the same command with --apply.")
+        print("\nDry run only. Review the counts, then reuse this exact run ID with --run-id and --apply.")
+        print("Apply command:")
+        print(
+            f"python backend/scripts/seed_load_test_data.py --region {args.region} "
+            f"--run-id {run_id} --apply"
+        )
         print("Cleanup command:")
         print(
             f"python backend/scripts/seed_load_test_data.py --region {args.region} "
             f"--cleanup-run-id {run_id} --apply"
         )
         return
+
+    # Refuse to overwrite data from a previous run if an explicit run ID is reused.
+    first_item_id = items[0]["itemId"]
+    first_event = next(event for event in events if event["itemId"] == first_item_id)
+    collisions = [
+        handler.WORK.get_item(Key={"itemId": first_item_id}, ConsistentRead=True).get("Item"),
+        handler.ACTIVITY.get_item(
+            Key={"itemId": first_event["itemId"], "activityKey": first_event["activityKey"]},
+            ConsistentRead=True,
+        ).get("Item"),
+        handler.ARCHIVE.get_item(Key={"archiveId": first_item_id}, ConsistentRead=True).get("Item"),
+    ]
+    if any(collisions):
+        raise SystemExit("That run ID already has records. Choose a new --run-id or clean up the previous run first.")
 
     try:
         with handler.WORK.batch_writer(overwrite_by_pkeys=["itemId"]) as batch:

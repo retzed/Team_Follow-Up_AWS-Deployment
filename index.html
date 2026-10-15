@@ -1626,6 +1626,7 @@ let previousMobileSidebarViewport=isMobileSidebarViewport();
 const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:isMobileSidebarViewport(),selectedParentId:'',tab:'overview',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||''),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all'};
 const activityRefreshRequests=new Map();
 const rootChildrenRequests=new Map();
+const assignedItemCache=new Map();
 let activityIndexRevision=0;
 let activityIndexCache={source:null,length:-1,revision:-1,byId:new Map(),byRoot:new Map(),all:[]};
 let hierarchyIndexCache={childrenSource:null,childrenLength:-1,parentsSource:null,parentsLength:-1,revision:-1,byParent:new Map(),byId:new Map()};
@@ -2045,8 +2046,11 @@ function renderParentList(){
      ?await api.queryAssigned(ui.actingUserId,{...options,query:''})
      :await api.queryTopLevel(options);
    if(token!==sidebarQuerySequence||ui.sidebarMode!==modeAtRender)return;
-   if(modeAtRender==='assigned')renderAssignedList(filteredAssignedItems(result.items||[]));
-   else renderParentSearchList(filteredParents(result.items||[]));
+   if(modeAtRender==='assigned'){
+    const assigned=(result.items||[]).map(item=>item?.id?item:toAppItem(item));
+    for(const item of assigned)assignedItemCache.set(String(item.id),item);
+    renderAssignedList(filteredAssignedItems(assigned));
+   }else renderParentSearchList(filteredParents(result.items||[]));
   }catch(error){console.warn('Sidebar API query failed; keeping cached workspace results.',error);}
  },120);
 }
@@ -2369,7 +2373,17 @@ function clearChildFilters(){ui.childQuery='';ui.childType='all';ui.childStatus=
 function handleAction(target){const actionEl=target.closest('[data-action]');if(!actionEl)return;const action=actionEl.dataset.action;const id=actionEl.dataset.id;const parentId=actionEl.dataset.parentId;if(!dataLoadState.initialComplete&&['new-parent','edit-item','new-child','delete-item','delete-from-modal','confirm-delete','archive-restore-selected'].includes(action)){toast(tr('loadingData'),true);return;}switch(action){
  case 'select-parent':{ui.selectedParentId=id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();renderParentList();renderDetail();void ensureRootChildrenLoaded(id);break;}
  case 'sidebar-mode':{const requestedMode=actionEl.dataset.mode==='assigned'?'assigned':'search';if(isMobileSidebarViewport()){if(ui.sidebarMode===requestedMode&&!ui.sidebarCollapsed){ui.sidebarCollapsed=true;}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}if(ui.sidebarMode==='search'&&!['all','project','job'].includes(ui.parentType))ui.parentType='all';applyTranslations();renderParentList();break;}
- case 'select-assigned':{const item=allItem(id);const root=rootParent(item);if(!item||!root)break;ui.selectedAssignedItemId=item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}renderParentList();renderDetail();void ensureRootChildrenLoaded(root.id);if(!['project','job'].includes(item.type)){document.getElementById(`card-${item.id}`)?.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}break;}
+ case 'select-assigned':{
+  const item=allItem(id)||assignedItemCache.get(String(id));
+  const rootId=String(item?.rootParentId||(item?rootParent(item)?.id:'')||'');
+  const root=data.parents.find(parent=>String(parent.id)===rootId)||(item?rootParent(item):null);
+  if(!item||!root)break;
+  ui.selectedAssignedItemId=item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();
+  let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}
+  renderParentList();renderDetail();
+  void ensureRootChildrenLoaded(root.id).then(()=>{if(String(ui.selectedParentId)===String(root.id)&&!['project','job'].includes(item.type)){document.getElementById(`card-${item.id}`)?.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}});
+  break;
+ }
  case 'open-archive':openArchive();break;
  case 'global-history':openApplicationHistory();break;
  case 'retry-data-load':if(ui.modal?.kind==='history')void refreshActivityFor(ui.modal.itemId,allItem(ui.modal.itemId)?.type==='followup'?'item':(ui.modal.historyScope||'all'));else if(ui.modal?.kind==='global-history')void refreshApplicationHistory();else if(!dataLoadState.parentsReady||dataLoadState.initialError)void startWorkspaceHydration();else if(ui.selectedParentId)void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});break;
@@ -2502,7 +2516,7 @@ async function startWorkspaceHydration(){
  const hydrationRun=++workspaceHydrationGeneration;
  dataLoadState.initialComplete=false;dataLoadState.usersReady=false;dataLoadState.parentsReady=false;
  dataLoadState.childrenLoaded.clear();dataLoadState.activityLoaded.clear();dataLoadState.rootErrors.clear();dataLoadState.initialError='';
- rootChildrenRequests.clear();
+ rootChildrenRequests.clear();assignedItemCache.clear();
  data={schema:4,users:[],parents:[],children:[],activity:[]};lastApiSnapshot=null;
  render();
  try{

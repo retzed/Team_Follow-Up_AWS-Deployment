@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static contract tests for the deployable AWS SAM template."""
+"""Contract tests for the target SAM template and recorded console bootstrap."""
 
 import json
 import re

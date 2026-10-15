@@ -272,6 +272,8 @@ Resources:
             - AttributeName: parentSort
               KeyType: RANGE
           Projection: {ProjectionType: ALL}
+  # Target declaration only; this does not import/adopt the manually created table.
+  # Default TeamFollowUp prefix collides with TeamFollowUp-Archive until the deployment plan is reconciled.
   ArchiveTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain

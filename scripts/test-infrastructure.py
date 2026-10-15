@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Contract tests for the target SAM template and recorded console bootstrap."""
+"""Contract tests for the full-stack automation template, console IAM policy, and current-account snapshot."""
 
 import json
 import re
@@ -466,7 +466,7 @@ def main():
     if not isinstance(outputs.get("FrontendUrl", {}).get("Value"), dict) or "FrontendApp.DefaultDomain" not in str(outputs["FrontendUrl"]["Value"]):
         fail("FrontendUrl output must identify the generated Amplify branch URL.")
 
-    print("Infrastructure checks passed: full from-scratch Cognito/DynamoDB/API/Lambda/IAM/CloudWatch/Amplify/Budget template, exact HTTPS CORS, matching schema/index contracts, and current console-state record.")
+    print("Infrastructure checks passed: full from-scratch Cognito/DynamoDB/API/Lambda/IAM/CloudWatch/Amplify/Budget template, exact HTTPS CORS, matching schema/index contracts, least-privilege console Lambda policy, and separate current-account snapshot.")
 
 if __name__ == "__main__":
     main()

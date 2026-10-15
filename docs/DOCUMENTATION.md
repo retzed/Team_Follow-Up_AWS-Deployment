@@ -418,7 +418,7 @@ DynamoDB is a key-value/document database rather than a relational database, so 
 - Activity snapshots preserve names/types at event time.
 - Archive records retain hierarchy snapshots and additional indexed key attributes.
 
-These duplicated fields must be maintained by the API. The backend strips or rebuilds server-owned index attributes rather than trusting them from a browser request. The primary keys and indexes in the existing tables are the physical contract; adding a new GSI is an AWS resource/cost decision and requires an explicit migration and documentation update.
+These duplicated fields must be maintained by the API. The backend strips or rebuilds server-owned index attributes rather than trusting them from a browser request. The target primary keys and indexes are the shared physical contract for console-created and template-created environments; adding a new GSI is an AWS resource/cost decision and requires an explicit migration and documentation update.
 
 ### 4.6 Integrity and transaction model
 
@@ -1016,7 +1016,7 @@ The operator confirmed the custom attribute was created and that the **Team_Foll
 - DynamoDB item mutations and audit records are coupled by transactions where supported by the implementation.
 - Activity events cannot be altered directly through the API.
 - CORS allows only the configured deployed HTTPS origin.
-- Lambda IAM access is scoped to the configured existing table/index ARNs and transactional operations. User-seeding permissions belong to the operator, not the Lambda.
+- Lambda IAM access is scoped to the configured target table/index ARNs and transactional operations. The console policy template and SAM execution-role policy must enforce equivalent least privilege. User-seeding permissions belong to the operator, not the Lambda.
 - Error messages to clients are sanitized; detailed internal exceptions are not returned.
 
 ### 9.3 Secrets and operational privacy

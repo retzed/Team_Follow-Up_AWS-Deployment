@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 
 const html = await readFile('index.html', 'utf8');
 const check = (condition, message) => assert.ok(condition, message);
@@ -72,6 +73,27 @@ check(itemHistoryBranch.includes('const historyReady=historyPopupReady(m.itemId,
   'The item popup must use exact item-and-scope readiness, independently of application-wide history.');
 check(itemHistoryBranch.includes('spinnerMarkup(tr(\'loadingActivity\'),true)'),
   'A pending item-specific history request must display an accessible loading indicator.');
+
+// Execute the real readiness helpers to prove the global-history flag cannot mark
+// an unrequested item popup as loaded.
+const readinessStart = html.indexOf('function rootActivityReady(');
+const readinessEnd = html.indexOf('function rootLoadingError(', readinessStart);
+assert.ok(readinessStart >= 0 && readinessEnd > readinessStart, 'History readiness helpers must be present.');
+const readinessContext = {
+  dataLoadState: { activityLoaded: new Set() },
+  applicationHistoryReady: true
+};
+vm.runInNewContext(
+  html.slice(readinessStart, readinessEnd) + '\\nthis.rootActivityReady = rootActivityReady; this.historyPopupReady = historyPopupReady;',
+  readinessContext
+);
+assert.equal(readinessContext.rootActivityReady('project-2', 'all'), true,
+  'The dashboard may reuse application-wide history after it is loaded.');
+assert.equal(readinessContext.historyPopupReady('project-2', 'all'), false,
+  'Application-wide history must not satisfy the separate item-popup readiness state.');
+readinessContext.dataLoadState.activityLoaded.add('project-2:all');
+assert.equal(readinessContext.historyPopupReady('project-2', 'all'), true,
+  'The item popup becomes ready only after its exact item-and-scope query succeeds.');
 check(html.includes('ui.modal.historyScope===scope')&&html.includes('ui.modal.historyRefreshError=message;renderModal();'),
   'A failure must be shown only for the still-open item-history scope, not hidden by a different history request.');
 check(html.includes("activityNotLoaded:'Open Activity History to load events.'") &&

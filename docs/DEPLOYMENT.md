@@ -269,7 +269,7 @@ Use two independent team accounts in separate browsers or sessions:
 
 ## 12. Optional full-stack automation reference (not the primary method)
 
-For the full step-by-step automation procedure—including GitHub credentials, SAM parameter prompts, changeset review, post-deploy team seeding, verification and cleanup—use the repository-root [`AUTOMATED_DEPLOYMENT.md`](AUTOMATED_DEPLOYMENT.md).
+For the full step-by-step automation procedure—including GitHub credentials, SAM parameter prompts, changeset review, post-deploy team seeding, verification and cleanup—use the docs folder [`AUTOMATED_DEPLOYMENT.md`](AUTOMATED_DEPLOYMENT.md).
 
 `backend/template.yaml` is a **complete from-scratch stack**, not a backend-only deploy. It creates the Cognito pool/client, four DynamoDB tables and five GSIs, Lambda/API/IAM, CloudWatch logs/dashboard/alarms, Amplify app/branch, and the $1 monthly budget. Its default `ResourceNamePrefix=TeamFollowUp` produces the same DynamoDB names used above.
 

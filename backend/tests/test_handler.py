@@ -10,9 +10,9 @@ from unittest.mock import patch
 
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
-os.environ.setdefault("WORK_ITEMS_TABLE", "UnitTest-WorkItems")
-os.environ.setdefault("ACTIVITY_TABLE", "UnitTest-ActivityEvents")
-os.environ.setdefault("USER_PROFILES_TABLE", "UnitTest-UserProfiles")
+os.environ.setdefault("WORK_ITEMS_TABLE", "UnitTest-Items")
+os.environ.setdefault("ACTIVITY_TABLE", "UnitTest-Activity")
+os.environ.setdefault("USER_PROFILES_TABLE", "UnitTest-Users")
 os.environ.setdefault("ARCHIVE_TABLE", "UnitTest-Archive")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
@@ -83,7 +83,7 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertNotIn("listPK", row)
         self.assertNotIn("assigneePK", row)
 
-    def test_activity_item_populates_all_timeline_indexes(self):
+    def test_activity_item_uses_existing_composite_primary_key(self):
         row = handler.activity_item(
             {
                 "eventId": "evt-1",

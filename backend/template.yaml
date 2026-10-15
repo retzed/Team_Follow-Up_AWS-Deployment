@@ -268,7 +268,7 @@ Outputs:
     Description: CloudWatch operations dashboard.
     Value: !Ref TeamFollowUpDashboard
   ApiBaseUrl:
-    Description: API Gateway HTTPS base URL; configure dataMode='api' and apiBaseUrl in index.html to use the real backend.
+    Description: API Gateway HTTPS base URL; set TEAM_FOLLOW_UP_API_BASE_URL in Amplify Hosting.
     Value: !Sub 'https://${TeamFollowUpApi}.execute-api.${AWS::Region}.amazonaws.com'
   ItemsTableName:
     Description: Existing Items table name; not created or managed by this stack.

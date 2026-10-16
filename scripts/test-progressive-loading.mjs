@@ -213,4 +213,40 @@ const historyHeaderCssStart=html.indexOf('<style id="activity-history-recovery-a
 const historyHeaderCssEnd=html.indexOf('</style>',historyHeaderCssStart);
 const historyHeaderCss=historyHeaderCssStart>=0&&historyHeaderCssEnd>historyHeaderCssStart?html.slice(historyHeaderCssStart,historyHeaderCssEnd):'';
 check(historyHeaderCss.includes('.modal.project-history-modal>.modal-head,')&&historyHeaderCss.includes('.modal.application-history-modal>.modal-head{position:relative!important;display:block!important}')&&historyHeaderCss.includes('position:absolute!important;top:19px!important;right:21px!important;')&&historyHeaderCss.includes('top:calc(15px + env(safe-area-inset-top))!important;right:14px!important;')&&!html.includes("modalHead.style.setProperty('display','grid','important')")&&!html.includes("closeControl.style.setProperty('grid-column','2','important')"), 'Activity-history close controls use independent physical-right anchors on desktop/mobile, with no render-time grid rewrite.');
+
+// Modal actions are handled by #modalRoot itself. Since it is inside #app,
+// the outer delegate must ignore those clicks rather than dispatching them twice.
+check(html.includes("$('#app').addEventListener('click',ev=>{if($('#modalRoot').contains(ev.target))return;"),
+  'Modal clicks must not bubble into the workspace action dispatcher a second time.');
+check(html.includes("$('#modalRoot').addEventListener('click',ev=>{const actionEl=ev.target.closest('[data-action]');"),
+  'The modal must retain its own delegated action handler.');
+
+// Opening edit/new-item modals calls allDescendants() to validate hierarchy-dependent type choices.
+// Execute that actual helper against malformed/cyclic and deep hierarchies to prove it always terminates.
+const descendantStart=html.indexOf('function allDescendants(id){');
+const descendantEnd=html.indexOf('function itemAncestorIds(',descendantStart);
+check(descendantStart>=0&&descendantEnd>descendantStart,'A standalone descendant traversal helper must exist.');
+check(!html.slice(descendantStart,descendantEnd).includes('allDescendants(c.id)'),
+  'Descendant traversal must not recurse on the JavaScript call stack.');
+const adjacency=new Map();
+const cycleA={id:'a'},cycleB={id:'b'},cycleRoot={id:'cycle-root'};
+adjacency.set('cycle-root',[cycleA]);adjacency.set('a',[cycleB]);adjacency.set('b',[cycleA,cycleRoot]);
+const deepLength=15000;
+for(let i=0;i<deepLength;i++)adjacency.set('deep-'+i,[{id:'deep-'+(i+1)}]);
+adjacency.set('deep-'+deepLength,[]);
+const descendantContext={childrenOf:id=>adjacency.get(String(id||''))||[]};
+vm.runInNewContext(html.slice(descendantStart,descendantEnd)+'\nthis.allDescendants=allDescendants;',descendantContext);
+assert.deepEqual(Array.from(descendantContext.allDescendants('cycle-root'),item=>item.id),['a','b'],
+  'A malformed hierarchy cycle must be traversed once without returning to the root or freezing.');
+assert.deepEqual(Array.from(descendantContext.allDescendants(''),item=>item.id),[],
+  'An empty root must not traverse orphaned child rows.');
+assert.equal(descendantContext.allDescendants('deep-0').length,deepLength,
+  'Deep hierarchies must complete without a recursive stack overflow.');
+const itemModalStart=html.indexOf("if(m.kind==='edit'||m.kind==='new-parent'||m.kind==='new-child'){");
+const itemModalEnd=html.indexOf("} else if(m.kind==='history'){",itemModalStart);
+check(itemModalStart>=0&&itemModalEnd>itemModalStart,'The item create/edit modal branch must exist.');
+const itemModal=html.slice(itemModalStart,itemModalEnd);
+check(itemModal.includes("if(m.kind==='new-parent'){const canBeJob=true;")&&!itemModal.includes("allDescendants(item?.id||'')"),
+  'Opening New Project/Job must not walk an unrelated empty-root hierarchy.');
+
 console.log('Progressive-loading tests passed: lean bootstrap, selected-root child hydration, popup-only activity reads, retry safety, accessible spinners, archive pagination, and mobile history controls.');

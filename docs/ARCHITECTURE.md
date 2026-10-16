@@ -68,6 +68,16 @@ flowchart LR
 
 The console procedure and the template should create the same logical service set, table/index names and low-capacity data settings. AWS-generated identifiers (Cognito pool ID, app-client ID, API ID and Amplify app ID) will naturally differ between deployments.
 
+### Frontend request lifecycle and responsiveness
+
+The AWS frontend is a statically hosted client that keeps transient view state and a namespaced, versioned cache of successful API responses. The cache is not an alternate source of truth: requests are revalidated against the authenticated API, and writes are committed through the API/Lambda transaction path. There is no offline work-item database or queue of writes to synchronize later.
+
+The client uses progressive loading. Bootstrap retrieves enabled team profiles and top-level Projects/Jobs; it then hydrates the selected root's children. Selecting another root loads that root's children and root-scoped Activity. A descendant history popup reuses the root Activity cache where available, while application-wide Activity is fetched only when its popup opens and is paged as the user scrolls or searches. The Activity table itself has no GSI, so a global timeline query uses Scan by design; this backend access pattern is unchanged by the frontend changes.
+
+For responsiveness and correctness, modal clicks are handled once at the modal root, whole-subtree traversal is iterative and cycle-safe, modal type checks inspect direct children when possible, and child date comparisons use per-item Activity index entries. These are client-side code changes. They do not add or change API routes, JSON contracts, Cognito claims, DynamoDB table/index definitions, Lambda permissions, or runtime configuration.
+
+A normal frontend-only source update is published by rebuilding the static artifact through the existing Amplify branch. It does not require a SAM/CloudFormation stack update or a Lambda ZIP replacement. Backend/infrastructure changes continue to follow the deployment method selected for that environment.
+
 ## 3. DynamoDB physical schema and access patterns
 
 The four tables use the DynamoDB **Standard** table class, **Provisioned** billing, and **1 RCU / 1 WCU** for every base table and GSI. The target is **9 RCUs and 9 WCUs** across four base tables and five GSIs. Auto scaling, point-in-time recovery, deletion protection and Streams are off in the low-cost baseline. DynamoDB encryption at rest uses the AWS-owned default key.

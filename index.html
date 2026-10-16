@@ -2063,11 +2063,11 @@ async function loadRemainingApplicationHistoryForSearch(){
    applicationHistorySearchFillActive=false;
    synchronizeApplicationHistoryWithWorkspace();
    if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();
-  }else if(ui.modal?.kind==='global-history'&&!String(ui.modal.historyQuery||'').trim()&&String(ui.modal.historyUserFilter||'all')==='all'&&!applicationHistorySearchFillActive){
-   /* A page already in flight may finish after the user clears the search. Commit that
-      page as normal history and redraw rather than leaving the visible list/cache stale. */
+  }else if(!applicationHistorySearchFillActive){
+   /* An in-flight page can finish after a search was cleared or its modal was closed.
+      Reconcile that completed page even when it no longer belongs to the active search. */
    synchronizeApplicationHistoryWithWorkspace();
-   renderModalPreservingInteraction();
+   if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();
   }
  }
 }
@@ -2474,7 +2474,7 @@ function historyQueryMatches(event,query,applicationWide=false){
 }
 function stableNewestFirst(a,b){return (Date.parse(b.at)||0)-(Date.parse(a.at)||0)||String(b.id||'').localeCompare(String(a.id||''));}
 
-function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='';return;}const m=ui.modal;let content='';let title='',subtitle='',wide=false,footer='';
+function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.modal){if(applicationHistorySearchFillActive){applicationHistorySearchRequest++;applicationHistorySearchFillActive=false;}root.innerHTML='';return;}const m=ui.modal;let content='';let title='',subtitle='',wide=false,footer='';
  if(m.kind==='edit'||m.kind==='new-parent'||m.kind==='new-child'){
    const item=currentModalItem();const isParent=m.kind==='new-parent'||(item&&(item.type==='project'||item.type==='job'));const isNew=m.kind.startsWith('new-');const isChild=!isParent;const parent= m.parentId ? allItem(m.parentId) : (item?rootParent(item):null);const kind=isNew?(isParent?'parent': 'child'):(isParent?'parent':'child');const type=m.type||(item?.type)||(isParent?'project':'followup');title=isNew?(isParent?tr('newParentTitle'):tr('newChildTitle')):(isParent?tr(item?.type==='job'?'editJobTitle':'editParentTitle'):tr('editChildTitle'));subtitle='';
    const allowedParentChildren= m.kind==='new-child'?allowedChildTypes(m.parentId):[];

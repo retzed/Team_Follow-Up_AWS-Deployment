@@ -135,7 +135,7 @@ await api.queryAssigned('u1', { status: 'not-completed', query: 'Task' });
 await api.queryChildren('project-1', { type: 'task' });
 assert.equal((await api.queryGlobalActivity()).events.length, 1);
 assert.equal((await api.listArchive()).items.length, 0);
-for (const key of ['team-users','top-level-items','root-items:project-1','activity:project-1:all','activity:application','assigned-query:dateMode=updated&direction=desc&status=not-completed&q=Task','children-query:project-1:dateMode=updated&direction=desc&type=task','archive-page:/archive?limit=250&offset=0']) {
+for (const key of ['team-users','top-level-items','root-items:project-1:rootParentId=project-1&dateMode=updated&direction=desc','activity:project-1:all','activity:application','assigned-query:dateMode=updated&direction=desc&status=not-completed&q=Task','children-query:project-1:dateMode=updated&direction=desc&type=task','archive-page:/archive?limit=250&offset=0']) {
   assert.ok(storage.has('team-follow-up-api-cache-v1:' + key), `the disk cache must persist ${key}`);
 }
 const beforeRevalidation = requests.length;

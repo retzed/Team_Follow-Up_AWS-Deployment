@@ -1171,7 +1171,8 @@ html[dir="rtl"] #signOutButton svg {
 
 <style id="activity-history-recovery-and-rtl-fixes">
 /* Keep the dismiss control on the physical right in both LTR and RTL workspaces. */
-#modalRoot .modal-head{direction:ltr}
+#modalRoot .modal-head{direction:ltr!important;flex-direction:row!important}
+#modalRoot .modal-head>button[data-action="close-modal"]{margin-inline-start:auto!important;flex:0 0 auto}
 :root[lang="ar"] #modalRoot .modal-head>div{direction:rtl;text-align:right}
 :root[lang="en"] #modalRoot .modal-head>div{direction:ltr;text-align:left}
 /* A high-contrast spinner that remains visibly animated, including under reduced-motion browser settings. */
@@ -1899,11 +1900,11 @@ function projectActivityEvents(rootId){if(!rootId)return [];return [...(ensureAc
 function eventRootName(event){const rootId=String(event.rootParentId||'');const root=rootId?allItem(rootId):null;return String(root?.name||event.rootParentName||event.rootNameSnapshot||(rootId&&rootId===event.itemId?event.itemName:'')||tr('unknownProject'));}
 function renderModalPreservingInteraction(){
  const modalRoot=$('#modalRoot');const selectors=['.modal-content','.application-history-scroll','.history-table-wrap','.history-card-list','.archive-groups'];const savedScroll=[];
- for(const selector of selectors) $(selector,modalRoot).forEach((node,index)=>savedScroll.push({selector,index,top:node.scrollTop,left:node.scrollLeft}));
+ for(const selector of selectors) $$(selector,modalRoot).forEach((node,index)=>savedScroll.push({selector,index,top:node.scrollTop,left:node.scrollLeft}));
  const focused=document.activeElement;const focusId=focused&&modalRoot.contains(focused)?focused.id:'';
  const selection=focusId&&typeof focused.selectionStart==='number'?{start:focused.selectionStart,end:focused.selectionEnd}:null;
  renderModal(true);
- for(const state of savedScroll){const nodes=$(state.selector,modalRoot);const node=nodes[state.index];if(node){node.scrollTop=state.top;node.scrollLeft=state.left;}}
+ for(const state of savedScroll){const nodes=$$(state.selector,modalRoot);const node=nodes[state.index];if(node){node.scrollTop=state.top;node.scrollLeft=state.left;}}
  if(focusId){const next=$('#modalRoot #'+CSS.escape(focusId));if(next){next.focus({preventScroll:true});if(selection&&typeof next.setSelectionRange==='function')try{next.setSelectionRange(selection.start,selection.end);}catch(e){}}}
 }
 function renderAfterActivityRefresh(itemId,scope){

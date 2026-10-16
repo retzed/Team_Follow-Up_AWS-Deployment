@@ -66,10 +66,18 @@ const user = { id: 'u1', name: 'Marwa', role: 'Team Leader' };
 function ok(payload, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => payload };
 }
+let globalActivityVersion = 'global-activity-v1';
+const unchangedCacheChecks = [];
 function versioned(url, key, payload) {
-  const version = key + '-v1';
-  if (url.searchParams.get('cacheMode') === '1' && url.searchParams.get('cacheVersion') === version) return ok({ notModified: true, version });
-  return ok({ ...payload, version });
+  const version = key === 'global-activity' ? globalActivityVersion : key + '-v1';
+  if (url.searchParams.get('cacheMode') === '1' && url.searchParams.get('cacheVersion') === version) {
+    unchangedCacheChecks.push(key);
+    return ok({ notModified: true, version });
+  }
+  const currentPayload = key === 'global-activity' && globalActivityVersion === 'global-activity-v2'
+    ? { ...payload, events: [...(payload.events || []), { ...createEvent, id: 'evt-global-new', action: 'Updated a second project', at: '2026-10-04T10:00:00.000Z' }], count: 2 }
+    : payload;
+  return ok({ ...currentPayload, version });
 }
 const window = {
   location: { origin: 'https://app.example.test' },
@@ -141,6 +149,11 @@ for (const key of ['team-users','top-level-items','root-items:project-1:rootPare
 const beforeRevalidation = requests.length;
 assert.equal((await api.queryGlobalActivity()).events.length, 1, 'an unchanged global timeline reuses the persisted payload');
 assert.ok(requests.slice(beforeRevalidation).some(request => request.path.includes('cacheVersion=global-activity-v1')), 'the next Activity read asks for a version check rather than a full payload');
+assert.ok(unchangedCacheChecks.includes('global-activity'), 'the mock backend confirms the cached Activity version is unchanged.');
+globalActivityVersion = 'global-activity-v2';
+const changedHistory = await api.queryGlobalActivity();
+assert.equal(changedHistory.events.length, 2, 'a changed server version returns the refreshed Activity payload');
+assert.equal(JSON.parse(storage.get('team-follow-up-api-cache-v2:activity:application')).version, 'global-activity-v2', 'changed data replaces the persisted cache version and payload');
 const beforeSecondBootstrap = requests.length;
 const secondBootstrap = await api.bootstrap();
 assert.equal(secondBootstrap.parents[0].id, 'project-1');

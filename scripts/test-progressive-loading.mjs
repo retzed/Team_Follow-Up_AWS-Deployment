@@ -58,8 +58,8 @@ check(!persistBody.includes('refreshActivityFor(') && !persistBody.includes('cha
 
 check(html.includes('function refreshActivityFor(itemId,scope=') || html.includes('async function refreshActivityFor(itemId,scope='),
   'The item-history API loader must remain available for popup open, scope change, and retry.');
-check(html.includes('async function refreshApplicationHistory('),
-  'The application-wide history loader must remain available for popup open and retry.');
+check(html.includes('function refreshApplicationHistory(') && html.includes('function loadMoreApplicationHistory('),
+  'The application-wide history loader and paged continuation must remain available for popup open, scroll and retry.');
 check(html.includes("ev.target.id==='historyScopeFilter'") && html.includes('void refreshActivityFor(itemId,scope)'),
   'Changing item-history scope inside the popup must fetch the newly selected scope.');
 check(html.includes('function rootActivityReady(') && !html.slice(html.indexOf('function rootActivityReady('),html.indexOf('function historyPopupReady(')).includes('applicationHistoryReady'),

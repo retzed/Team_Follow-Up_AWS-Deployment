@@ -1170,9 +1170,20 @@ html[dir="rtl"] #signOutButton svg {
 </style>
 
 <style id="activity-history-recovery-and-rtl-fixes">
-/* Keep the dismiss control on the physical right in both LTR and RTL workspaces. */
-#modalRoot .modal-head{direction:ltr!important;flex-direction:row!important}
-#modalRoot .modal-head>button[data-action="close-modal"]{margin-inline-start:auto!important;flex:0 0 auto}
+/* History header geometry is independent of flex order, grid tracks, and document bidi direction. */
+#modalRoot .modal-head{direction:ltr!important}
+#modalRoot .modal.project-history-modal>.modal-head,
+#modalRoot .modal.application-history-modal>.modal-head{position:relative!important;display:block!important}
+#modalRoot .modal.project-history-modal>.modal-head>div,
+#modalRoot .modal.application-history-modal>.modal-head>div{display:block!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;padding-right:46px!important}
+#modalRoot .modal.project-history-modal>.modal-head>button[data-action="close-modal"],
+#modalRoot .modal.application-history-modal>.modal-head>button[data-action="close-modal"]{position:absolute!important;top:19px!important;right:21px!important;left:auto!important;margin:0!important;flex:none!important;float:none!important;transform:none!important;z-index:2!important;direction:ltr!important}
+@media(max-width:700px){
+ #modalRoot .modal.project-history-modal>.modal-head>button[data-action="close-modal"],
+ #modalRoot .modal.application-history-modal>.modal-head>button[data-action="close-modal"]{top:calc(15px + env(safe-area-inset-top))!important;right:14px!important}
+ #modalRoot .modal.project-history-modal>.modal-head>div,
+ #modalRoot .modal.application-history-modal>.modal-head>div{padding-right:42px!important}
+}
 :root[lang="ar"] #modalRoot .modal-head>div{direction:rtl;text-align:right}
 :root[lang="en"] #modalRoot .modal-head>div{direction:ltr;text-align:left}
 /* A high-contrast spinner that remains visibly animated, including under reduced-motion browser settings. */
@@ -2581,34 +2592,7 @@ function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.mo
   const contentNode=existingModal.querySelector('.modal-content');if(contentNode)contentNode.innerHTML=content;
   const footerNode=existingModal.querySelector('.modal-footer');if(footerNode)footerNode.innerHTML=footer;
  }else root.innerHTML=modalMarkup;
- const modalHead=root.querySelector('.modal-head');
- if(modalHead){
-  /* Grid columns bind the dismiss button to the physical right column regardless of
-     the inherited document direction or a heading's Arabic text direction. */
-  modalHead.style.setProperty('display','grid','important');
-  modalHead.style.setProperty('grid-template-columns','minmax(0,1fr) auto','important');
-  modalHead.style.setProperty('grid-template-rows','auto','important');
-  modalHead.style.setProperty('direction','ltr','important');
-  modalHead.style.setProperty('align-items','start','important');
-  const headingContent=modalHead.querySelector(':scope > div');
-  if(headingContent){
-   headingContent.style.setProperty('grid-column','1','important');
-   headingContent.style.setProperty('grid-row','1','important');
-   headingContent.style.setProperty('min-width','0','important');
-   headingContent.style.setProperty('justify-self','stretch','important');
-   headingContent.style.setProperty('direction',ui.lang==='ar'?'rtl':'ltr','important');
-   headingContent.style.setProperty('text-align',ui.lang==='ar'?'right':'left','important');
-  }
-  const closeControl=modalHead.querySelector('button[data-action="close-modal"]');
-  if(closeControl){
-   closeControl.style.setProperty('grid-column','2','important');
-   closeControl.style.setProperty('grid-row','1','important');
-   closeControl.style.setProperty('justify-self','end','important');
-   closeControl.style.setProperty('align-self','start','important');
-   closeControl.style.setProperty('margin','0','important');
-   closeControl.style.setProperty('direction','ltr','important');
-  }
- }
+ // History dismiss controls are positioned by CSS relative to their own header, never by bidi-sensitive flow.
  if(m.focusNameOnOpen){m.focusNameOnOpen=false;const nameInput=$('#formName');if(nameInput)nameInput.focus({preventScroll:true});}
 }
 let toastTimer;

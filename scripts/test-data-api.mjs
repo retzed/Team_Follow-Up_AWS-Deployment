@@ -66,6 +66,11 @@ const user = { id: 'u1', name: 'Marwa', role: 'Team Leader' };
 function ok(payload, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => payload };
 }
+function versioned(url, key, payload) {
+  const version = key + '-v1';
+  if (url.searchParams.get('cacheMode') === '1' && url.searchParams.get('cacheVersion') === version) return ok({ notModified: true, version });
+  return ok({ ...payload, version });
+}
 const window = {
   location: { origin: 'https://app.example.test' },
   TeamFollowUpAuth: {
@@ -76,20 +81,20 @@ const window = {
       try { body = init.body ? JSON.parse(init.body) : undefined; } catch { body = init.body; }
       requests.push({ method, path: url.pathname + url.search, body });
 
-      if (method === 'GET' && url.pathname === '/users') return ok({ users: [user] });
+      if (method === 'GET' && url.pathname === '/users') return versioned(url, 'users', { users: [user] });
       if (method === 'GET' && url.pathname === '/items' && url.searchParams.get('scope') === 'top-level') {
-        return ok({ items: [project], count: 1, nextOffset: null });
+        return versioned(url, 'top-level', { items: [project], count: 1, nextOffset: null });
       }
       if (method === 'GET' && url.pathname === '/items' && url.searchParams.has('rootParentId')) {
-        return ok({ items: [project, task], count: 2, nextOffset: null });
+        return versioned(url, 'root-items', { items: [project, task], count: 2, nextOffset: null });
       }
       if (method === 'GET' && url.pathname === '/items/project-1/activity') {
-        return ok({ events: [createEvent], count: 1 });
+        return versioned(url, 'item-activity', { events: [createEvent], count: 1 });
       }
-      if (method === 'GET' && url.pathname === '/activity') return ok({ events: [createEvent], count: 1 });
-      if (method === 'GET' && url.pathname === '/items/assigned-to-me') return ok({ items: [task], count: 1, nextOffset: null });
-      if (method === 'GET' && url.pathname === '/items/project-1/children') return ok({ items: [task], count: 1, nextOffset: null });
-      if (method === 'GET' && url.pathname === '/archive') return ok({ items: [], count: 0, nextOffset: null });
+      if (method === 'GET' && url.pathname === '/activity') return versioned(url, 'global-activity', { events: [createEvent], count: 1 });
+      if (method === 'GET' && url.pathname === '/items/assigned-to-me') return versioned(url, 'assigned', { items: [task], count: 1, nextOffset: null });
+      if (method === 'GET' && url.pathname === '/items/project-1/children') return versioned(url, 'children', { items: [task], count: 1, nextOffset: null });
+      if (method === 'GET' && url.pathname === '/archive') return versioned(url, 'archive', { items: [], count: 0, nextOffset: null });
       if (method === 'POST' && url.pathname === '/archive/restore') return ok({ restoredIds: body?.itemIds || [] });
       if (method === 'PATCH' && url.pathname === '/items/project-1') {
         return ok({ item: { ...body, id: 'project-1' }, activityEvents: body.activityEvents || [] });
@@ -130,6 +135,17 @@ await api.queryAssigned('u1', { status: 'not-completed', query: 'Task' });
 await api.queryChildren('project-1', { type: 'task' });
 assert.equal((await api.queryGlobalActivity()).events.length, 1);
 assert.equal((await api.listArchive()).items.length, 0);
+for (const key of ['team-users','top-level-items','root-items:project-1','activity:project-1:all','activity:application','assigned-query:userId=u1&dateMode=updated&direction=desc&status=not-completed&q=Task','children-query:project-1:dateMode=updated&direction=desc&type=task','archive-page:/archive?limit=250&offset=0']) {
+  assert.ok(storage.has('team-follow-up-api-cache-v1:' + key), `the disk cache must persist ${key}`);
+}
+const beforeRevalidation = requests.length;
+assert.equal((await api.queryGlobalActivity()).events.length, 1, 'an unchanged global timeline reuses the persisted payload');
+assert.ok(requests.slice(beforeRevalidation).some(request => request.path.includes('cacheVersion=global-activity-v1')), 'the next Activity read asks for a version check rather than a full payload');
+const beforeSecondBootstrap = requests.length;
+const secondBootstrap = await api.bootstrap();
+assert.equal(secondBootstrap.parents[0].id, 'project-1');
+assert.ok(requests.slice(beforeSecondBootstrap).some(request => request.path.includes('/users?cacheMode=1&cacheVersion=users-v1')), 'startup validates stored team profiles');
+assert.ok(requests.slice(beforeSecondBootstrap).some(request => request.path.includes('cacheVersion=top-level-v1')), 'startup validates stored Project/Job rows');
 await api.restoreArchive(['archived-id-1']);
 assert.ok(requests.some(request => request.path.startsWith('/items/assigned-to-me?')));
 assert.ok(requests.some(request => request.path.startsWith('/items?rootParentId=project-1')));

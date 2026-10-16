@@ -871,7 +871,7 @@ def lambda_handler(event, context):
                 version=cache_version(items)
                 if qs.get('cacheVersion')==version:
                     return response(200,{'notModified':True,'version':version})
-                if qs.get('scope')=='top-level':
+                if qs.get('scope')=='top-level' or 'limit' in qs or 'offset' in qs:
                     offset=max(0,int(qs.get('offset',0)))
                     limit=max(1,min(250,int(qs.get('limit',100))))
                     total=len(items)

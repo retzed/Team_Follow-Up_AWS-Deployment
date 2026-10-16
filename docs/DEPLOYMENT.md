@@ -248,7 +248,7 @@ The fixes to modal action dispatch, hierarchy traversal, and child Activity sort
 
 For a frontend-only change in this console-first deployment:
 
-1. Run `npm test` and `npm run build` from the repository root. Confirm the generated `dist/index.html` exists and the checks pass.
+1. Run `npm test` and `npm run build` from the repository root. Confirm the generated `dist/index.html` exists and the checks pass. A local AWS build requires the real public configuration values from Step 9: `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, and `TEAM_FOLLOW_UP_API_BASE_URL`. Supply them in the build shell; Amplify supplies its configured branch variables automatically. The build intentionally fails if values are missing or placeholders.
 2. Commit/push the tested source to the branch connected to Amplify (normally `main`). If automatic builds are enabled, monitor **Amplify → Hosting → Build history**; otherwise start a new build for that branch in the console.
 3. Confirm the build succeeds and test the deployed URL: sign in; open/close Edit and New Project/Job dialogs repeatedly; create a child item; verify Activity opens and can be searched; confirm no duplicate action occurs.
 4. Do **not** rebuild/re-upload the Lambda package, change API Gateway routes/CORS, edit the Cognito app client, modify DynamoDB indexes, or run SAM/CloudFormation solely for a frontend-only change.

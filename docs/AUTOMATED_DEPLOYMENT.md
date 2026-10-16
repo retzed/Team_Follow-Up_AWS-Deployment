@@ -366,6 +366,7 @@ Changes limited to `index.html`, frontend JavaScript/styles, UI tests, or other 
    npm run test:all
    npm run build
    ```
+   A local AWS build requires the three real public configuration values (`TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, and `TEAM_FOLLOW_UP_API_BASE_URL`). Use values from this environment; Amplify supplies the variables during hosted builds. Do not commit them into source files.
 2. Commit and push the reviewed change to the configured Amplify branch (normally `main`). Watch **Amplify → Hosting → Build history** and confirm the published artifact is healthy.
 3. Exercise sign-in, item creation/editing, modal close/save behavior, child hierarchy/search/sort, item Activity, and application-wide Activity. Confirm failures show a retryable state instead of an indefinite loading indicator.
 4. Do **not** run `sam deploy`, rebuild the Lambda ZIP, change API Gateway/CORS, alter Cognito, or modify DynamoDB solely for a frontend-only change.

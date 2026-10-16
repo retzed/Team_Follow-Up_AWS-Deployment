@@ -76,7 +76,7 @@ check(itemHistoryBranch.includes('spinnerMarkup(tr(\'loadingActivity\'),true)'),
 
 // Execute the real readiness helpers to prove the global-history flag cannot mark
 // an unrequested item popup as loaded.
-const readinessStart = html.indexOf('function rootActivityReady(');
+const readinessStart = html.indexOf('function historyRootIdFor(');
 const readinessEnd = html.indexOf('function rootLoadingError(', readinessStart);
 assert.ok(readinessStart >= 0 && readinessEnd > readinessStart, 'History readiness helpers must be present.');
 const readinessContext = {

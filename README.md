@@ -1,6 +1,6 @@
 # Team Follow-Up Application
 
-An English/Arabic workspace for a team to manage projects, temporary jobs, tasks, and follow-ups. **This repository is AWS-only:** users sign in with Amazon Cognito and all application data is read from and written to DynamoDB through an authenticated API. There is no local authentication, demo database, offline data store, or browser-side work-data persistence.
+An English/Arabic workspace for a team to manage projects, temporary jobs, tasks, and follow-ups. **This repository is AWS-only:** users sign in with Amazon Cognito and authoritative application data is read from and written to DynamoDB through an authenticated API. There is no local authentication, demo database, or offline-first work-data store. The browser may retain a versioned cache of successful API responses for performance; the authenticated API and DynamoDB remain authoritative.
 
 > **Current account checkpoint (15 October 2026):** The Cognito pool/client, four DynamoDB tables (Items, Activity, Users and Archive), and monthly cost budget were reported as created manually in `us-east-1`. Amplify Hosting, API Gateway/Lambda and CloudWatch operational resources remained pending in the dated implementation snapshot. See the [implementation record](docs/IMPLEMENTATION.md) for current-account details. This status is a snapshot, not a prerequisite assumed by the architecture or automation template.
 
@@ -176,14 +176,22 @@ Open [http://localhost:8000](http://localhost:8000). Keep the terminal running w
 
 ## Client-side data cache and progressive loading
 
-The AWS-backed frontend persists successfully fetched table-backed API responses in the browser's persistent storage. The cache is namespaced and versioned separately from the demo database. On a later read, the client sends a lightweight conditional request with the cached version:
-- If the server version is unchanged, the API returns `notModified` and the frontend reuses the stored response instead of downloading the item collection or activity timeline again.
-- If a version changed, the endpoint returns the current response and new version; the frontend replaces the stored cache entry.
-- This covers enabled team profiles, top-level Projects/Jobs, root/child item queries (including pagination and filters), assigned-item queries, item-scoped Activity, application-wide Activity, and Archive pages.
-- Selecting a Project/Job and expanding a child loads that item's relevant Activity history automatically. Application-wide Activity is requested only when its popup opens.
-- Jobs do not display the Tasks metric/filter because Jobs contain Follow-ups only.
+The frontend intentionally separates the authoritative AWS data from a versioned browser cache. Successfully fetched API responses may be stored in browser storage under the `team-follow-up-api-cache-v2:` namespace. This is a response cache, not a local database or offline-write queue.
 
-This is a client-side performance cache, not the system of record: DynamoDB and the authenticated API remain authoritative. It is persistent per browser profile, so treat browser-profile access accordingly. A cache entry is reused only after the API confirms its version.
+On a subsequent read the client sends a conditional request with the cache version. If the backend confirms the version is unchanged, the saved response is reused; otherwise, the latest server response replaces the cached value. Storage errors do not make the browser cache authoritative, and a cold browser profile still requires the authenticated API.
+
+### Loading lifecycle
+
+- Startup loads enabled team profiles and the top-level Project/Job list, then hydrates the selected root's child records. It does not download every descendant or the entire application-wide Activity table as one startup snapshot.
+- Selecting another Project/Job triggers loading for that root's children and its root-scoped Activity timeline. When a descendant's Activity popup opens, it reuses the cached root timeline when it is available; otherwise, the client queries the relevant root/item scope.
+- Application-wide Activity is loaded when its popup opens and retrieved in pages. Scrolling near the end requests the next page; a search that needs older records can trigger additional page loading. The view renders already-loaded records while requests continue and offers a visible retry/error state when a request fails. A stalled application-wide Activity request transitions to an error after 25 seconds.
+- Item-list filtering, creation/edit dialogs, and date sorting use the in-memory hierarchy/Activity indexes rather than rebuilding or scanning unrelated data for every UI action.
+
+### Modal and hierarchy safety
+
+Modal clicks are stopped by the modal's own delegated handler before the action is processed; the workspace delegate ignores modal clicks as a second defensive guard. This avoids duplicate action dispatch when a dialog closes or its DOM is replaced. Full descendant operations use iterative, cycle-safe traversal. Dialogs use direct-child checks for type validation where that is sufficient, and child timestamp comparisons read that child's indexed Activity events instead of scanning the entire root timeline.
+
+These front-end safeguards do not change the AWS infrastructure. They add no API routes, request parameters required by the backend, environment variables, DynamoDB attributes/indexes, Lambda permissions, Cognito configuration, or migration steps. See the frontend-only update procedure in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#frontend-only-releases).
 
 ## API documentation
 

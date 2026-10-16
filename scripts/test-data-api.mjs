@@ -143,7 +143,7 @@ await api.queryAssigned('u1', { status: 'not-completed', query: 'Task' });
 await api.queryChildren('project-1', { type: 'task' });
 assert.equal((await api.queryGlobalActivity()).events.length, 1);
 assert.equal((await api.listArchive()).items.length, 0);
-for (const key of ['team-users','top-level-items','root-items:project-1:rootParentId=project-1&dateMode=updated&direction=desc','activity:project-1:all:','activity:application','assigned-query:dateMode=updated&direction=desc&status=not-completed&q=Task','children-query:project-1:dateMode=updated&direction=desc&type=task','archive-page:/archive?limit=250&offset=0']) {
+for (const key of ['team-users','top-level-items','root-items:project-1:rootParentId=project-1&dateMode=updated&direction=desc','activity:project-1:all:','activity:application:scope=application&limit=100&offset=0','assigned-query:dateMode=updated&direction=desc&status=not-completed&q=Task','children-query:project-1:dateMode=updated&direction=desc&type=task','archive-page:/archive?limit=250&offset=0']) {
   assert.ok(storage.has('team-follow-up-api-cache-v2:' + key), `the disk cache must persist ${key}`);
 }
 const beforeRevalidation = requests.length;
@@ -153,7 +153,7 @@ assert.ok(unchangedCacheChecks.includes('global-activity'), 'the mock backend co
 globalActivityVersion = 'global-activity-v2';
 const changedHistory = await api.queryGlobalActivity();
 assert.equal(changedHistory.events.length, 2, 'a changed server version returns the refreshed Activity payload');
-assert.equal(JSON.parse(storage.get('team-follow-up-api-cache-v2:activity:application')).version, 'global-activity-v2', 'changed data replaces the persisted cache version and payload');
+assert.equal(JSON.parse(storage.get('team-follow-up-api-cache-v2:activity:application:scope=application&limit=100&offset=0')).version, 'global-activity-v2', 'changed data replaces the persisted cache version and payload');
 const beforeSecondBootstrap = requests.length;
 const secondBootstrap = await api.bootstrap();
 assert.equal(secondBootstrap.parents[0].id, 'project-1');

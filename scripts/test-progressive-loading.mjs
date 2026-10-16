@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import vm from 'node:vm';
 
 const html = await readFile('index.html', 'utf8');
 const check = (condition, message) => assert.ok(condition, message);

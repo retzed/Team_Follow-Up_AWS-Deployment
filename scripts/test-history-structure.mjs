@@ -7,6 +7,15 @@ const projectHistory = html.slice(html.indexOf("} else if(m.kind==='history'){")
 const appHistory = html.slice(html.indexOf("} else if(m.kind==='global-history'){"), html.indexOf("} else if(m.kind==='archive'){", html.indexOf("} else if(m.kind==='global-history'){")));
 assert.ok(projectHistory.includes("<th>${esc(tr('time'))}</th><th>${esc(tr('date'))}</th><th>${esc(tr('user'))}</th><th>${esc(tr('itemColumn'))}</th><th>${esc(tr('action'))}</th>"));
 assert.ok(appHistory.includes("<th>${esc(tr('time'))}</th><th>${esc(tr('date'))}</th><th>${esc(tr('user'))}</th><th>${esc(tr('parentItem'))}</th><th>${esc(tr('childItem'))}</th><th>${esc(tr('action'))}</th>"));
+
+const relatedTreeStart = html.indexOf('function treeActivity(parent){');
+const relatedTreeEnd = html.indexOf('\\nfunction timelineEvents(', relatedTreeStart);
+assert.ok(relatedTreeStart >= 0 && relatedTreeEnd > relatedTreeStart, 'The related-item hierarchy renderer must exist.');
+const relatedTree = html.slice(relatedTreeStart, relatedTreeEnd);
+assert.ok(relatedTree.includes('childrenOf(parent.id).sort(newestCreatedFirst)') &&
+          relatedTree.includes('childrenOf(item.id).sort(newestCreatedFirst)'),
+  'Related items and nested follow-ups are sorted newest-created first at every hierarchy level.');
+
 assert.equal((projectHistory.match(/id="historyQuery"/g)||[]).length, 1, 'Project history renders one shared search box.');
 assert.equal((appHistory.match(/id="historyQuery"/g)||[]).length, 1, 'Application history renders one shared search box.');
 assert.doesNotMatch(html, /historyItemQuery/, 'No second item-only search box exists.');
@@ -41,7 +50,15 @@ const context = {
   fmtTime:()=> '10:00',
   fmtDateTime:()=> '14 Oct 2026 · 10:00',
 };
-vm.runInNewContext(html.slice(helperStart,helperEnd)+';this.historySubjectData=historySubjectData;this.historyActionLabel=historyActionLabel;this.historyQueryMatches=historyQueryMatches;this.historySubjectMarkup=historySubjectMarkup;this.stableNewestFirst=stableNewestFirst;',context);
+vm.runInNewContext(html.slice(helperStart,helperEnd)+';this.historySubjectData=historySubjectData;this.historyActionLabel=historyActionLabel;this.historyQueryMatches=historyQueryMatches;this.historySubjectMarkup=historySubjectMarkup;this.stableNewestFirst=stableNewestFirst;this.newestCreatedFirst=newestCreatedFirst;',context);
+
+const creationOrder = [
+  {id:'older',createdAt:'2026-10-12T12:00:00.000Z'},
+  {id:'newer',createdAt:'2026-10-15T12:00:00.000Z'},
+  {id:'middle',createdAt:'2026-10-14T12:00:00.000Z'}
+].sort(context.newestCreatedFirst).map(item=>item.id);
+assert.deepEqual(creationOrder,['newer','middle','older'],
+  'The related-item comparator orders creation timestamps newest to oldest.');
 const projectEvent={id:'e1',itemId:'p1',itemName:'Platform Refresh',itemType:'project',rootParentId:'p1',rootParentName:'Platform Refresh',rootParentType:'project',userId:'u1',action:'Updated description for project: Platform Refresh.',kind:'update',at:'2026-10-14T10:00:00.000Z'};
 const childEvent={id:'e2',itemId:'t1',itemName:'Define API Contract',itemType:'task',rootParentId:'p1',rootParentName:'Platform Refresh',rootParentType:'project',parentId:'p1',userId:'u1',action:'Created task: Define API Contract',kind:'create',at:'2026-10-14T10:00:00.000Z'};
 const parentSubject=context.historySubjectData(projectEvent);

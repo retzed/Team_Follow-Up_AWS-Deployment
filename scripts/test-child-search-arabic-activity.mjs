@@ -37,4 +37,37 @@ assert.equal(context.activityText({ id:'update-task',itemId:'t1',action:'Updated
 assert.equal(context.activityText({ id:'update-child',itemId:'t1',action:'Updated details for task: Define indexes.' },'p1'), 'Updated details for task: Define indexes.', 'A child event keeps its item context when shown under the selected project.');
 context.ui.lang='ar';
 assert.equal(context.activityText({ id:'update-root-job',itemId:'j1',action:'Updated details for job: Weekly Operations.' },'j1'), 'تم تحديث تفاصيل العمل المؤقت');
-console.log('Child search labels, context-aware activity summaries, and Arabic activity localization tests passed.');
+
+const sortModeStart=html.indexOf('function childDateSortMode(');
+const sortModeEnd=html.indexOf('function childCard(',sortModeStart);
+const compareStart=html.indexOf('function compareByDateMode(');
+const compareEnd=html.indexOf('function parentDateForMode(',compareStart);
+assert.ok(sortModeStart>=0&&sortModeEnd>sortModeStart,'Child date sorting helpers must exist.');
+assert.ok(compareStart>=0&&compareEnd>compareStart,'The shared date comparator must exist.');
+assert.match(html,/const order=\(a,b\)=>compareByDateMode\(a\.item,b\.item,childDateSortMode\(\)\)/,
+  'The top-level child-item results must use the selected child sort mode.');
+assert.match(html,/const kids= item\.type==='task' \? sortChildrenByDate\(filteredNested\?\?childrenOf\(item\.id\)\) : \[\];/,
+  'Nested follow-ups must use the same selected child sort mode whether or not other filters are active.');
+const sortContext={ui:{childDateMode:'last-created'},activityTimestamp:(item,mode)=>Date.parse(mode==='updated'?item.updatedAt:item.createdAt)};
+vm.runInNewContext(
+  html.slice(compareStart,compareEnd)+'\n'+html.slice(sortModeStart,sortModeEnd)+
+  '\nthis.childDateSortMode=childDateSortMode;this.sortChildrenByDate=sortChildrenByDate;',
+  sortContext
+);
+const sortFixtures=[
+  {id:'created-earlier-updated-later',createdAt:'2026-10-01T08:00:00Z',updatedAt:'2026-10-05T08:00:00Z'},
+  {id:'created-later-updated-earlier',createdAt:'2026-10-04T08:00:00Z',updatedAt:'2026-10-02T08:00:00Z'}
+];
+assert.deepEqual(sortContext.sortChildrenByDate(sortFixtures).map(item=>item.id),
+  ['created-later-updated-earlier','created-earlier-updated-later'],
+  'Last created must sort by creation time descending even when update-time order is the opposite.');
+sortContext.ui.childDateMode='created';
+assert.deepEqual(sortContext.sortChildrenByDate(sortFixtures).map(item=>item.id),
+  ['created-earlier-updated-later','created-later-updated-earlier'],
+  'Created must retain its oldest-first ordering.');
+sortContext.ui.childDateMode='updated';
+assert.deepEqual(sortContext.sortChildrenByDate(sortFixtures).map(item=>item.id),
+  ['created-earlier-updated-later','created-later-updated-earlier'],
+  'Last updated must continue to sort by update time descending.');
+
+console.log('Child search labels, date sorting, context-aware activity summaries, and Arabic activity localization tests passed.');

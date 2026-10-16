@@ -129,6 +129,7 @@ const itemHistoryMarkup=html.slice(historyBranchStart,historyBranchEnd);
 check(itemHistoryMarkup.includes('const historyReady=historyPopupReady(m.itemId,historyScope);')&&itemHistoryMarkup.includes('let events=historyReady?activitiesFor(m.itemId,historyScope):[]'),'Item history must render its loader before building events and wait for its exact item/scope response.');
 const globalHistoryMarkup=html.slice(historyBranchEnd,html.indexOf("} else if(m.kind==='archive')",historyBranchEnd));
 check(globalHistoryMarkup.includes('let events=applicationHistoryEvents.slice();')&&globalHistoryMarkup.includes('const visibleEvents=events;'),'Global history must render only fetched pages.');
+check(globalHistoryMarkup.includes("${query?events.length:applicationHistoryTotal}"), 'Global history count should show an integer count, not a loaded/total fraction.');
 check(globalHistoryMarkup.includes('application-history-scroll')&&html.includes('loadMoreApplicationHistory'),'Global history must load additional pages as the user reaches the end.');
 check(html.includes('applicationHistoryGeneration++;applicationHistoryPagePromise=null;applicationHistoryEvents=[];'), 'Reopening application history must not reuse an in-flight stale page promise.');
 check(html.includes('function loadRemainingApplicationHistoryForSearch()')&&html.includes('queryGlobalActivity({limit:APPLICATION_HISTORY_PAGE_SIZE,offset:Number(offset)||0})'),'Search must filter loaded pages and fetch the remainder with a loading indicator.');

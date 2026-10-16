@@ -89,6 +89,8 @@ const readinessContext = {
   applicationHistoryReady: false,
   applicationHistoryCacheInvalidated: false,
   applicationHistoryCacheIsComplete: () => readinessContext.applicationHistoryHasLoaded && readinessContext.applicationHistoryReady && !readinessContext.applicationHistoryCacheInvalidated,
+  restorePersistentRootActivityCache: () => false,
+  restoreCachedApplicationHistoryPage: () => false,
   allItem: id => ({ id: String(id), type: 'project' }),
   assignedItemCache: new Map(),
   ui: { modal: null },
@@ -98,10 +100,10 @@ vm.runInNewContext(
   html.slice(readinessStart, readinessEnd) + '\nthis.rootActivityReady = rootActivityReady; this.historyPopupReady = historyPopupReady;',
   readinessContext
 );
-assert.equal(readinessContext.rootActivityReady('project-2', 'all'), false,
-  'An incomplete application-history cache must not mark root Activity as loaded.');
+assert.equal(readinessContext.rootActivityReady('project-2', 'all'), true,
+  'A persisted first page allows the Activity tab to show its currently cached event count while more pages remain.');
 assert.equal(readinessContext.historyPopupReady('project-2', 'all'), false,
-  'An incomplete application-history cache must not satisfy item-popup readiness.');
+  'An incomplete application-history cache must not satisfy the full item-history popup.');
 readinessContext.applicationHistoryReady = true;
 assert.equal(readinessContext.rootActivityReady('project-2', 'all'), true,
   'A complete persistent application-history cache satisfies Activity readiness without a root-specific request.');

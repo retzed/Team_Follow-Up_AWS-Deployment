@@ -2011,8 +2011,10 @@ function spinnerMarkup(label=tr('loadingData'),compact=false){return `<div class
 function inlineSpinnerMarkup(){return `<span class="loading-count" role="status" aria-label="${esc(tr('loadingData'))}"><span class="loading-spinner inline" aria-hidden="true"></span></span>`;}
 function loadErrorMarkup(message=''){return `<div class="data-loading-error" role="alert"><span>${esc(message||tr('loadFailed'))}</span><button class="btn btn-small" type="button" data-action="retry-data-load">${esc(tr('retry'))}</button></div>`;}
 function rootChildrenReady(rootId){return dataLoadState.childrenLoaded.has(String(rootId));}
-function rootActivityReady(itemId,scope='all'){return dataLoadState.activityLoaded.has(`${String(itemId)}:${scope}`)||applicationHistoryReady;}
-function historyPopupReady(itemId,scope='all'){return dataLoadState.activityLoaded.has(`${String(itemId)}:${scope}`);}
+function historyRootIdFor(itemId){const key=String(itemId||'');const item=allItem(key)||assignedItemCache.get(key)||(ui.modal?.kind==='history'&&String(ui.modal.itemId)===key?ui.modal.itemSnapshot:null);if(!item)return key;const root=['project','job'].includes(item.type)?item:rootParent(item);return String(root?.id||item.rootParentId||item.id||key);}
+function rootActivityReady(itemId,scope='all'){return dataLoadState.activityLoaded.has(`${String(itemId)}:${scope}`);}
+function historyPopupReady(itemId,scope='all'){if(dataLoadState.activityLoaded.has(`${String(itemId)}:${scope}`))return true;const rootId=historyRootIdFor(itemId);return Boolean(rootId&&dataLoadState.activityLoaded.has(`${rootId}:all`));}
+function ensureActivityFromRootCache(itemId){const rootId=historyRootIdFor(itemId);if(!rootId||dataLoadState.activityLoaded.has(`${rootId}:all`))return Promise.resolve();return refreshActivityFor(rootId,'all');}
 function rootLoadingError(rootId,part){return (part==='activity'?dataLoadState.rootErrors.get(`${part}:${rootId}:all`):null)||dataLoadState.rootErrors.get(`${part}:${rootId}`)||'';}
 function rootPendingMarkup(rootId,part,label){const message=rootLoadingError(rootId,part);return message?loadErrorMarkup(message):spinnerMarkup(label,true);}
 function countValueMarkup(value,ready,rootId=null,part='children'){if(ready)return String(value);const error=(rootId?rootLoadingError(rootId,part):'')||dataLoadState.initialError||'';if(error)return `<button class="loading-inline-retry" type="button" data-action="retry-data-load" title="${esc(error)}">${icon('refresh-cw',12)} ${esc(tr('retry'))}</button>`;return `<span class="metric-loading-value">${inlineSpinnerMarkup()}</span>`;}
@@ -2358,7 +2360,7 @@ async function restoreSelectedArchive(){
   const rawMessage=String(error?.message||'');const displayMessage=/restore the parent item together|restore the parent first|parent item.+together/i.test(rawMessage)?tr('archiveParentRequired'):(rawMessage||tr('archiveRestoreFailed'));ui.modal={kind:'archive',loading:false,archiveItems:items,selectedIds:selected.filter(id=>items.some(x=>x.id===id)),error:displayMessage};render();toast(ui.modal.error,true);
  }
 }
-function openHistory(itemId){const key=String(itemId||'');if(!key)return;const loadedItem=allItem(key)||assignedItemCache.get(key);const item=loadedItem||{id:key,type:'task',name:key,parentId:null,rootParentId:String(ui.selectedParentId||key)};if(!loadedItem)console.warn('Opening item history before its local item metadata is hydrated; resolving from the API.',key);const historyScope=item.type==='followup'?'item':'all';ui.modal={kind:'history',itemId:key,itemSnapshot:allItem(key)?null:{...item},historyQuery:'',historyScope,historyRefreshError:''};renderModal();void refreshActivityFor(key,historyScope);}
+function openHistory(itemId){const key=String(itemId||'');if(!key)return;const loadedItem=allItem(key)||assignedItemCache.get(key);const item=loadedItem||{id:key,type:'task',name:key,parentId:null,rootParentId:String(ui.selectedParentId||key)};if(!loadedItem)console.warn('Opening item history before its local item metadata is hydrated; resolving from the API.',key);const historyScope=item.type==='followup'?'item':'all';ui.modal={kind:'history',itemId:key,itemSnapshot:allItem(key)?null:{...item},historyQuery:'',historyScope,historyRefreshError:''};renderModal();if(!historyPopupReady(key,historyScope))void ensureActivityFromRootCache(key);}
 function openApplicationHistory(){applicationHistoryReady=false;applicationHistoryError='';ui.modal={kind:'global-history',historyQuery:'',historyUserFilter:'all',historyVisibleCount:100,historyRefreshError:''};renderModal();void refreshApplicationHistory();}
 function openEdit(id){const item=allItem(id);if(!item)return;ui.modal={kind:'edit',itemId:id};renderModal();}
 function openNewParent(){ui.modal={kind:'new-parent',type:'project',focusNameOnOpen:true};renderModal();}
@@ -2405,7 +2407,7 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
   if(!item||!root)break;
   ui.selectedAssignedItemId=item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();
   let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}
-  renderParentList({skipRemote:true});renderDetail();void refreshActivityFor(root.id,'all');void refreshActivityFor(item.id,item.type==='followup'?'item':'all');
+  renderParentList({skipRemote:true});renderDetail();void refreshActivityFor(root.id,'all');
   void ensureRootChildrenLoaded(root.id).then(()=>{if(String(ui.selectedParentId)===String(root.id)&&!['project','job'].includes(item.type)){document.getElementById(`card-${item.id}`)?.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}});
   break;
  }
@@ -2437,7 +2439,7 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
   // Stay at the current scroll position; metrics only toggle the corresponding list filters.
   renderDetail();break;
  }
- case 'toggle-nested':{const itemId=id;if(ui.expanded.has(itemId))ui.expanded.delete(itemId);else{ui.expanded.add(itemId);const expandedItem=allItem(itemId);if(expandedItem)void refreshActivityFor(itemId,expandedItem.type==='followup'?'item':'all');}renderDetail();break;}
+ case 'toggle-nested':{const itemId=id;if(ui.expanded.has(itemId))ui.expanded.delete(itemId);else{ui.expanded.add(itemId);void ensureActivityFromRootCache(itemId);}renderDetail();break;}
  case 'toggle-child-search':ui.childSearchExpanded=!ui.childSearchExpanded;renderDetail();break;
  case 'clear-child-filters':clearChildFilters();break;
  case 'close-modal':ui.modal=null;renderModal();break;

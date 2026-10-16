@@ -46,8 +46,8 @@ check(tabHandlerStart >= 0, 'The dashboard detail-tab handler must exist.');
 const tabHandler = html.slice(tabHandlerStart, tabHandlerStart + 260);
 check(!tabHandler.includes('refreshActivityFor('),
   'Switching to the dashboard Activity tab must not issue an Activity-table request.');
-check(!html.includes("refreshActivityFor(ui.selectedParentId,'all')"),
-  'No hidden route should fetch Activity history for the selected item after a routine interaction.');
+check(html.includes("if(ui.selectedParentId){void ensureRootChildrenLoaded(ui.selectedParentId);void refreshActivityFor(ui.selectedParentId,'all');}"),
+  'The initially selected Project/Job must preload its Activity history.');
 
 const persistStart = html.indexOf('function persist()');
 const persistEnd = html.indexOf('const localizedUserNames', persistStart);

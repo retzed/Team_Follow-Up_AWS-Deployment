@@ -1341,7 +1341,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   return {...(result||{}),items:all,count:result?.count??all.length,nextOffset:null};
  }
  async function restoreArchive(itemIds){return request('POST','/archive/restore',{itemIds:[...new Set((itemIds||[]).map(String))]});}
- window.TeamFollowUpDataApi=Object.freeze({request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryRootItems,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive});
+ window.TeamFollowUpDataApi=Object.freeze({remoteApi:true,request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryRootItems,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive});
 })();
 </script>
 
@@ -2505,7 +2505,7 @@ function mergeRootChildrenRows(existingRows,rootId,incomingRows){
 }
 async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
  const rootId=String(rootParentId||'');if(!rootId)return;
- if(dataLoadState.childrenLoaded.has(rootId)&&!force&&window.TeamFollowUpDataApi?.mode!=='api')return;
+ if(dataLoadState.childrenLoaded.has(rootId)&&!force&&!window.TeamFollowUpDataApi?.remoteApi)return;
  if(rootChildrenRequests.has(rootId))return rootChildrenRequests.get(rootId);
  const api=window.TeamFollowUpDataApi;if(!api||typeof api.queryRootItems!=='function')return;
  dataLoadState.rootErrors.delete(`children:${rootId}`);

@@ -130,6 +130,7 @@ check(itemHistoryMarkup.includes('const historyReady=historyPopupReady(m.itemId,
 const globalHistoryMarkup=html.slice(historyBranchEnd,html.indexOf("} else if(m.kind==='archive')",historyBranchEnd));
 check(globalHistoryMarkup.includes('let events=applicationHistoryEvents.slice();')&&globalHistoryMarkup.includes('const visibleEvents=events;'),'Global history must render only fetched pages.');
 check(globalHistoryMarkup.includes('application-history-scroll')&&html.includes('loadMoreApplicationHistory'),'Global history must load additional pages as the user reaches the end.');
+check(html.includes('applicationHistoryGeneration++;applicationHistoryPagePromise=null;applicationHistoryEvents=[];'), 'Reopening application history must not reuse an in-flight stale page promise.');
 check(html.includes('function loadRemainingApplicationHistoryForSearch()')&&html.includes('queryGlobalActivity({limit:APPLICATION_HISTORY_PAGE_SIZE,offset:Number(offset)||0})'),'Search must filter loaded pages and fetch the remainder with a loading indicator.');
 check(html.includes('function applicationHistoryLoadTailMarkup()')&&html.includes('data-action="history-load-more"')&&html.includes("case 'history-load-more':"),'Global history must expose an incremental loading tail and load-more fallback.');
 check(html.includes('.data-loading-state.compact { justify-content:center;')&&html.includes('.history-card-list > .data-loading-state'),'Loading indicators in popup/card areas must be centered.');

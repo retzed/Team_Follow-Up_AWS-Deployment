@@ -1667,9 +1667,17 @@ let activityRootSnapshotCache={source:null,length:-1,revision:-1,byId:new Map()}
 let activityIdsNormalized=false;
 
 let applicationHistoryRequest=0;
+let applicationHistoryEvents=[];
+let applicationHistoryNextOffset=0;
+let applicationHistoryTotal=0;
+let applicationHistoryHasLoaded=false;
 let applicationHistoryReady=false;
 let applicationHistoryLoading=false;
 let applicationHistoryError='';
+let applicationHistoryGeneration=0;
+let applicationHistoryPagePromise=null;
+let applicationHistorySearchFillActive=false;
+const APPLICATION_HISTORY_PAGE_SIZE=100;
 function invalidateActivityIndexes(){activityIndexRevision++;activityIndexCache.source=null;activityRootSnapshotCache.source=null;historySearchCache.clear();}
 function ensureActivityRootSnapshotIndex(){
  const rows=Array.isArray(data.activity)?data.activity:[];
@@ -1782,12 +1790,15 @@ function renderModalPreservingInteraction(){
 function renderAfterActivityRefresh(itemId,scope){
  if(ui.modal?.kind==='global-history'){renderModalPreservingInteraction();}
  else if(ui.modal?.kind==='history'){
-  const modalItem=allItem(ui.modal.itemId);const modalRoot=rootParent(modalItem);
-  const belongs=String(ui.modal.itemId)===String(itemId)||(scope==='all'&&String(modalRoot?.id||'')===String(itemId)&&ui.modal.historyScope==='all');
+  const modalItemId=String(ui.modal.itemId||'');const modalRootId=historyRootIdFor(modalItemId);
+  const belongs=modalItemId===String(itemId)||(scope==='all'&&modalRootId===String(itemId));
   if(belongs){renderModalPreservingInteraction();return;}
  }
  if(ui.sidebarMode==='search')renderParentSearchList(filteredParents());
  const selected=data.parents.find(p=>String(p.id)===String(ui.selectedParentId));
+ if(selected&&scope==='all'&&String(selected.id)===String(itemId)){
+  const y=window.scrollY||0;renderDetail();window.scrollTo({top:y,left:0,behavior:'instant'});return;
+ }
  if(selected&&rootActivityReady(selected.id)&&ui.tab==='activity'){
   const y=window.scrollY||0;renderDetail();window.scrollTo({top:y,left:0,behavior:'instant'});
  }else if(selected&&ui.tab==='overview'){
@@ -1815,31 +1826,58 @@ async function refreshActivityFor(itemId,scope='all'){
   if(viewed){const message=String(error?.message||tr('loadFailed'));dataLoadState.rootErrors.set(`activity:${String(itemId)}:${scope}`,message);ui.modal.historyRefreshError=message;renderModal();}
  }
 }
-async function refreshApplicationHistory(silent=false){
- const api=window.TeamFollowUpDataApi;
- if(!api||typeof api.queryGlobalActivity!=='function'){applicationHistoryReady=true;applicationHistoryError='';return;}
+function refreshApplicationHistory(silent=false){
+ applicationHistoryGeneration++;applicationHistoryEvents=[];applicationHistoryNextOffset=0;applicationHistoryTotal=0;applicationHistoryHasLoaded=false;applicationHistoryReady=false;applicationHistoryError='';applicationHistorySearchFillActive=false;
+ return loadMoreApplicationHistory(silent);
+}
+function loadMoreApplicationHistory(silent=false){
+ if(applicationHistoryPagePromise)return applicationHistoryPagePromise;
+ if(applicationHistoryReady)return Promise.resolve(false);
+ const api=window.TeamFollowUpDataApi;if(!api||typeof api.queryGlobalActivity!=='function'){applicationHistoryReady=true;applicationHistoryHasLoaded=true;applicationHistoryError='';return Promise.resolve(false);}
+ const generation=applicationHistoryGeneration;const offset=applicationHistoryHasLoaded?applicationHistoryNextOffset:0;
+ if(offset===null&&applicationHistoryHasLoaded){applicationHistoryReady=true;return Promise.resolve(false);}
  const requestId=++applicationHistoryRequest;applicationHistoryLoading=true;
- if(ui.modal?.kind==='global-history'&&!silent)renderModal();
+ if(!silent&&ui.modal?.kind==='global-history')renderModalPreservingInteraction();
+ const promise=(async()=>{
+  try{
+   await apiPersistQueue.catch(()=>{});
+   const result=await api.queryGlobalActivity({limit:APPLICATION_HISTORY_PAGE_SIZE,offset:Number(offset)||0});
+   if(generation!==applicationHistoryGeneration||requestId!==applicationHistoryRequest)return false;
+   const incoming=(result?.events||result?.activity||[]).map(normalizeActivityEventForUi).filter(e=>e&&e.id&&Number.isFinite(Date.parse(e.at))&&Date.parse(e.at)<=Date.now());
+   const seen=new Set(applicationHistoryEvents.map(e=>String(e.id||e.eventId||'')));
+   for(const event of incoming){const id=String(event.id||event.eventId||'');if(!id||seen.has(id))continue;seen.add(id);applicationHistoryEvents.push(event);}
+   const changed=mergeActivityEventsIntoWorkspace(incoming);
+   if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],incoming);lastApiSnapshot.activity=merged.rows;}
+   applicationHistoryTotal=Number.isFinite(Number(result?.count))?Number(result.count):applicationHistoryEvents.length;
+   applicationHistoryNextOffset=result?.nextOffset===undefined?null:result.nextOffset;
+   applicationHistoryHasLoaded=true;applicationHistoryReady=applicationHistoryNextOffset===null;
+   applicationHistoryError='';
+   if(changed){try{if(typeof scheduleWorkspaceCacheSave==='function')scheduleWorkspaceCacheSave();}catch(e){}}
+   if(ui.sidebarMode==='search')renderParentSearchList(filteredParents());
+   const selected=data.parents.find(p=>String(p.id)===String(ui.selectedParentId));
+   if(selected&&ui.tab==='overview'){const list=$('#childItemsList');if(list)list.innerHTML=renderChildList(selected);updateNotCompletedMetricCount(selected);syncOverviewMetricPressed();}
+   return true;
+  }catch(error){
+   if(generation!==applicationHistoryGeneration||requestId!==applicationHistoryRequest)return false;
+   console.warn('Could not load the next application-wide Activity page.',error);
+   applicationHistoryError=String(error?.message||tr('loadFailed'));
+   return false;
+  }finally{
+   if(generation===applicationHistoryGeneration&&requestId===applicationHistoryRequest){applicationHistoryLoading=false;if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();}
+  }
+ })();
+ applicationHistoryPagePromise=promise;
+ return promise.finally(()=>{if(applicationHistoryPagePromise===promise)applicationHistoryPagePromise=null;});
+}
+async function loadRemainingApplicationHistoryForSearch(){
+ const generation=applicationHistoryGeneration;applicationHistorySearchFillActive=true;
+ if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();
  try{
-  await apiPersistQueue.catch(()=>{});
-  const result=await api.queryGlobalActivity();
-  if(requestId!==applicationHistoryRequest)return;
-  const incoming=Array.isArray(result?.events)?result.events:(Array.isArray(result?.activity)?result.activity:[]);
-  const changed=mergeActivityEventsIntoWorkspace(incoming);
-  if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],incoming);lastApiSnapshot.activity=merged.rows;}
-  applicationHistoryReady=true;applicationHistoryError='';
-  
-  if(ui.sidebarMode==='search')renderParentSearchList(filteredParents());
-  const selected=data.parents.find(p=>String(p.id)===String(ui.selectedParentId));
-  if(selected&&ui.tab==='overview'){const list=$('#childItemsList');if(list)list.innerHTML=renderChildList(selected);updateNotCompletedMetricCount(selected);syncOverviewMetricPressed();}
- }catch(error){
-  if(requestId!==applicationHistoryRequest)return;
-  console.warn('Could not load application-wide activity history.',error);
-  applicationHistoryError=String(error?.message||tr('loadFailed'));
-  // Existing project-scoped records remain usable, but show the global-source error explicitly.
-  applicationHistoryReady=(data.activity||[]).length>0;
+  while(generation===applicationHistoryGeneration&&ui.modal?.kind==='global-history'&&String(ui.modal.historyQuery||'').trim()&&!applicationHistoryReady&&!applicationHistoryError){
+   const loaded=await loadMoreApplicationHistory(true);if(!loaded&&applicationHistoryError)break;if(!loaded&&!applicationHistoryPagePromise&&!applicationHistoryReady)break;
+  }
  }finally{
-  if(requestId===applicationHistoryRequest){applicationHistoryLoading=false;if(ui.modal?.kind==='global-history')renderModal();}
+  if(generation===applicationHistoryGeneration){applicationHistorySearchFillActive=false;if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();}
  }
 }
 function persist(){

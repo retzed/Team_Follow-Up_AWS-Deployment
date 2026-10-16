@@ -179,4 +179,11 @@ check(modalPreserverStart>=0&&modalPreserverEnd>modalPreserverStart,'The modal i
 const modalPreserver=html.slice(modalPreserverStart,modalPreserverEnd);
 check(modalPreserver.includes('for(const selector of selectors) $$(selector,modalRoot).forEach')&&modalPreserver.includes('const nodes=$$(state.selector,modalRoot)'), 'Modal scroll preservation must query selector lists, not call forEach on querySelector results.');
 check(html.includes('#modalRoot .modal-head{direction:ltr!important;flex-direction:row!important}')&&html.includes('#modalRoot .modal-head>button[data-action="close-modal"]{margin-inline-start:auto!important;flex:0 0 auto}'), 'The modal close control is physically right-aligned on its first render in RTL and LTR.');
+
+const globalHistoryScrollStart=html.indexOf("addEventListener('scroll',ev=>{if(ui.modal?.kind!=='global-history'");
+const globalHistoryScrollEnd=html.indexOf('},true);',globalHistoryScrollStart);
+check(globalHistoryScrollStart>=0&&globalHistoryScrollEnd>globalHistoryScrollStart&&html.slice(globalHistoryScrollStart,globalHistoryScrollEnd).includes(".application-history-scroll")&&html.slice(globalHistoryScrollStart,globalHistoryScrollEnd).includes('void loadMoreApplicationHistory()'), 'Reaching the bottom of the application-wide history scroll region must request the next page.');
+const searchFillStart=html.indexOf('async function loadRemainingApplicationHistoryForSearch()');
+const searchFillEnd=html.indexOf('function scheduleWorkspaceCacheSave',searchFillStart);
+check(searchFillStart>=0&&searchFillEnd>searchFillStart&&html.slice(searchFillStart,searchFillEnd).includes('await loadMoreApplicationHistory(true)')&&html.slice(searchFillStart,searchFillEnd).includes('while(')&&html.includes('void loadRemainingApplicationHistoryForSearch()'), 'Searching application-wide history must continue loading pages until search coverage is complete or a recoverable error occurs.');
 console.log('Progressive-loading tests passed: lean bootstrap, selected-root child hydration, popup-only activity reads, retry safety, accessible spinners, archive pagination, and mobile history controls.');

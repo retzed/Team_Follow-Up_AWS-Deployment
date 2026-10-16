@@ -174,6 +174,17 @@ python -m http.server 8000 --directory dist
 
 Open [http://localhost:8000](http://localhost:8000). Keep the terminal running while testing. The frontend signs in directly with Cognito and sends API requests with a Cognito access token. Authentication, CORS, API Gateway, Lambda, team-user mappings, and DynamoDB must be configured first; starting the static server does not start the backend.
 
+## Client-side data cache and progressive loading
+
+The AWS-backed frontend persists successfully fetched table-backed API responses in the browser's persistent storage. The cache is namespaced and versioned separately from the demo database. On a later read, the client sends a lightweight conditional request with the cached version:
+- If the server version is unchanged, the API returns `notModified` and the frontend reuses the stored response instead of downloading the item collection or activity timeline again.
+- If a version changed, the endpoint returns the current response and new version; the frontend replaces the stored cache entry.
+- This covers enabled team profiles, top-level Projects/Jobs, root/child item queries (including pagination and filters), assigned-item queries, item-scoped Activity, application-wide Activity, and Archive pages.
+- Selecting a Project/Job and expanding a child loads that item's relevant Activity history automatically. Application-wide Activity is requested only when its popup opens.
+- Jobs do not display the Tasks metric/filter because Jobs contain Follow-ups only.
+
+This is a client-side performance cache, not the system of record: DynamoDB and the authenticated API remain authoritative. It is persistent per browser profile, so treat browser-profile access accordingly. A cache entry is reused only after the API confirms its version.
+
 ## API documentation
 
 The AWS-backed application uses a JSON HTTP API. The frontend sends authenticated requests to the configured `TEAM_FOLLOW_UP_API_BASE_URL`; API Gateway validates the Cognito JWT, and Lambda resolves the verified Cognito `sub` to one enabled team profile. All routes below require a valid mapped team identity. Send `Accept: application/json`; JSON request bodies use `Content-Type: application/json`.

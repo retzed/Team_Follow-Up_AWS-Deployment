@@ -2063,6 +2063,11 @@ async function loadRemainingApplicationHistoryForSearch(){
    applicationHistorySearchFillActive=false;
    synchronizeApplicationHistoryWithWorkspace();
    if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();
+  }else if(ui.modal?.kind==='global-history'&&!String(ui.modal.historyQuery||'').trim()&&String(ui.modal.historyUserFilter||'all')==='all'&&!applicationHistorySearchFillActive){
+   /* A page already in flight may finish after the user clears the search. Commit that
+      page as normal history and redraw rather than leaving the visible list/cache stale. */
+   synchronizeApplicationHistoryWithWorkspace();
+   renderModalPreservingInteraction();
   }
  }
 }

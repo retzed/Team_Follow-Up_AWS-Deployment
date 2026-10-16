@@ -684,7 +684,10 @@ def lambda_handler(event, context):
             version=cache_version(users)
             if qs.get('cacheMode')=='1' and qs.get('cacheVersion')==version:
                 return response(200,{'notModified':True,'version':version})
-            return response(200,{'users':users,'version':version})
+            payload={'users':users}
+            if qs.get('cacheMode')=='1':
+                payload['version']=version
+            return response(200,payload)
         if path=='/archive' and method=='GET':
             rows=all_pages(ARCHIVE,IndexName='GSI_ArchiveIndex',KeyConditionExpression=Key('archivePK').eq('ARCHIVE'),ScanIndexForward=False)
             item_type=qs.get('type','all')
@@ -703,7 +706,10 @@ def lambda_handler(event, context):
             version=cache_version(public_rows)
             if qs.get('cacheMode')=='1' and qs.get('cacheVersion')==version:
                 return response(200,{'notModified':True,'version':version})
-            return response(200,{'items':public_rows[offset:offset+limit],'count':total,'nextOffset':offset+limit if offset+limit<total else None,'version':version if qs.get('cacheMode')=='1' else None})
+            payload={'items':public_rows[offset:offset+limit],'count':total,'nextOffset':offset+limit if offset+limit<total else None}
+            if qs.get('cacheMode')=='1':
+                payload['version']=version
+            return response(200,payload)
         if path=='/archive/restore' and method=='POST':
             ids=body.get('itemIds')
             if not isinstance(ids,list) or not ids:
@@ -920,7 +926,10 @@ def lambda_handler(event, context):
             version=cache_version(public_events)
             if qs.get('cacheMode')=='1' and qs.get('cacheVersion')==version:
                 return response(200,{'notModified':True,'version':version})
-            return response(200,{'events':public_events,'count':len(public_events),'version':version})
+            payload={'events':public_events,'count':len(public_events)}
+            if qs.get('cacheMode')=='1':
+                payload['version']=version
+            return response(200,payload)
         if path=='/items' and method=='POST':
             item=dict(body)
             events=item.pop('activityEvents',[]) or []

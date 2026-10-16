@@ -70,4 +70,28 @@ assert.deepEqual(Array.from(sortContext.sortChildrenByDate(sortFixtures),item=>i
   ['created-earlier-updated-later','created-later-updated-earlier'],
   'Last updated must continue to sort by update time descending.');
 
+
+const timestampStart=html.indexOf('function activityTimestamp(');
+const timestampEnd=html.indexOf('function parentDate(',timestampStart);
+assert.ok(timestampStart>=0&&timestampEnd>timestampStart,'The indexed activity timestamp helper must exist.');
+let rootLookupCount=0;
+const slowRootEvent={};
+Object.defineProperty(slowRootEvent,'itemId',{get(){throw new Error('Child sorting scanned the entire Project/Job activity timeline.');}});
+const timestampContext={
+ ensureActivityIndex:()=>({
+  byRoot:new Map([['p1',[slowRootEvent]]]),
+  byId:new Map([['t1',[{id:'t1-created',itemId:'t1',at:'2026-10-05T08:00:00Z'}]]])
+ }),
+ rootParent:()=>{rootLookupCount++;throw new Error('A child sort should not resolve its root parent.');}
+};
+vm.runInNewContext(html.slice(timestampStart,timestampEnd)+'\nthis.activityTimestamp=activityTimestamp;',timestampContext);
+const indexedChildTime=timestampContext.activityTimestamp(
+ {id:'t1',type:'task',rootParentId:'p1',createdAt:'2026-10-01T08:00:00Z',updatedAt:'2026-10-02T08:00:00Z'},
+ 'updated','project'
+);
+assert.equal(indexedChildTime,Date.parse('2026-10-05T08:00:00Z'),
+  'A child timestamp uses the latest event indexed for that child.');
+assert.equal(rootLookupCount,0,
+  'Sorting child items must not repeatedly walk top-level parents to resolve their root.');
+
 console.log('Child search labels, date sorting, context-aware activity summaries, and Arabic activity localization tests passed.');

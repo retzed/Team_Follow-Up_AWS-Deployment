@@ -1181,6 +1181,20 @@ html[dir="rtl"] #signOutButton svg {
 @media(prefers-reduced-motion:reduce){.loading-spinner{animation:tfu-spinner-rotate 1s linear infinite!important}.loading-spinner.inline{animation:tfu-spinner-rotate 1s linear infinite!important}}
 .application-history-load-state .loading-spinner,.application-history-scroll .loading-spinner{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 10%,transparent)}
 </style>
+<style id="activity-history-single-scroll-owner">
+/* One vertical scroll owner for app-wide history prevents nested mobile card scrolling from
+   bypassing the scroll-to-load-more listener. */
+#modalRoot .modal.application-history-modal>.modal-content{display:flex!important;flex-direction:column!important;min-height:0!important;overflow:hidden!important}
+#modalRoot .modal.application-history-modal .application-history-scroll{display:block!important;flex:1 1 0!important;min-height:0!important;height:auto!important;max-height:none!important;overflow-x:auto!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+#modalRoot .modal.application-history-modal .history-table-wrap{overflow-x:auto!important;overflow-y:hidden!important;max-height:none!important}
+#modalRoot .modal.application-history-modal .history-card-list{display:flex!important;flex:0 0 auto!important;flex-direction:column!important;min-height:0!important;height:auto!important;max-height:none!important;overflow:visible!important}
+#modalRoot .modal.application-history-modal .application-history-scroll>.history-table-desktop,
+#modalRoot .modal.application-history-modal .application-history-scroll>.history-card-list{flex:0 0 auto!important}
+@media(max-width:700px){
+ #modalRoot .modal.application-history-modal .application-history-scroll{overflow-x:hidden!important;overflow-y:auto!important;touch-action:pan-y!important}
+ #modalRoot .modal.application-history-modal .history-card-list{flex:0 0 auto!important;overflow:visible!important;max-height:none!important}
+}
+</style>
 </head>
 <body>
 <section class="signin-screen" id="signInScreen" role="dialog" aria-modal="true" aria-labelledby="signInTitle" hidden>
@@ -1715,7 +1729,7 @@ let applicationHistoryLoading=false;
 let applicationHistoryError='';
 let applicationHistoryGeneration=0;
 let applicationHistoryPagePromise=null;
-let applicationHistorySearchFillActive=false;
+let applicationHistorySearchFillActive=false; let applicationHistorySearchRequest=0;
 let applicationHistoryRefreshingFirstPage=false;
 const APPLICATION_HISTORY_PAGE_SIZE=100;
 const APPLICATION_HISTORY_CACHE_KEY='team-follow-up-application-history-v1';
@@ -1960,34 +1974,49 @@ function refreshApplicationHistory(silent=false){
 function loadMoreApplicationHistory(silent=false){
  if(applicationHistoryPagePromise)return applicationHistoryPagePromise;
  if(applicationHistoryReady)return Promise.resolve(false);
- const api=window.TeamFollowUpDataApi;if(!api||typeof api.queryGlobalActivity!=='function'){applicationHistoryReady=true;applicationHistoryHasLoaded=true;applicationHistoryError='';return Promise.resolve(false);}
- const generation=applicationHistoryGeneration;const offset=applicationHistoryHasLoaded?applicationHistoryNextOffset:0;
+ const api=window.TeamFollowUpDataApi;
+ if(!api||typeof api.queryGlobalActivity!=='function'){applicationHistoryReady=true;applicationHistoryHasLoaded=true;applicationHistoryError='';return Promise.resolve(false);}
+ const generation=applicationHistoryGeneration;
+ const offset=applicationHistoryHasLoaded?applicationHistoryNextOffset:0;
  if(offset===null&&applicationHistoryHasLoaded){applicationHistoryReady=true;return Promise.resolve(false);}
- const requestId=++applicationHistoryRequest;applicationHistoryLoading=true;
+ const requestId=++applicationHistoryRequest;
+ applicationHistoryLoading=true;
  if(!silent&&ui.modal?.kind==='global-history'&&applicationHistoryHasLoaded)renderModalPreservingInteraction();
  const promise=(async()=>{
   try{
-   await apiPersistQueue.catch(()=>{});
-   let loadTimeout=0;const result=await Promise.race([
-    api.queryGlobalActivity({limit:APPLICATION_HISTORY_PAGE_SIZE,offset:Number(offset)||0}),
+   let loadTimeout=0;
+   const result=await Promise.race([
+    (async()=>{await apiPersistQueue.catch(()=>{});return api.queryGlobalActivity({limit:APPLICATION_HISTORY_PAGE_SIZE,offset:Number(offset)||0});})(),
     new Promise((resolve,reject)=>{loadTimeout=setTimeout(()=>reject(new Error(tr('activityLoadTimeout'))),25000);})
    ]).finally(()=>{if(loadTimeout)clearTimeout(loadTimeout);});
    if(generation!==applicationHistoryGeneration||requestId!==applicationHistoryRequest)return false;
    const incoming=(result?.events||result?.activity||[]).map(normalizeActivityEventForUi).filter(e=>e&&e.id&&Number.isFinite(Date.parse(e.at))&&Date.parse(e.at)<=Date.now());
-   if(applicationHistoryRefreshingFirstPage&&Number(offset)===0){applicationHistoryEvents=[];applicationHistoryRefreshingFirstPage=false;}
+   const replacesFirstPage=applicationHistoryRefreshingFirstPage&&Number(offset)===0;
+   if(replacesFirstPage){applicationHistoryEvents=[];applicationHistoryRefreshingFirstPage=false;}
+   const countBeforeAppend=applicationHistoryEvents.length;
    const seen=new Set(applicationHistoryEvents.map(e=>String(e.id||e.eventId||'')));
    for(const event of incoming){const id=String(event.id||event.eventId||'');if(!id||seen.has(id))continue;seen.add(id);applicationHistoryEvents.push(event);}
-   const changed=mergeActivityEventsIntoWorkspace(incoming);
-   if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],incoming);lastApiSnapshot.activity=merged.rows;}
+   const addedCount=applicationHistoryEvents.length-countBeforeAppend;
+   if(!silent&&!replacesFirstPage&&countBeforeAppend>0&&addedCount>0&&ui.modal?.kind==='global-history'&&!String(ui.modal.historyQuery||'').trim()&&!applicationHistorySearchFillActive){
+    ui.modal.historyVisibleCount=Math.max(100,Number(ui.modal.historyVisibleCount)||100)+addedCount;
+   }
+   const changed=silent?false:mergeActivityEventsIntoWorkspace(incoming);
+   if(lastApiSnapshot&&!silent){const merged=mergeActivityRows(lastApiSnapshot.activity||[],incoming);lastApiSnapshot.activity=merged.rows;}
    applicationHistoryTotal=Number.isFinite(Number(result?.count))?Number(result.count):applicationHistoryEvents.length;
    applicationHistoryNextOffset=result?.nextOffset===undefined?null:result.nextOffset;
-   applicationHistoryHasLoaded=true;applicationHistoryReady=applicationHistoryNextOffset===null;
-   applicationHistoryError='';applicationHistoryCacheChecked=true;applicationHistoryCacheInvalidated=false;saveApplicationHistoryCache();
-   if(changed){try{if(typeof scheduleWorkspaceCacheSave==='function')scheduleWorkspaceCacheSave();}catch(e){}}
-   if(ui.sidebarMode==='search')renderParentSearchList(filteredParents());
-   const selected=data.parents.find(p=>String(p.id)===String(ui.selectedParentId));
-   if(selected){const activityCount=$('#mainContent [data-tab="activity"] .tab-count');if(activityCount)activityCount.textContent=String(activitiesFor(selected.id).length);}
-   if(selected&&ui.tab==='overview'){const list=$('#childItemsList');if(list)list.innerHTML=renderChildList(selected);updateNotCompletedMetricCount(selected);syncOverviewMetricPressed();}
+   applicationHistoryHasLoaded=true;
+   applicationHistoryReady=applicationHistoryNextOffset===null;
+   applicationHistoryError='';
+   applicationHistoryCacheChecked=true;
+   applicationHistoryCacheInvalidated=false;
+   if(!silent)saveApplicationHistoryCache();
+   if(changed){try{if(typeof scheduleWorkspaceCacheSave==='function')scheduleWorkspaceCacheSave();}catch(error){}}
+   if(!silent){
+    if(ui.sidebarMode==='search')renderParentSearchList(filteredParents());
+    const selected=data.parents.find(p=>String(p.id)===String(ui.selectedParentId));
+    if(selected){const activityCount=$('#mainContent [data-tab="activity"] .tab-count');if(activityCount)activityCount.textContent=String(activitiesFor(selected.id).length);}
+    if(selected&&ui.tab==='overview'){const list=$('#childItemsList');if(list)list.innerHTML=renderChildList(selected);updateNotCompletedMetricCount(selected);syncOverviewMetricPressed();}
+   }
    return true;
   }catch(error){
    if(generation!==applicationHistoryGeneration||requestId!==applicationHistoryRequest)return false;
@@ -1995,21 +2024,46 @@ function loadMoreApplicationHistory(silent=false){
    applicationHistoryError=String(error?.message||tr('loadFailed'));
    return false;
   }finally{
-   if(generation===applicationHistoryGeneration&&requestId===applicationHistoryRequest){applicationHistoryLoading=false;if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();}
+   if(generation===applicationHistoryGeneration&&requestId===applicationHistoryRequest){
+    applicationHistoryLoading=false;
+    if(!silent&&ui.modal?.kind==='global-history')renderModalPreservingInteraction();
+   }
   }
  })();
  applicationHistoryPagePromise=promise;
  return promise.finally(()=>{if(applicationHistoryPagePromise===promise)applicationHistoryPagePromise=null;});
 }
+function synchronizeApplicationHistoryWithWorkspace(){
+ const changed=mergeActivityEventsIntoWorkspace(applicationHistoryEvents);
+ if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],applicationHistoryEvents);lastApiSnapshot.activity=merged.rows;}
+ if(changed){try{if(typeof scheduleWorkspaceCacheSave==='function')scheduleWorkspaceCacheSave();}catch(error){}}
+ saveApplicationHistoryCache();
+ if(ui.sidebarMode==='search')renderParentSearchList(filteredParents());
+ const selected=data.parents.find(p=>String(p.id)===String(ui.selectedParentId));
+ if(selected){const activityCount=$('#mainContent [data-tab="activity"] .tab-count');if(activityCount)activityCount.textContent=String(activitiesFor(selected.id).length);}
+ if(selected&&ui.tab==='overview'){const list=$('#childItemsList');if(list)list.innerHTML=renderChildList(selected);updateNotCompletedMetricCount(selected);syncOverviewMetricPressed();}
+}
 async function loadRemainingApplicationHistoryForSearch(){
- const generation=applicationHistoryGeneration;applicationHistorySearchFillActive=true;
+ const searchQuery=String(ui.modal?.historyQuery||'').trim();
+ const searchUser=String(ui.modal?.historyUserFilter||'all');
+ if(!searchQuery&&searchUser==='all')return;
+ const searchRequest=++applicationHistorySearchRequest;
+ applicationHistorySearchFillActive=true;
  if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();
  try{
-  while(generation===applicationHistoryGeneration&&ui.modal?.kind==='global-history'&&String(ui.modal.historyQuery||'').trim()&&!applicationHistoryReady&&!applicationHistoryError){
-   const loaded=await loadMoreApplicationHistory(true);if(!loaded&&applicationHistoryError)break;if(!loaded&&!applicationHistoryPagePromise&&!applicationHistoryReady)break;
+  while(searchRequest===applicationHistorySearchRequest&&ui.modal?.kind==='global-history'&&String(ui.modal.historyQuery||'').trim()===searchQuery&&String(ui.modal.historyUserFilter||'all')===searchUser&&!applicationHistoryReady&&!applicationHistoryError){
+   /* Yield between requests so searching never monopolizes the browser's main thread. */
+   await new Promise(resolve=>setTimeout(resolve,0));
+   if(searchRequest!==applicationHistorySearchRequest||ui.modal?.kind!=='global-history'||String(ui.modal.historyQuery||'').trim()!==searchQuery||String(ui.modal.historyUserFilter||'all')!==searchUser)break;
+   const loaded=await loadMoreApplicationHistory(true);
+   if(!loaded&&!applicationHistoryPagePromise&&!applicationHistoryReady)break;
   }
  }finally{
-  if(generation===applicationHistoryGeneration){applicationHistorySearchFillActive=false;if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();}
+  if(searchRequest===applicationHistorySearchRequest){
+   applicationHistorySearchFillActive=false;
+   synchronizeApplicationHistoryWithWorkspace();
+   if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();
+  }
  }
 }
 function persist(){
@@ -2451,13 +2505,13 @@ function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.mo
   if(selectedHistoryUser!=='all')events=events.filter(e=>String(e.userId||'')===selectedHistoryUser);
   const query=String(m.historyQuery||'').trim();
   if(query)events=events.filter(e=>historyQueryMatches(e,query,true));
-  const visibleLimit=events.length;
-  const visibleEvents=events;
+  const visibleLimit=Math.max(100,Number(m.historyVisibleCount)||100);
+  const visibleEvents=events.slice(0,visibleLimit);
   const tableMarkup=visibleEvents.length?`<table class="history-table application-history-table"><colgroup><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:28%"><col style="width:28%"><col style="width:auto"></colgroup><thead><tr><th>${esc(tr('time'))}</th><th>${esc(tr('date'))}</th><th>${esc(tr('user'))}</th><th>${esc(tr('parentItem'))}</th><th>${esc(tr('childItem'))}</th><th>${esc(tr('action'))}</th></tr></thead><tbody>${visibleEvents.map(e=>{const subject=historySubjectData(e);return `<tr><td class="history-time-cell">${esc(fmtTime(e.at))}</td><td class="history-date-cell">${esc(fmtDate(e.at,{year:'numeric',month:'short',day:'numeric'}))}</td><td>${historyUserMarkup(e)}</td><td>${historySubjectMarkup(subject.parentName,subject.parentType)}</td><td>${subject.isParent?'<span class="history-dash">—</span>':historySubjectMarkup(subject.childName,subject.childType)}</td><td class="history-action-cell"><div class="history-action">${esc(historyActionLabel(e))}</div></td></tr>`;}).join('')}</tbody></table>`:error?loadErrorMarkup(error):pending?spinnerMarkup(tr('loadingActivity')):`<div class="history-empty">${esc(tr('noActivity'))}</div>`;
   const cardsMarkup=visibleEvents.length?visibleEvents.map(e=>{const subject=historySubjectData(e);return `<article class="history-event-card"><div class="history-event-head"><span class="history-event-datetime"><span><b>${esc(tr('time'))}</b> ${esc(fmtTime(e.at))}</span><span><b>${esc(tr('date'))}</b> ${esc(fmtDate(e.at,{year:'numeric',month:'short',day:'numeric'}))}</span></span>${historyUserMarkup(e)}</div><div class="history-event-action"><b>${esc(tr('parentItem'))}</b> ${historySubjectMarkup(subject.parentName,subject.parentType)}</div><div class="history-event-action"><b>${esc(tr('childItem'))}</b> ${subject.isParent?'<span class="history-dash">—</span>':historySubjectMarkup(subject.childName,subject.childType)}</div><div class="history-event-subject"><b>${esc(tr('action'))}</b> ${esc(historyActionLabel(e))}</div></article>`;}).join(''):error?loadErrorMarkup(error):pending?spinnerMarkup(tr('loadingActivity')):`<div class="history-empty">${esc(tr('noActivity'))}</div>`;
   const selectedUser=String(m.historyUserFilter||'all');
   const userFilterOptions=`<select id="historyUserFilter" class="application-history-user-filter" aria-label="${esc(tr('user'))}"><option value="all" ${selectedUser==='all'?'selected':''}>${esc(tr('allUsers'))}</option>${data.users.map(raw=>{const u=person(raw.id);return `<option value="${esc(u.id)}" ${selectedUser===String(u.id)?'selected':''}>${esc(u.name)}</option>`;}).join('')}</select>`;
-  content=`${error?`<div class="archive-error" role="status">${esc(error)}</div>`:''}<div class="history-controls application-history-controls"><input id="historyQuery" type="search" class="application-history-search" value="${esc(m.historyQuery||'')}" autocomplete="off" aria-label="${esc(tr('searchApplicationHistory'))}" placeholder="${esc(tr('searchApplicationHistory'))}">${userFilterOptions}<span class="count-badge application-history-count">${applicationHistoryHasLoaded?`${query?events.length:applicationHistoryTotal} ${esc(tr('historyCount'))}`:query?`${events.length} ${esc(tr('historyCount'))}`:esc(tr('loadingActivity'))}</span></div><div class="history-search-hint">${esc(tr('searchApplicationHistory'))}</div><div class="application-history-scroll" data-history-scroll><div class="history-table-desktop history-table-wrap">${tableMarkup}</div><div class="history-card-list">${cardsMarkup}</div></div>${applicationHistoryLoadTailMarkup()}`;
+  content=`${error?`<div class="archive-error" role="status">${esc(error)}</div>`:''}<div class="history-controls application-history-controls"><input id="historyQuery" type="search" class="application-history-search" value="${esc(m.historyQuery||'')}" autocomplete="off" aria-label="${esc(tr('searchApplicationHistory'))}" placeholder="${esc(tr('searchApplicationHistory'))}">${userFilterOptions}<span class="count-badge application-history-count">${applicationHistoryHasLoaded?`${query?events.length:applicationHistoryTotal} ${esc(tr('historyCount'))}`:query?`${events.length} ${esc(tr('historyCount'))}`:esc(tr('loadingActivity'))}</span></div><div class="history-search-hint">${esc(tr('searchApplicationHistory'))}</div><div class="application-history-scroll" data-history-scroll data-visible-count="${visibleEvents.length}" data-matched-count="${events.length}"><div class="history-table-desktop history-table-wrap">${tableMarkup}</div><div class="history-card-list">${cardsMarkup}</div></div>${applicationHistoryLoadTailMarkup()}`;
   footer=`<div class="modal-footer"><span></span><div class="right"><button class="btn btn-primary" type="button" data-action="close-modal">${esc(tr('close'))}</button></div></div>`;
  } else if(m.kind==='archive'){
   title=tr('archive');subtitle='';wide=true;
@@ -2521,6 +2575,30 @@ function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.mo
   const contentNode=existingModal.querySelector('.modal-content');if(contentNode)contentNode.innerHTML=content;
   const footerNode=existingModal.querySelector('.modal-footer');if(footerNode)footerNode.innerHTML=footer;
  }else root.innerHTML=modalMarkup;
+ const modalHead=root.querySelector('.modal-head');
+ if(modalHead){
+  modalHead.style.setProperty('display','flex','important');
+  modalHead.style.setProperty('direction','ltr','important');
+  modalHead.style.setProperty('flex-direction','row','important');
+  modalHead.style.setProperty('justify-content','space-between','important');
+  modalHead.style.setProperty('align-items','flex-start','important');
+  const headingContent=modalHead.querySelector(':scope > div');
+  if(headingContent){
+   headingContent.style.setProperty('flex','1 1 auto','important');
+   headingContent.style.setProperty('min-width','0','important');
+   headingContent.style.setProperty('direction',ui.lang==='ar'?'rtl':'ltr','important');
+   headingContent.style.setProperty('text-align',ui.lang==='ar'?'right':'left','important');
+  }
+  const closeControl=modalHead.querySelector('button[data-action="close-modal"]');
+  if(closeControl){
+   closeControl.style.setProperty('margin-left','auto','important');
+   closeControl.style.setProperty('margin-right','0','important');
+   closeControl.style.setProperty('order','2','important');
+   closeControl.style.setProperty('flex','0 0 auto','important');
+   closeControl.style.setProperty('align-self','flex-start','important');
+   closeControl.style.setProperty('direction','ltr','important');
+  }
+ }
  if(m.focusNameOnOpen){m.focusNameOnOpen=false;const nameInput=$('#formName');if(nameInput)nameInput.focus({preventScroll:true});}
 }
 let toastTimer;
@@ -2652,9 +2730,22 @@ window.addEventListener('resize',()=>{const mobile=isMobileSidebarViewport();if(
 $('#app').addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.parent-card[tabindex="0"]')&&!ev.target.querySelector(':focus')){ev.preventDefault();handleAction(ev.target);}});
 $('#modalRoot').addEventListener('click',ev=>{const actionEl=ev.target.closest('[data-action]');if(actionEl){if(actionEl.dataset.action==='backdrop-close'&&ev.target!==actionEl)return;if(actionEl.dataset.action==='backdrop-close'){ui.modal=null;renderModal();return;}ev.preventDefault();handleAction(actionEl);}});
 $('#modalRoot').addEventListener('submit',ev=>{if(ev.target.id==='itemForm'){ev.preventDefault();handleItemSubmit(ev.target);}});
-$('#modalRoot').addEventListener('scroll',ev=>{if(ui.modal?.kind!=='global-history'||!ev.target?.matches?.('.application-history-scroll'))return;const scroller=ev.target;if(scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<180&&!applicationHistoryLoading&&!applicationHistoryReady)void loadMoreApplicationHistory();},true);
+$('#modalRoot').addEventListener('scroll',ev=>{
+ if(ui.modal?.kind!=='global-history')return;
+ const scroller=ev.target?.closest?.('.application-history-scroll');
+ if(!scroller||!$('#modalRoot').contains(scroller))return;
+ if(scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight>=180||applicationHistoryLoading||applicationHistorySearchFillActive)return;
+ const visibleCount=Number(scroller.dataset.visibleCount||0);
+ const matchedCount=Number(scroller.dataset.matchedCount||0);
+ if(visibleCount<matchedCount){
+  ui.modal.historyVisibleCount=Math.max(100,Number(ui.modal.historyVisibleCount)||100)+100;
+  renderModalPreservingInteraction();
+  return;
+ }
+ if(!applicationHistoryReady)void loadMoreApplicationHistory();
+},true);
 $('#modalRoot').addEventListener('toggle',ev=>{const details=ev.target.closest('.archive-disclosure[data-archive-node]');if(!details||ui.modal?.kind!=='archive')return;const key=details.dataset.archiveNode;const set=new Set(ui.modal.expandedArchiveNodes||[]);if(details.open)set.add(key);else set.delete(key);ui.modal.expandedArchiveNodes=[...set];},true);
-$('#modalRoot').addEventListener('change',ev=>{if(ev.target.id==='historyUserFilter'&&ui.modal?.kind==='global-history'){ui.modal.historyUserFilter=ev.target.value||'all';ui.modal.historyVisibleCount=100;renderModal();$('#historyUserFilter')?.focus({preventScroll:true});if(String(ui.modal.historyQuery||'').trim())void loadRemainingApplicationHistoryForSearch();return;}const checkbox=ev.target.closest('.archive-select');if(!checkbox||ui.modal?.kind!=='archive')return;const id=String(checkbox.dataset.archiveId);const scroller=$('.archive-groups');const top=scroller?.scrollTop||0;const left=scroller?.scrollLeft||0;const openKeys=[...$('#modalRoot').querySelectorAll('.archive-disclosure[data-archive-node][open]')].map(el=>el.dataset.archiveNode);ui.modal.expandedArchiveNodes=[...new Set(openKeys)];const selected=new Set(ui.modal.selectedIds||[]);if(checkbox.checked)selected.add(id);else selected.delete(id);ui.modal.selectedIds=[...selected];renderModal();const next=$('.archive-groups');if(next){next.scrollTop=top;next.scrollLeft=left;}const restored=$(`#modalRoot .archive-select[data-archive-id="${CSS.escape(id)}"]`);if(restored)restored.focus({preventScroll:true});});
+$('#modalRoot').addEventListener('change',ev=>{if(ev.target.id==='historyUserFilter'&&ui.modal?.kind==='global-history'){applicationHistorySearchRequest++;ui.modal.historyUserFilter=ev.target.value||'all';ui.modal.historyVisibleCount=100;renderModal();$('#historyUserFilter')?.focus({preventScroll:true});if(String(ui.modal.historyQuery||'').trim()||String(ui.modal.historyUserFilter||'all')!=='all')void loadRemainingApplicationHistoryForSearch();else{applicationHistorySearchFillActive=false;synchronizeApplicationHistoryWithWorkspace();renderModalPreservingInteraction();}return;}const checkbox=ev.target.closest('.archive-select');if(!checkbox||ui.modal?.kind!=='archive')return;const id=String(checkbox.dataset.archiveId);const scroller=$('.archive-groups');const top=scroller?.scrollTop||0;const left=scroller?.scrollLeft||0;const openKeys=[...$('#modalRoot').querySelectorAll('.archive-disclosure[data-archive-node][open]')].map(el=>el.dataset.archiveNode);ui.modal.expandedArchiveNodes=[...new Set(openKeys)];const selected=new Set(ui.modal.selectedIds||[]);if(checkbox.checked)selected.add(id);else selected.delete(id);ui.modal.selectedIds=[...selected];renderModal();const next=$('.archive-groups');if(next){next.scrollTop=top;next.scrollLeft=left;}const restored=$(`#modalRoot .archive-select[data-archive-id="${CSS.escape(id)}"]`);if(restored)restored.focus({preventScroll:true});});
 $('#langToggle').addEventListener('click',()=>{ui.lang=ui.lang==='en'?'ar':'en';render();});
 $('#themeToggle').addEventListener('click',()=>{ui.theme=ui.theme==='light'?'dark':'light';document.documentElement.dataset.theme=ui.theme;applyTranslations();});
 $('#newParentTop').addEventListener('click',openNewParent);
@@ -2682,7 +2773,27 @@ $('#modalRoot').addEventListener('change',ev=>{
   syncAssigneeControl(type);
  }
 });
-$('#modalRoot').addEventListener('input',ev=>{if(!ui.modal||!['history','global-history'].includes(ui.modal.kind)||ev.target.id!=='historyQuery')return;const pos=ev.target.selectionStart;ui.modal.historyQuery=ev.target.value;if(ui.modal.kind==='global-history')ui.modal.historyVisibleCount=100;if(historySearchTimer)clearTimeout(historySearchTimer);const modalKind=ui.modal.kind;historySearchTimer=setTimeout(()=>{if(!ui.modal||ui.modal.kind!==modalKind)return;renderModal();const input=$('#historyQuery');if(input){input.focus({preventScroll:true});if(typeof input.setSelectionRange==='function')input.setSelectionRange(pos,pos);}if(modalKind==='global-history'&&String(ui.modal.historyQuery||'').trim())void loadRemainingApplicationHistoryForSearch();},90);});
+$('#modalRoot').addEventListener('input',ev=>{
+ if(!ui.modal||!['history','global-history'].includes(ui.modal.kind)||ev.target.id!=='historyQuery')return;
+ const pos=ev.target.selectionStart;ui.modal.historyQuery=ev.target.value;
+ if(ui.modal.kind==='global-history'){
+  applicationHistorySearchRequest++;
+  ui.modal.historyVisibleCount=100;
+  if(!String(ui.modal.historyQuery||'').trim()&&String(ui.modal.historyUserFilter||'all')==='all')applicationHistorySearchFillActive=false;
+ }
+ if(historySearchTimer)clearTimeout(historySearchTimer);
+ const modalKind=ui.modal.kind;
+ historySearchTimer=setTimeout(()=>{
+  if(!ui.modal||ui.modal.kind!==modalKind)return;
+  renderModal();
+  const input=$('#historyQuery');
+  if(input){input.focus({preventScroll:true});if(typeof input.setSelectionRange==='function')input.setSelectionRange(pos,pos);}
+  if(modalKind==='global-history'){
+   if(String(ui.modal.historyQuery||'').trim()||String(ui.modal.historyUserFilter||'all')!=='all')void loadRemainingApplicationHistoryForSearch();
+   else {applicationHistorySearchFillActive=false;synchronizeApplicationHistoryWithWorkspace();renderModalPreservingInteraction();}
+  }
+ },90);
+});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&ui.modal){ui.modal=null;renderModal();}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='k'){ev.preventDefault();$('#parentQuery').focus();}});
 // Cognito sign-in is handled by the pre-auth gate. Never accept a local username/password here.
 function setSignInState(signedIn){

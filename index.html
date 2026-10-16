@@ -1182,17 +1182,17 @@ html[dir="rtl"] #signOutButton svg {
 .application-history-load-state .loading-spinner,.application-history-scroll .loading-spinner{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 10%,transparent)}
 </style>
 <style id="activity-history-single-scroll-owner">
-/* One vertical scroll owner for app-wide history prevents nested mobile card scrolling from
-   bypassing the scroll-to-load-more listener. */
-#modalRoot .modal.application-history-modal>.modal-content{display:flex!important;flex-direction:column!important;min-height:0!important;overflow:hidden!important}
+/* The app-wide history has exactly one vertical scroll owner. The desktop table and
+   mobile cards are mutually exclusive representations of the same events. */
+#modalRoot .modal.application-history-modal>.modal-content{display:flex!important;flex-direction:column!important;min-height:0!important;min-width:0!important;overflow:hidden!important}
 #modalRoot .modal.application-history-modal .application-history-scroll{display:block!important;flex:1 1 0!important;min-width:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;min-height:0!important;height:auto!important;max-height:none!important;overflow-x:auto!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;touch-action:pan-y;-webkit-overflow-scrolling:touch}
-#modalRoot .modal.application-history-modal .history-table-wrap{overflow:visible!important;max-height:none!important}
-#modalRoot .modal.application-history-modal .history-card-list{display:flex!important;flex:0 0 auto!important;flex-direction:column!important;min-height:0!important;height:auto!important;max-height:none!important;overflow:visible!important}
-#modalRoot .modal.application-history-modal .application-history-scroll>.history-table-desktop,
-#modalRoot .modal.application-history-modal .application-history-scroll>.history-card-list{flex:0 0 auto!important}
+#modalRoot .modal.application-history-modal .history-table-desktop{display:block!important;flex:0 0 auto!important;min-width:0}
+#modalRoot .modal.application-history-modal .history-table-wrap{overflow:visible!important;max-height:none!important;min-width:0}
+#modalRoot .modal.application-history-modal .history-card-list{display:none!important;flex:0 0 auto!important;flex-direction:column!important;min-width:0;min-height:0!important;height:auto!important;max-height:none!important;overflow:visible!important}
 @media(max-width:700px){
  #modalRoot .modal.application-history-modal .application-history-scroll{overflow-x:hidden!important;overflow-y:auto!important;touch-action:pan-y!important}
- #modalRoot .modal.application-history-modal .history-card-list{flex:0 0 auto!important;overflow:visible!important;max-height:none!important}
+ #modalRoot .modal.application-history-modal .history-table-desktop{display:none!important}
+ #modalRoot .modal.application-history-modal .history-card-list{display:flex!important;flex:0 0 auto!important;overflow:visible!important;max-height:none!important}
 }
 </style>
 </head>
@@ -2583,25 +2583,29 @@ function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.mo
  }else root.innerHTML=modalMarkup;
  const modalHead=root.querySelector('.modal-head');
  if(modalHead){
-  modalHead.style.setProperty('display','flex','important');
+  /* Grid columns bind the dismiss button to the physical right column regardless of
+     the inherited document direction or a heading's Arabic text direction. */
+  modalHead.style.setProperty('display','grid','important');
+  modalHead.style.setProperty('grid-template-columns','minmax(0,1fr) auto','important');
+  modalHead.style.setProperty('grid-template-rows','auto','important');
   modalHead.style.setProperty('direction','ltr','important');
-  modalHead.style.setProperty('flex-direction','row','important');
-  modalHead.style.setProperty('justify-content','space-between','important');
-  modalHead.style.setProperty('align-items','flex-start','important');
+  modalHead.style.setProperty('align-items','start','important');
   const headingContent=modalHead.querySelector(':scope > div');
   if(headingContent){
-   headingContent.style.setProperty('flex','1 1 auto','important');
+   headingContent.style.setProperty('grid-column','1','important');
+   headingContent.style.setProperty('grid-row','1','important');
    headingContent.style.setProperty('min-width','0','important');
+   headingContent.style.setProperty('justify-self','stretch','important');
    headingContent.style.setProperty('direction',ui.lang==='ar'?'rtl':'ltr','important');
    headingContent.style.setProperty('text-align',ui.lang==='ar'?'right':'left','important');
   }
   const closeControl=modalHead.querySelector('button[data-action="close-modal"]');
   if(closeControl){
-   closeControl.style.setProperty('margin-left','auto','important');
-   closeControl.style.setProperty('margin-right','0','important');
-   closeControl.style.setProperty('order','2','important');
-   closeControl.style.setProperty('flex','0 0 auto','important');
-   closeControl.style.setProperty('align-self','flex-start','important');
+   closeControl.style.setProperty('grid-column','2','important');
+   closeControl.style.setProperty('grid-row','1','important');
+   closeControl.style.setProperty('justify-self','end','important');
+   closeControl.style.setProperty('align-self','start','important');
+   closeControl.style.setProperty('margin','0','important');
    closeControl.style.setProperty('direction','ltr','important');
   }
  }

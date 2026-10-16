@@ -2214,10 +2214,9 @@ function activityTimestamp(item,mode,source='application'){
  const index=ensureActivityIndex();const itemId=String(item?.id||'');
  if(!itemId)return 0;
  const isRoot=item?.type==='project'||item?.type==='job';
- const rootId=String(isRoot?itemId:(rootParent(item)?.id||item?.rootParentId||''));
- // These lists are already sorted by timestamp and ID in ensureActivityIndex. Never sort the
- // entire project history from inside a list comparator: doing so made search/render quadratic.
- const timeline=(isRoot||source==='project')?(index.byRoot.get(rootId)||[]):(index.byId.get(itemId)||[]);
+ // Root timestamps come from the root timeline; every child uses its own pre-indexed events.
+ // List comparators call this repeatedly, so never walk a whole Project/Job timeline here.
+ const timeline=isRoot?(index.byRoot.get(itemId)||[]):(index.byId.get(itemId)||[]);
  const fallback=Date.parse(mode==='updated'?item?.updatedAt:item?.createdAt);
  if(mode==='created'){
   for(const event of timeline){

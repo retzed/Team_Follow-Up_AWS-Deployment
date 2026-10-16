@@ -1142,6 +1142,13 @@ html[dir="rtl"] #signOutButton svg {
 .history-load-more-wrap .btn{min-width:150px}
 .history-table-wrap>.data-loading-state,.history-card-list>.data-loading-state{justify-content:center;text-align:center;width:100%;box-sizing:border-box}
 </style>
+
+<style id="application-history-infinite-scroll">
+.application-history-scroll{max-height:min(58vh,680px);overflow:auto;overscroll-behavior:contain;min-height:180px;scrollbar-gutter:stable}
+.application-history-scroll .history-table-wrap{overflow-x:auto;overflow-y:visible;max-height:none}
+.application-history-load-state{display:flex;align-items:center;justify-content:center;padding:9px 4px 2px;min-height:34px}
+.application-history-load-state .data-loading-state{width:100%;justify-content:center;box-sizing:border-box}
+</style>
 </head>
 <body>
 <section class="signin-screen" id="signInScreen" role="dialog" aria-modal="true" aria-labelledby="signInTitle" hidden>
@@ -1826,6 +1833,11 @@ async function refreshActivityFor(itemId,scope='all'){
   if(viewed){const message=String(error?.message||tr('loadFailed'));dataLoadState.rootErrors.set(`activity:${String(itemId)}:${scope}`,message);ui.modal.historyRefreshError=message;renderModal();}
  }
 }
+function applicationHistoryLoadTailMarkup(){
+ if((applicationHistoryLoading&&applicationHistoryHasLoaded)||applicationHistorySearchFillActive)return `<div class="application-history-load-state">${spinnerMarkup(tr('loadingActivity'),true)}</div>`;
+ if(!applicationHistoryReady&&applicationHistoryHasLoaded&&!applicationHistoryError)return `<div class="history-load-more-wrap"><button class="btn btn-small" type="button" data-action="history-load-more">${esc(tr('loadMoreActivity'))}</button></div>`;
+ return '';
+}
 function refreshApplicationHistory(silent=false){
  applicationHistoryGeneration++;applicationHistoryEvents=[];applicationHistoryNextOffset=0;applicationHistoryTotal=0;applicationHistoryHasLoaded=false;applicationHistoryReady=false;applicationHistoryError='';applicationHistorySearchFillActive=false;
  return loadMoreApplicationHistory(silent);
@@ -2290,21 +2302,21 @@ function renderModal(){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='
  } else if(m.kind==='global-history'){
   wide=true;title=tr('applicationHistoryTitle');subtitle=tr('applicationHistorySubtitle');
   const error=m.historyRefreshError||applicationHistoryError;
-  const pending=!applicationHistoryReady&&!error;
-  // Render the popup shell before processing cached history; the full timeline can be large.
-  let events=pending?[]:(data.activity||[]).map(normalizeActivityEventForUi).filter(e=>e&&Number.isFinite(Date.parse(e.at))&&Date.parse(e.at)<=Date.now());
-  if(!pending)events.sort(stableNewestFirst);
+  const pending=!applicationHistoryHasLoaded&&!error;
+  // Use only application-wide pages already fetched, not events cached from individual root history.
+  let events=applicationHistoryEvents.slice();
+  events.sort(stableNewestFirst);
   const selectedHistoryUser=String(m.historyUserFilter||'all');
   if(selectedHistoryUser!=='all')events=events.filter(e=>String(e.userId||'')===selectedHistoryUser);
   const query=String(m.historyQuery||'').trim();
   if(query)events=events.filter(e=>historyQueryMatches(e,query,true));
-  const visibleLimit=Math.max(100,Number(m.historyVisibleCount)||100);
-  const visibleEvents=events.slice(0,visibleLimit);
+  const visibleLimit=events.length;
+  const visibleEvents=events;
   const tableMarkup=error?loadErrorMarkup(error):pending?spinnerMarkup(tr('loadingActivity'),true):visibleEvents.length?`<table class="history-table application-history-table"><colgroup><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:28%"><col style="width:28%"><col style="width:auto"></colgroup><thead><tr><th>${esc(tr('time'))}</th><th>${esc(tr('date'))}</th><th>${esc(tr('user'))}</th><th>${esc(tr('parentItem'))}</th><th>${esc(tr('childItem'))}</th><th>${esc(tr('action'))}</th></tr></thead><tbody>${visibleEvents.map(e=>{const subject=historySubjectData(e);return `<tr><td class="history-time-cell">${esc(fmtTime(e.at))}</td><td class="history-date-cell">${esc(fmtDate(e.at,{year:'numeric',month:'short',day:'numeric'}))}</td><td>${historyUserMarkup(e)}</td><td>${historySubjectMarkup(subject.parentName,subject.parentType)}</td><td>${subject.isParent?'<span class="history-dash">—</span>':historySubjectMarkup(subject.childName,subject.childType)}</td><td class="history-action-cell"><div class="history-action">${esc(historyActionLabel(e))}</div></td></tr>`;}).join('')}</tbody></table>`:error?loadErrorMarkup(error):pending?spinnerMarkup(tr('loadingActivity')):`<div class="history-empty">${esc(tr('noActivity'))}</div>`;
   const cardsMarkup=visibleEvents.length?visibleEvents.map(e=>{const subject=historySubjectData(e);return `<article class="history-event-card"><div class="history-event-head"><span class="history-event-datetime"><span><b>${esc(tr('time'))}</b> ${esc(fmtTime(e.at))}</span><span><b>${esc(tr('date'))}</b> ${esc(fmtDate(e.at,{year:'numeric',month:'short',day:'numeric'}))}</span></span>${historyUserMarkup(e)}</div><div class="history-event-action"><b>${esc(tr('parentItem'))}</b> ${historySubjectMarkup(subject.parentName,subject.parentType)}</div><div class="history-event-action"><b>${esc(tr('childItem'))}</b> ${subject.isParent?'<span class="history-dash">—</span>':historySubjectMarkup(subject.childName,subject.childType)}</div><div class="history-event-subject"><b>${esc(tr('action'))}</b> ${esc(historyActionLabel(e))}</div></article>`;}).join(''):error?loadErrorMarkup(error):pending?spinnerMarkup(tr('loadingActivity')):`<div class="history-empty">${esc(tr('noActivity'))}</div>`;
   const selectedUser=String(m.historyUserFilter||'all');
   const userFilterOptions=`<select id="historyUserFilter" class="application-history-user-filter" aria-label="${esc(tr('user'))}"><option value="all" ${selectedUser==='all'?'selected':''}>${esc(tr('allUsers'))}</option>${data.users.map(raw=>{const u=person(raw.id);return `<option value="${esc(u.id)}" ${selectedUser===String(u.id)?'selected':''}>${esc(u.name)}</option>`;}).join('')}</select>`;
-  content=`${error?`<div class="archive-error" role="status">${esc(error)}</div>`:''}<div class="history-controls application-history-controls"><input id="historyQuery" type="search" class="application-history-search" value="${esc(m.historyQuery||'')}" autocomplete="off" aria-label="${esc(tr('searchApplicationHistory'))}" placeholder="${esc(tr('searchApplicationHistory'))}">${userFilterOptions}<span class="count-badge application-history-count">${applicationHistoryReady?`${Math.min(visibleLimit,events.length)} / ${events.length} ${esc(tr('historyCount'))}`:esc(tr('loadingActivity'))}</span></div><div class="history-search-hint">${esc(tr('searchApplicationHistory'))}</div><div class="history-table-desktop history-table-wrap">${tableMarkup}</div><div class="history-card-list">${cardsMarkup}</div>${events.length>visibleEvents.length?`<div class="history-load-more-wrap"><button class="btn btn-small" type="button" data-action="history-load-more">${esc(tr('loadMoreActivity'))}</button></div>`:''}`;
+  content=`${error?`<div class="archive-error" role="status">${esc(error)}</div>`:''}<div class="history-controls application-history-controls"><input id="historyQuery" type="search" class="application-history-search" value="${esc(m.historyQuery||'')}" autocomplete="off" aria-label="${esc(tr('searchApplicationHistory'))}" placeholder="${esc(tr('searchApplicationHistory'))}">${userFilterOptions}<span class="count-badge application-history-count">${applicationHistoryHasLoaded?`${events.length} / ${applicationHistoryTotal} ${esc(tr('historyCount'))}`:esc(tr('loadingActivity'))}</span></div><div class="history-search-hint">${esc(tr('searchApplicationHistory'))}</div><div class="application-history-scroll" data-history-scroll><div class="history-table-desktop history-table-wrap">${tableMarkup}</div><div class="history-card-list">${cardsMarkup}</div></div>${applicationHistoryLoadTailMarkup()}`;
   footer=`<div class="modal-footer"><span></span><div class="right"><button class="btn btn-primary" type="button" data-action="close-modal">${esc(tr('close'))}</button></div></div>`;
  } else if(m.kind==='archive'){
   title=tr('archive');subtitle='';wide=true;
@@ -2451,7 +2463,7 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
  }
  case 'open-archive':openArchive();break;
  case 'global-history':openApplicationHistory();break;
- case 'history-load-more':if(ui.modal?.kind==='global-history'){ui.modal.historyVisibleCount=Math.max(100,Number(ui.modal.historyVisibleCount)||100)+100;renderModalPreservingInteraction();}break;
+ case 'history-load-more':if(ui.modal?.kind==='global-history')void loadMoreApplicationHistory();break;
  case 'retry-data-load':if(ui.modal?.kind==='history')void refreshActivityFor(ui.modal.itemId,allItem(ui.modal.itemId)?.type==='followup'?'item':(ui.modal.historyScope||'all'));else if(ui.modal?.kind==='global-history')void refreshApplicationHistory();else if(!dataLoadState.parentsReady||dataLoadState.initialError)void startWorkspaceHydration();else if(ui.selectedParentId)void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});break;
  case 'archive-toggle-group':toggleArchiveGroup(actionEl.dataset.rootId);break;
  case 'archive-select-parent':toggleArchiveParent(actionEl.dataset.id);break;
@@ -2491,8 +2503,9 @@ window.addEventListener('resize',()=>{const mobile=isMobileSidebarViewport();if(
 $('#app').addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.parent-card[tabindex="0"]')&&!ev.target.querySelector(':focus')){ev.preventDefault();handleAction(ev.target);}});
 $('#modalRoot').addEventListener('click',ev=>{const actionEl=ev.target.closest('[data-action]');if(actionEl){if(actionEl.dataset.action==='backdrop-close'&&ev.target!==actionEl)return;if(actionEl.dataset.action==='backdrop-close'){ui.modal=null;renderModal();return;}ev.preventDefault();handleAction(actionEl);}});
 $('#modalRoot').addEventListener('submit',ev=>{if(ev.target.id==='itemForm'){ev.preventDefault();handleItemSubmit(ev.target);}});
+$('#modalRoot').addEventListener('scroll',ev=>{if(ui.modal?.kind!=='global-history'||!ev.target?.matches?.('.application-history-scroll'))return;const scroller=ev.target;if(scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<180&&!applicationHistoryLoading&&!applicationHistoryReady)void loadMoreApplicationHistory();},true);
 $('#modalRoot').addEventListener('toggle',ev=>{const details=ev.target.closest('.archive-disclosure[data-archive-node]');if(!details||ui.modal?.kind!=='archive')return;const key=details.dataset.archiveNode;const set=new Set(ui.modal.expandedArchiveNodes||[]);if(details.open)set.add(key);else set.delete(key);ui.modal.expandedArchiveNodes=[...set];},true);
-$('#modalRoot').addEventListener('change',ev=>{if(ev.target.id==='historyUserFilter'&&ui.modal?.kind==='global-history'){ui.modal.historyUserFilter=ev.target.value||'all';ui.modal.historyVisibleCount=100;renderModal();$('#historyUserFilter')?.focus({preventScroll:true});return;}const checkbox=ev.target.closest('.archive-select');if(!checkbox||ui.modal?.kind!=='archive')return;const id=String(checkbox.dataset.archiveId);const scroller=$('.archive-groups');const top=scroller?.scrollTop||0;const left=scroller?.scrollLeft||0;const openKeys=[...$('#modalRoot').querySelectorAll('.archive-disclosure[data-archive-node][open]')].map(el=>el.dataset.archiveNode);ui.modal.expandedArchiveNodes=[...new Set(openKeys)];const selected=new Set(ui.modal.selectedIds||[]);if(checkbox.checked)selected.add(id);else selected.delete(id);ui.modal.selectedIds=[...selected];renderModal();const next=$('.archive-groups');if(next){next.scrollTop=top;next.scrollLeft=left;}const restored=$(`#modalRoot .archive-select[data-archive-id="${CSS.escape(id)}"]`);if(restored)restored.focus({preventScroll:true});});
+$('#modalRoot').addEventListener('change',ev=>{if(ev.target.id==='historyUserFilter'&&ui.modal?.kind==='global-history'){ui.modal.historyUserFilter=ev.target.value||'all';ui.modal.historyVisibleCount=100;renderModal();$('#historyUserFilter')?.focus({preventScroll:true});if(String(ui.modal.historyQuery||'').trim())void loadRemainingApplicationHistoryForSearch();return;}const checkbox=ev.target.closest('.archive-select');if(!checkbox||ui.modal?.kind!=='archive')return;const id=String(checkbox.dataset.archiveId);const scroller=$('.archive-groups');const top=scroller?.scrollTop||0;const left=scroller?.scrollLeft||0;const openKeys=[...$('#modalRoot').querySelectorAll('.archive-disclosure[data-archive-node][open]')].map(el=>el.dataset.archiveNode);ui.modal.expandedArchiveNodes=[...new Set(openKeys)];const selected=new Set(ui.modal.selectedIds||[]);if(checkbox.checked)selected.add(id);else selected.delete(id);ui.modal.selectedIds=[...selected];renderModal();const next=$('.archive-groups');if(next){next.scrollTop=top;next.scrollLeft=left;}const restored=$(`#modalRoot .archive-select[data-archive-id="${CSS.escape(id)}"]`);if(restored)restored.focus({preventScroll:true});});
 $('#langToggle').addEventListener('click',()=>{ui.lang=ui.lang==='en'?'ar':'en';render();});
 $('#themeToggle').addEventListener('click',()=>{ui.theme=ui.theme==='light'?'dark':'light';document.documentElement.dataset.theme=ui.theme;applyTranslations();});
 $('#newParentTop').addEventListener('click',openNewParent);
@@ -2520,7 +2533,7 @@ $('#modalRoot').addEventListener('change',ev=>{
   syncAssigneeControl(type);
  }
 });
-$('#modalRoot').addEventListener('input',ev=>{if(!ui.modal||!['history','global-history'].includes(ui.modal.kind)||ev.target.id!=='historyQuery')return;const pos=ev.target.selectionStart;ui.modal.historyQuery=ev.target.value;if(ui.modal.kind==='global-history')ui.modal.historyVisibleCount=100;if(historySearchTimer)clearTimeout(historySearchTimer);const modalKind=ui.modal.kind;historySearchTimer=setTimeout(()=>{if(!ui.modal||ui.modal.kind!==modalKind)return;renderModal();const input=$('#historyQuery');if(input){input.focus({preventScroll:true});if(typeof input.setSelectionRange==='function')input.setSelectionRange(pos,pos);}},90);});
+$('#modalRoot').addEventListener('input',ev=>{if(!ui.modal||!['history','global-history'].includes(ui.modal.kind)||ev.target.id!=='historyQuery')return;const pos=ev.target.selectionStart;ui.modal.historyQuery=ev.target.value;if(ui.modal.kind==='global-history')ui.modal.historyVisibleCount=100;if(historySearchTimer)clearTimeout(historySearchTimer);const modalKind=ui.modal.kind;historySearchTimer=setTimeout(()=>{if(!ui.modal||ui.modal.kind!==modalKind)return;renderModal();const input=$('#historyQuery');if(input){input.focus({preventScroll:true});if(typeof input.setSelectionRange==='function')input.setSelectionRange(pos,pos);}if(modalKind==='global-history'&&String(ui.modal.historyQuery||'').trim())void loadRemainingApplicationHistoryForSearch();},90);});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&ui.modal){ui.modal=null;renderModal();}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='k'){ev.preventDefault();$('#parentQuery').focus();}});
 // Cognito sign-in is handled by the pre-auth gate. Never accept a local username/password here.
 function setSignInState(signedIn){

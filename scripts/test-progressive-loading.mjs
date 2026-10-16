@@ -235,13 +235,30 @@ const deepLength=15000;
 for(let i=0;i<deepLength;i++)adjacency.set('deep-'+i,[{id:'deep-'+(i+1)}]);
 adjacency.set('deep-'+deepLength,[]);
 const descendantContext={childrenOf:id=>adjacency.get(String(id||''))||[]};
-vm.runInNewContext(html.slice(descendantStart,descendantEnd)+'\nthis.allDescendants=allDescendants;',descendantContext);
+vm.runInNewContext(html.slice(descendantStart,descendantEnd)+'\nthis.allDescendants=allDescendants;this.hasDescendantType=hasDescendantType;',descendantContext);
 assert.deepEqual(Array.from(descendantContext.allDescendants('cycle-root'),item=>item.id),['a','b'],
   'A malformed hierarchy cycle must be traversed once without returning to the root or freezing.');
 assert.deepEqual(Array.from(descendantContext.allDescendants(''),item=>item.id),[],
   'An empty root must not traverse orphaned child rows.');
 assert.equal(descendantContext.allDescendants('deep-0').length,deepLength,
   'Deep hierarchies must complete without a recursive stack overflow.');
+const earlyTaskLookups=[];
+const earlyTaskContext={
+ childrenOf:id=>{
+  earlyTaskLookups.push(String(id||''));
+  return String(id)==='early-root'?[{id:'task-node',type:'task'},{id:'large-subtree',type:'task'}]:
+    String(id)==='cycle-root'?[cycleA]:
+    String(id)==='a'?[cycleB]:
+    String(id)==='b'?[cycleA,cycleRoot]:[];
+ }
+};
+vm.runInNewContext(html.slice(descendantStart,descendantEnd)+'\nthis.hasDescendantType=hasDescendantType;',earlyTaskContext);
+assert.equal(earlyTaskContext.hasDescendantType('early-root','task'),true,
+  'Checking whether a Project contains Tasks must stop as soon as the first Task is found.');
+assert.deepEqual(earlyTaskLookups,['early-root'],
+  'A modal type-validation check must not traverse the Task subtree or unrelated descendants.');
+assert.equal(earlyTaskContext.hasDescendantType('cycle-root','task'),false,
+  'A cyclic hierarchy without the requested type must terminate and return false.');
 const itemModalStart=html.indexOf("if(m.kind==='edit'||m.kind==='new-parent'||m.kind==='new-child'){");
 const itemModalEnd=html.indexOf("} else if(m.kind==='history'){",itemModalStart);
 check(itemModalStart>=0&&itemModalEnd>itemModalStart,'The item create/edit modal branch must exist.');

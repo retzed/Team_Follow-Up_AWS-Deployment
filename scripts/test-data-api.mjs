@@ -135,7 +135,7 @@ assert.ok(requests.some(request => request.path.startsWith('/items/assigned-to-m
 assert.ok(requests.some(request => request.path.startsWith('/items?rootParentId=project-1')));
 assert.ok(requests.some(request => request.path.startsWith('/items/project-1/activity?scope=all')));
 assert.ok(requests.some(request => request.path.startsWith('/items/project-1/children?')));
-assert.ok(requests.some(request => request.path === '/activity?scope=application'));
+assert.ok(requests.some(request => request.path.startsWith('/activity?scope=application')));
 assert.ok(requests.some(request => request.path.startsWith('/archive?')));
 assert.ok(requests.some(request => request.method === 'POST' && request.path === '/archive/restore'));
 

@@ -267,4 +267,10 @@ const itemModal=html.slice(itemModalStart,itemModalEnd);
 check(itemModal.includes("if(m.kind==='new-parent'){const canBeJob=true;")&&!itemModal.includes("allDescendants(item?.id||'')"),
   'Opening New Project/Job must not walk an unrelated empty-root hierarchy.');
 
+check(itemModal.includes("const canBeJob=item.type==='job'||!hasDescendantType(item.id,'task')"),
+  'Editing an existing Job must not scan all descendants just to preserve its already-valid Job type.');
+check(html.includes("if(type==='job'&&item.type!=='job'&&hasDescendantType(item.id,'task'))"),
+  'The save path must only use an early-exit Task check when converting a Project to a Job.');
+
+
 console.log('Progressive-loading tests passed: lean bootstrap, selected-root child hydration, popup-only activity reads, retry safety, accessible spinners, archive pagination, and mobile history controls.');

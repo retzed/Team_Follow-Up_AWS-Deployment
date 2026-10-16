@@ -48,7 +48,7 @@ assert.ok(html.includes(':root[lang="en"] { --mixed-content-align: left; }') && 
 assert.ok(html.includes('function assignmentContextMarkup(item)') && html.includes('<bdi dir="auto">${esc(root.name)}</bdi>'), 'Names embedded in Assigned to me card context are isolated from UI-direction changes.');
 assert.ok(html.includes('id="formName" name="name" dir="auto"') && html.includes('id="formDescription" name="description" dir="auto"') && html.includes('<option dir="auto" value="${esc(p.id)}"'), 'Editing fields and parent selector use content-driven direction for mixed Arabic/Latin text.');
 
-const modalStart = html.indexOf('function renderModal(preserveExisting=false){');
+const modalStart = html.indexOf('function renderModal(preserveExisting=true){');
 const modalEnd = html.indexOf('\nlet toastTimer;', modalStart);
 assert.ok(modalStart >= 0 && modalEnd > modalStart, 'Modal renderer must exist.');
 const modalRenderer = html.slice(modalStart, modalEnd);

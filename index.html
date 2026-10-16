@@ -1291,12 +1291,14 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function queryTopLevel(options={}){
   const dateMode=options.dateMode||'updated',params=new URLSearchParams({scope:'top-level',dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
-  return request('GET','/items?'+params.toString());
+  const path='/items?'+params.toString();
+  return !options.limit&&options.offset===undefined?requestCachedGet(path,'top-level-query:'+params.toString()):request('GET',path);
  }
  async function queryChildren(parentId,options={}){
   const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
-  return request('GET','/items/'+encodeURIComponent(parentId)+'/children?'+params.toString());
+  const path='/items/'+encodeURIComponent(parentId)+'/children?'+params.toString();
+  return requestCachedGet(path,'children-query:'+parentId+':'+params.toString());
  }
  async function queryRootItems(rootParentId,options={}){
   const rootId=String(rootParentId||'');if(!rootId)throw new Error('A Project or Job ID is required to load its items.');
@@ -1316,7 +1318,8 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function queryAssigned(userId,options={}){
   const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
-  return request('GET','/items/assigned-to-me?'+params.toString());
+  const path='/items/assigned-to-me?'+params.toString();
+  return requestCachedGet(path,'assigned-query:'+params.toString());
  }
  async function queryActivity(itemId,scope='item',queryText=''){
   const params=new URLSearchParams({scope:scope});if(queryText)params.set('q',queryText);
@@ -1328,7 +1331,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   const pageSize=Math.max(1,Math.min(500,Number(options.limit||250)));let offset=Math.max(0,Number(options.offset||0)),all=[],result=null,pages=0;
   while(true){
    const params=new URLSearchParams();for(const [key,value] of Object.entries({q:options.query,type:options.type,rootParentId:options.rootParentId}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
-   params.set('limit',String(pageSize));params.set('offset',String(offset));result=await request('GET','/archive?'+params.toString());
+   params.set('limit',String(pageSize));params.set('offset',String(offset));const archivePath='/archive?'+params.toString();result=await requestCachedGet(archivePath,'archive-page:'+archivePath);
    const page=Array.isArray(result.items)?result.items.map(row=>row.id?row:toAppArchiveRecord(row)):[];
    all.push(...page);if(typeof onPage==='function'){try{onPage(page,{loaded:all.length,count:result.count??null,nextOffset:result.nextOffset??null,page:pages});}catch(error){console.warn('Archive page callback failed.',error);}}
    const next=result.nextOffset;if(next===undefined||next===null)break;const numeric=Number(next);

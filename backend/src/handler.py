@@ -1075,7 +1075,12 @@ def lambda_handler(event, context):
             version=cache_version(public_events)
             if qs.get('cacheMode')=='1' and qs.get('cacheVersion')==version:
                 return response(200,{'notModified':True,'version':version})
-            return response(200,{'events':public_events,'count':len(public_events),'version':version})
+            # Send the newest events in bounded pages. The client requests subsequent
+            # pages only when its history scroll region reaches the end.
+            offset=max(0,int(qs.get('offset',0)))
+            limit=max(1,min(250,int(qs.get('limit',100))))
+            next_offset=offset+limit if offset+limit<len(public_events) else None
+            return response(200,{'events':public_events[offset:offset+limit],'count':len(public_events),'nextOffset':next_offset,'version':version})
         m=re.fullmatch(r'/activity/([^/]+)',path)
         if m and method in ('PATCH','DELETE'):
             return response(405,{'message':'Activity history is append-only and cannot be edited or deleted.'})

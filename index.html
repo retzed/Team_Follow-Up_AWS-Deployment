@@ -1327,7 +1327,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   const path='/items/'+encodeURIComponent(itemId)+'/activity?'+params.toString();
   return requestCachedGet(path,'activity:'+String(itemId)+':'+scope+':'+queryText);
  }
- async function queryGlobalActivity(){return requestCachedGet('/activity?scope=application','activity:application');}
+ async function queryGlobalActivity(options={}){const params=new URLSearchParams({scope:'application',limit:String(Math.max(1,Math.min(250,Number(options.limit)||100))),offset:String(Math.max(0,Number(options.offset)||0))});const path='/activity?'+params.toString();return requestCachedGet(path,'activity:application:'+params.toString());}
  async function listArchive(options={},onPage){
   const pageSize=Math.max(1,Math.min(500,Number(options.limit||250)));let offset=Math.max(0,Number(options.offset||0)),all=[],result=null,pages=0;
   while(true){

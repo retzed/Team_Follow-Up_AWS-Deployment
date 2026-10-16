@@ -189,7 +189,7 @@ On a subsequent read the client sends a conditional request with the cache versi
 
 ### Modal and hierarchy safety
 
-Modal clicks are stopped by the modal's own delegated handler before the action is processed; the workspace delegate ignores modal clicks as a second defensive guard. This avoids duplicate action dispatch when a dialog closes or its DOM is replaced. Full descendant operations use iterative, cycle-safe traversal. Dialogs use direct-child checks for type validation where that is sufficient, and child timestamp comparisons read that child's indexed Activity events instead of scanning the entire root timeline.
+Modal clicks are stopped by the modal's own delegated handler before the action is processed; the workspace delegate ignores modal clicks as a second defensive guard. This avoids duplicate action dispatch when a dialog closes or its DOM is replaced. The shared `allDescendants()` helper used for subtree validation/deletion uses iterative, cycle-safe traversal; separate hierarchy renderers retain their own visited-ID guards. Dialogs use direct-child checks for type validation where that is sufficient, and child timestamp comparisons read that child's indexed Activity events instead of scanning the entire root timeline.
 
 These front-end safeguards do not change the AWS infrastructure. They add no API routes, request parameters required by the backend, environment variables, DynamoDB attributes/indexes, Lambda permissions, Cognito configuration, or migration steps. See the frontend-only update procedure in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#frontend-only-releases).
 

@@ -236,7 +236,7 @@ const deepLength=15000;
 for(let i=0;i<deepLength;i++)adjacency.set('deep-'+i,[{id:'deep-'+(i+1)}]);
 adjacency.set('deep-'+deepLength,[]);
 const descendantContext={childrenOf:id=>adjacency.get(String(id||''))||[]};
-vm.runInNewContext(html.slice(descendantStart,descendantEnd)+'\nthis.allDescendants=allDescendants;this.hasDescendantType=hasDescendantType;',descendantContext);
+vm.runInNewContext(html.slice(descendantStart,descendantEnd)+'\nthis.allDescendants=allDescendants;this.hasDirectChildType=hasDirectChildType;',descendantContext);
 assert.deepEqual(Array.from(descendantContext.allDescendants('cycle-root'),item=>item.id),['a','b'],
   'A malformed hierarchy cycle must be traversed once without returning to the root or freezing.');
 assert.deepEqual(Array.from(descendantContext.allDescendants(''),item=>item.id),[],
@@ -253,12 +253,12 @@ const earlyTaskContext={
     String(id)==='b'?[cycleA,cycleRoot]:[];
  }
 };
-vm.runInNewContext(html.slice(descendantStart,descendantEnd)+'\nthis.hasDescendantType=hasDescendantType;',earlyTaskContext);
-assert.equal(earlyTaskContext.hasDescendantType('early-root','task'),true,
+vm.runInNewContext(html.slice(descendantStart,descendantEnd)+'\nthis.hasDirectChildType=hasDirectChildType;',earlyTaskContext);
+assert.equal(earlyTaskContext.hasDirectChildType('early-root','task'),true,
   'Checking whether a Project contains Tasks must stop as soon as the first Task is found.');
 assert.deepEqual(earlyTaskLookups,['early-root'],
   'A modal type-validation check must not traverse the Task subtree or unrelated descendants.');
-assert.equal(earlyTaskContext.hasDescendantType('cycle-root','task'),false,
+assert.equal(earlyTaskContext.hasDirectChildType('cycle-root','task'),false,
   'A cyclic hierarchy without the requested type must terminate and return false.');
 const itemModalStart=html.indexOf("if(m.kind==='edit'||m.kind==='new-parent'||m.kind==='new-child'){");
 const itemModalEnd=html.indexOf("} else if(m.kind==='history'){",itemModalStart);
@@ -267,9 +267,9 @@ const itemModal=html.slice(itemModalStart,itemModalEnd);
 check(itemModal.includes("if(m.kind==='new-parent'){const canBeJob=true;")&&!itemModal.includes("allDescendants(item?.id||'')"),
   'Opening New Project/Job must not walk an unrelated empty-root hierarchy.');
 
-check(itemModal.includes("const canBeJob=item.type==='job'||!hasDescendantType(item.id,'task')"),
+check(itemModal.includes("const canBeJob=item.type==='job'||!hasDirectChildType(item.id,'task')"),
   'Editing an existing Job must not scan all descendants just to preserve its already-valid Job type.');
-check(html.includes("if(type==='job'&&item.type!=='job'&&hasDescendantType(item.id,'task'))"),
+check(html.includes("if(type==='job'&&item.type!=='job'&&hasDirectChildType(item.id,'task'))"),
   'The save path must only use an early-exit Task check when converting a Project to a Job.');
 
 

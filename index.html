@@ -2131,7 +2131,7 @@ function allDescendants(id){
  }
  return found;
 }
-function hasDirectChildType(id,type){return childrenOf(id).some(item=>item.type===type);}
+function hasDirectChildType(id,type){const rootId=String(id||'');if(!rootId)return false;return (ensureHierarchyIndex().byParent.get(rootId)||[]).some(item=>item.type===type);}
 function itemAncestorIds(item){const ids=[];let cursor=item;const seen=new Set();while(cursor&&cursor.parentId&&!seen.has(cursor.parentId)){seen.add(cursor.parentId);ids.push(cursor.parentId);cursor=allItem(cursor.parentId);}if(item?.rootParentId&&!ids.includes(item.rootParentId))ids.push(item.rootParentId);return [...new Set(ids)];}
 function activityUid(){try{if(window.crypto&&typeof window.crypto.randomUUID==='function')return `activity_${window.crypto.randomUUID()}`;}catch(e){}return `activity_${uid('evt')}_${Math.random().toString(36).slice(2,14)}_${Date.now().toString(36)}`;}
 function activityRecord(item,action,kind='update',at=nowISO(),userId=currentUser().id,rootIdOverride=null){const root=rootParent(item);const rootParentId=String(rootIdOverride||(root?.id||item.rootParentId||item.id));const rootItem=allItem(rootParentId);const rootParentName=String(root?.name||(rootParentId===item.id?item.name:(rootItem?.name||''))||'');const rootParentType=String(root?.type||rootItem?.type||(rootParentId===item.id?item.type:'')||'');return {id:activityUid(),itemId:item.id,rootParentId,rootParentName,rootParentType,parentId:item.parentId||null,ancestorIds:itemAncestorIds(item),itemName:item.name,itemType:item.type,at,userId,action,kind};}

@@ -7,6 +7,7 @@ as the source of truth for creator, editor, assignee, and activity actor identit
 
 import base64
 import json
+import hashlib
 import logging
 import os
 import re
@@ -605,6 +606,26 @@ def query_work_items_all(qs):
         offset=page['nextOffset']
     return combined
 
+
+def cache_version(rows):
+    """Stable validator for persisted browser-side copies of table-backed data."""
+    tokens=[]
+    for row in rows or []:
+        tokens.append({
+            'id': row.get('id') or row.get('itemId') or row.get('eventId') or row.get('userId') or '',
+            'updatedAt': row.get('updatedAt') or row.get('at') or row.get('archivedAt') or row.get('createdAt') or '',
+            'version': row.get('version'),
+            'deletedAt': row.get('deletedAt') or '',
+            'activityKey': row.get('activityKey') or '',
+            'name': row.get('name') or row.get('displayName') or '',
+            'role': row.get('role') or '',
+            'status': row.get('status') or '',
+        })
+    tokens.sort(key=lambda value: json.dumps(value,sort_keys=True,default=str))
+    serialized=json.dumps(tokens,sort_keys=True,separators=(',',':'),default=str).encode('utf-8')
+    return hashlib.sha256(serialized).hexdigest()
+
+
 # ---------------------------------------------------------------------------
 # API Gateway HTTP API entry point
 # ---------------------------------------------------------------------------
@@ -659,7 +680,11 @@ def lambda_handler(event, context):
             return response(200,{'items':parents,'users':users})
         if method=='GET' and path=='/users':
             rows=scan_pages(USERS)
-            return response(200,{'users':[{'id':u['userId'],'name':u.get('displayName',''),'role':u.get('role','AWS Engineer')} for u in rows if u.get('enabled',True)]})
+            users=[{'id':u['userId'],'name':u.get('displayName',''),'role':u.get('role','AWS Engineer')} for u in rows if u.get('enabled',True)]
+            version=cache_version(users)
+            if qs.get('cacheMode')=='1' and qs.get('cacheVersion')==version:
+                return response(200,{'notModified':True,'version':version})
+            return response(200,{'users':users,'version':version})
         if path=='/archive' and method=='GET':
             rows=all_pages(ARCHIVE,IndexName='GSI_ArchiveIndex',KeyConditionExpression=Key('archivePK').eq('ARCHIVE'),ScanIndexForward=False)
             item_type=qs.get('type','all')
@@ -828,10 +853,16 @@ def lambda_handler(event, context):
                 all_events.extend(public_event(e) for e in chunk_events)
             return response(200,{'ok':True,'restoredIds':restored_ids,'restoredItems':restored_items,'activityEvents':all_events})
         if path=='/items' and method=='GET':
-            if qs.get('scope')=='top-level':
-                result=query_work_items(qs)
-            else:
-                result=query_work_items(qs)
+            # Cache-aware clients ask for a compact validator before re-downloading
+            # the current collection. The returned version is based on the complete
+            # filtered collection, not just the current page.
+            if qs.get('cacheMode')=='1' and (qs.get('scope')=='top-level' or qs.get('rootParentId')):
+                items=query_work_items_all(qs)
+                version=cache_version(items)
+                if qs.get('cacheVersion')==version:
+                    return response(200,{'notModified':True,'version':version})
+                return response(200,{'items':items,'count':len(items),'nextOffset':None,'version':version})
+            result=query_work_items(qs)
             return response(200,result)
         if path=='/items/assigned-to-me' and method=='GET':
             result=query_work_items({**qs,'assigneeUserId':profile['userId']})
@@ -863,7 +894,11 @@ def lambda_handler(event, context):
             search=str(qs.get('q') or '').lower()
             if search:
                 events=[row for row in events if search in json.dumps(row,ensure_ascii=False,default=str).lower()]
-            return response(200,{'events':[public_event(row) for row in events],'count':len(events)})
+            public_events=[public_event(row) for row in events]
+            version=cache_version(public_events)
+            if qs.get('cacheMode')=='1' and qs.get('cacheVersion')==version:
+                return response(200,{'notModified':True,'version':version})
+            return response(200,{'events':public_events,'count':len(public_events),'version':version})
         if path=='/items' and method=='POST':
             item=dict(body)
             events=item.pop('activityEvents',[]) or []

@@ -172,4 +172,11 @@ check(html.includes("scope==='all'&&String(selected.id)===String(itemId)"),'The 
 check(html.includes('data-filter="urgent"')&&html.includes("ui.childPriority==='urgent'"),'Jobs must show an Urgent metric instead of Tasks.');
 check(html.includes("parent.type==='project'?\`<button") && html.includes('data-filter="tasks"'), 'The Tasks metric is rendered only for Projects, not Jobs.');
 
+
+const modalPreserverStart=html.indexOf('function renderModalPreservingInteraction(){');
+const modalPreserverEnd=html.indexOf('function renderAfterActivityRefresh',modalPreserverStart);
+check(modalPreserverStart>=0&&modalPreserverEnd>modalPreserverStart,'The modal interaction-preserver must exist as a bounded function.');
+const modalPreserver=html.slice(modalPreserverStart,modalPreserverEnd);
+check(modalPreserver.includes('for(const selector of selectors) $$(selector,modalRoot).forEach')&&modalPreserver.includes('const nodes=$$(state.selector,modalRoot)'), 'Modal scroll preservation must query selector lists, not call forEach on querySelector results.');
+check(html.includes('#modalRoot .modal-head{direction:ltr!important;flex-direction:row!important}')&&html.includes('#modalRoot .modal-head>button[data-action="close-modal"]{margin-inline-start:auto!important;flex:0 0 auto}'), 'The modal close control is physically right-aligned on its first render in RTL and LTR.');
 console.log('Progressive-loading tests passed: lean bootstrap, selected-root child hydration, popup-only activity reads, retry safety, accessible spinners, archive pagination, and mobile history controls.');

@@ -242,6 +242,19 @@ Save and trigger a new build. A successful build should publish `dist/index.html
 
 If the Amplify branch hostname changes, update the API CORS origin before relying on cross-origin browser requests.
 
+### Frontend-only releases
+
+The fixes to modal action dispatch, hierarchy traversal, and child Activity sorting are frontend-only. They do not change the Lambda handler, API request/response contract, Cognito setup, DynamoDB table/index schema, IAM role, or the four `TEAM_FOLLOW_UP_*` Amplify variables.
+
+For a frontend-only change in this console-first deployment:
+
+1. Run `npm test` and `npm run build` from the repository root. Confirm the generated `dist/index.html` exists and the checks pass.
+2. Commit/push the tested source to the branch connected to Amplify (normally `main`). If automatic builds are enabled, monitor **Amplify → Hosting → Build history**; otherwise start a new build for that branch in the console.
+3. Confirm the build succeeds and test the deployed URL: sign in; open/close Edit and New Project/Job dialogs repeatedly; create a child item; verify Activity opens and can be searched; confirm no duplicate action occurs.
+4. Do **not** rebuild/re-upload the Lambda package, change API Gateway routes/CORS, edit the Cognito app client, modify DynamoDB indexes, or run SAM/CloudFormation solely for a frontend-only change.
+
+For Lambda handler, data schema, environment, or infrastructure changes, use the relevant sections in this runbook and rerun the backend/infrastructure checks. A successful GitHub Actions validation proves repository artifacts and tests pass; it does not deploy AWS resources or prove the live environment is healthy.
+
 ## 10. CloudWatch dashboard and alarms
 
 Create these alarms in **CloudWatch → Alarms → Create alarm**. Use statistic **Sum**, period **5 minutes (300 seconds)**, evaluation periods **1**, threshold **greater than or equal to 1**, and missing data **not breaching** for all three.

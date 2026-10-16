@@ -24,6 +24,13 @@ check(html.includes('void ensureRootChildrenLoaded(ui.selectedParentId)'),
   'After the top-level list appears, only the currently selected Project/Job should be hydrated.');
 check(html.includes("case 'select-parent':") && html.includes('void ensureRootChildrenLoaded(id)'),
   'Selecting another Project/Job must trigger its own lazy child-item query.');
+
+const newParentStart = html.indexOf("if(kind==='new-parent'){");
+const newParentEnd = html.indexOf("if(kind==='new-child'){", newParentStart);
+check(newParentStart >= 0 && newParentEnd > newParentStart, 'The new Project/Job creation branch must exist.');
+const newParentBranch = html.slice(newParentStart, newParentEnd);
+check(newParentBranch.includes('dataLoadState.childrenLoaded.add(String(item.id))'),
+  'A newly created Project/Job starts with a known-empty child set, so its overview metrics and item lists never spin until it is reselected.');
 check(html.includes("case 'retry-data-load':if(ui.modal?.kind==='history')"),
   'Data-load retry must remain available and target the relevant view.');
 

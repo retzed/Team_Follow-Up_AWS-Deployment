@@ -131,7 +131,7 @@ check(html.includes('.data-loading-state.compact { justify-content:center;')&&ht
 
 check(html.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v1:'") && html.includes('function requestCachedGet(path,key){'), 'Fetched API data must be stored persistently and conditionally revalidated.');
 check(html.includes("requestCachedGet('/users','team-users')") && html.includes("requestCachedGet('/items?scope=top-level&dateMode=updated&direction=desc','top-level-items')"), 'Startup must validate persisted profiles and top-level data.');
-check(html.includes("requestCachedGet(path,`activity:${String(itemId)}:${scope}`)") || html.includes("requestCachedGet(path,'activity:'+String(itemId)+':'+scope)"), 'Item history must be conditionally revalidated from its local disk cache.');
+check(html.includes("requestCachedGet(path,'activity:'+String(itemId)+':'+scope+':')"), 'Item history must be conditionally revalidated from its local disk cache.');
 check(html.includes("requestCachedGet('/activity?scope=application','activity:application')"), 'Application-wide history must be conditionally revalidated from its local disk cache.');
 check(html.includes("void refreshActivityFor(id,'all')") && html.includes("void refreshActivityFor(itemId,expandedItem.type==='followup'?'item':'all')"), 'Selecting a parent and expanding a child must preload the corresponding Activity history.');
 check(html.includes("parent.type==='project'?\`<button") && html.includes('data-filter="tasks"'), 'The Tasks metric is rendered only for Projects, not Jobs.');

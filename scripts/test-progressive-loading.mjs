@@ -242,23 +242,18 @@ assert.deepEqual(Array.from(descendantContext.allDescendants(''),item=>item.id),
   'An empty root must not traverse orphaned child rows.');
 assert.equal(descendantContext.allDescendants('deep-0').length,deepLength,
   'Deep hierarchies must complete without a recursive stack overflow.');
-const earlyTaskLookups=[];
-const earlyTaskContext={
- childrenOf:id=>{
-  earlyTaskLookups.push(String(id||''));
-  return String(id)==='early-root'?[{id:'task-node',type:'task'},{id:'large-subtree',type:'task'}]:
-    String(id)==='cycle-root'?[cycleA]:
-    String(id)==='a'?[cycleB]:
-    String(id)==='b'?[cycleA,cycleRoot]:[];
- }
-};
+const directChildren=new Map();
+const earlyTaskRows=[{id:'task-node',type:'task'}];
+Object.defineProperty(earlyTaskRows,'1',{get(){throw new Error('Type validation should stop at the first Task.');}});
+earlyTaskRows.length=2;
+directChildren.set('early-root',earlyTaskRows);
+directChildren.set('cycle-root',[{id:'a',type:'other'}]);
+const earlyTaskContext={ensureHierarchyIndex:()=>({byParent:directChildren})};
 vm.runInNewContext(html.slice(descendantStart,descendantEnd)+'\nthis.hasDirectChildType=hasDirectChildType;',earlyTaskContext);
 assert.equal(earlyTaskContext.hasDirectChildType('early-root','task'),true,
   'Checking whether a Project contains Tasks must stop as soon as the first Task is found.');
-assert.deepEqual(earlyTaskLookups,['early-root'],
-  'A modal type-validation check must not traverse the Task subtree or unrelated descendants.');
 assert.equal(earlyTaskContext.hasDirectChildType('cycle-root','task'),false,
-  'A cyclic hierarchy without the requested type must terminate and return false.');
+  'The direct-child check must not traverse malformed descendants just to decide whether a Project can become a Job.');
 const itemModalStart=html.indexOf("if(m.kind==='edit'||m.kind==='new-parent'||m.kind==='new-child'){");
 const itemModalEnd=html.indexOf("} else if(m.kind==='history'){",itemModalStart);
 check(itemModalStart>=0&&itemModalEnd>itemModalStart,'The item create/edit modal branch must exist.');

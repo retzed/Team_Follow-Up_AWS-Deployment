@@ -1325,7 +1325,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function queryActivity(itemId,scope='item',queryText=''){
   const params=new URLSearchParams({scope:scope});if(queryText)params.set('q',queryText);
   const path='/items/'+encodeURIComponent(itemId)+'/activity?'+params.toString();
-  return !queryText?requestCachedGet(path,'activity:'+String(itemId)+':'+scope):request('GET',path);
+  return requestCachedGet(path,'activity:'+String(itemId)+':'+scope+':'+queryText);
  }
  async function queryGlobalActivity(){return requestCachedGet('/activity?scope=application','activity:application');}
  async function listArchive(options={},onPage){

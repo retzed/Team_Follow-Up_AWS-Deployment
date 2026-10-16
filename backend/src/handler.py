@@ -1040,7 +1040,11 @@ def lambda_handler(event, context):
             rows.sort(key=lambda row:(str(row.get('at') or ''),str(row.get('eventId') or '')),reverse=True)
             unique={str(row.get('eventId') or row.get('activityKey')):row for row in rows}
             events=sorted(unique.values(),key=lambda row:(str(row.get('at') or ''),str(row.get('eventId') or '')),reverse=True)
-            return response(200,{'events':[public_event(row) for row in events],'count':len(events)})
+            public_events=[public_event(row) for row in events]
+            version=cache_version(public_events)
+            if qs.get('cacheMode')=='1' and qs.get('cacheVersion')==version:
+                return response(200,{'notModified':True,'version':version})
+            return response(200,{'events':public_events,'count':len(public_events),'version':version})
         m=re.fullmatch(r'/activity/([^/]+)',path)
         if m and method in ('PATCH','DELETE'):
             return response(405,{'message':'Activity history is append-only and cannot be edited or deleted.'})

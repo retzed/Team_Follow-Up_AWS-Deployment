@@ -20,7 +20,7 @@ for (const forbidden of [
 
 const storage = new Map();
 const localStorage = { getItem:key=>storage.has(key)?storage.get(key):null, setItem:(key,value)=>storage.set(key,String(value)), removeItem:key=>storage.delete(key) };
-assert.ok(source.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v1:'") && source.includes('function requestCachedGet(path,key){'), 'Only the API response cache may use browser storage.');
+assert.ok(source.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v2:'") && source.includes('function requestCachedGet(path,key){'), 'Only the API response cache may use browser storage.');
 const requests = [];
 const project = {
   id: 'project-1',
@@ -136,7 +136,7 @@ await api.queryChildren('project-1', { type: 'task' });
 assert.equal((await api.queryGlobalActivity()).events.length, 1);
 assert.equal((await api.listArchive()).items.length, 0);
 for (const key of ['team-users','top-level-items','root-items:project-1:rootParentId=project-1&dateMode=updated&direction=desc','activity:project-1:all:','activity:application','assigned-query:dateMode=updated&direction=desc&status=not-completed&q=Task','children-query:project-1:dateMode=updated&direction=desc&type=task','archive-page:/archive?limit=250&offset=0']) {
-  assert.ok(storage.has('team-follow-up-api-cache-v1:' + key), `the disk cache must persist ${key}`);
+  assert.ok(storage.has('team-follow-up-api-cache-v2:' + key), `the disk cache must persist ${key}`);
 }
 const beforeRevalidation = requests.length;
 assert.equal((await api.queryGlobalActivity()).events.length, 1, 'an unchanged global timeline reuses the persisted payload');

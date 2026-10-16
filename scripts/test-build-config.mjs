@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 
 const sourceHtml = await readFile('index.html', 'utf8');
-assert.ok(sourceHtml.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v1:'"), 'AWS frontend may persist only the versioned API response cache.');
+assert.ok(sourceHtml.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v2:'"), 'AWS frontend may persist only the versioned API response cache.');
 assert.ok(sourceHtml.includes('function requestCachedGet(path,key){'), 'AWS response cache must validate server versions before reusing stored data.');
 for (const forbidden of [
   'team-follow-up-local-auth-v1',

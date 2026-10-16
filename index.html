@@ -1206,7 +1206,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   if(!response.ok)throw new Error(payload.message||payload.error||('API request failed ('+response.status+').'));
   return payload;
  }
- const API_CACHE_PREFIX='team-follow-up-api-cache-v1:';
+ const API_CACHE_PREFIX='team-follow-up-api-cache-v2:';
  function readApiDiskCache(key){try{const raw=localStorage.getItem(API_CACHE_PREFIX+key);if(!raw)return null;const value=JSON.parse(raw);return value&&value.payload?value:null;}catch(error){return null;}}
  function writeApiDiskCache(key,value){try{localStorage.setItem(API_CACHE_PREFIX+key,JSON.stringify(value));return true;}catch(error){console.warn('Could not persist the API cache to browser storage.',error);return false;}}
  async function requestCachedGet(path,key){

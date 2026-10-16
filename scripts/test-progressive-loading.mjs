@@ -11,8 +11,8 @@ const bootstrapStart = html.indexOf('async function bootstrap(');
 const bootstrapEnd = html.indexOf('function sameRecordFields', bootstrapStart);
 check(bootstrapStart >= 0 && bootstrapEnd > bootstrapStart, 'The data API must expose a standalone bootstrap function.');
 const bootstrapBody = html.slice(bootstrapStart, bootstrapEnd);
-const usersLoad = bootstrapBody.indexOf("await request('GET','/users')");
-const parentLoad = bootstrapBody.indexOf("fetchPagedItems('/items?scope=top-level");
+const usersLoad = bootstrapBody.indexOf("await requestCachedGet('/users','team-users')");
+const parentLoad = bootstrapBody.indexOf("requestCachedGet('/items?scope=top-level&dateMode=updated&direction=desc','top-level-items')");
 check(usersLoad >= 0 && parentLoad > usersLoad, 'Bootstrap must load users then the paginated top-level Project/Job list.');
 for (const forbidden of ['/activity', 'queryActivity', 'queryGlobalActivity', 'rootParentId=']) {
   check(!bootstrapBody.includes(forbidden), `Bootstrap must not load Activity or descendants (${forbidden}).`);

@@ -865,6 +865,11 @@ def lambda_handler(event, context):
                 version=cache_version(items)
                 if qs.get('cacheVersion')==version:
                     return response(200,{'notModified':True,'version':version})
+                if qs.get('scope')=='top-level':
+                    offset=max(0,int(qs.get('offset',0)))
+                    limit=max(1,min(250,int(qs.get('limit',100))))
+                    total=len(items)
+                    return response(200,{'items':items[offset:offset+limit],'count':total,'nextOffset':offset+limit if offset+limit<total else None,'version':version})
                 return response(200,{'items':items,'count':len(items),'nextOffset':None,'version':version})
             result=query_work_items(qs)
             return response(200,result)

@@ -1292,7 +1292,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   const dateMode=options.dateMode||'updated',params=new URLSearchParams({scope:'top-level',dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
   const path='/items?'+params.toString();
-  return !options.limit&&options.offset===undefined?requestCachedGet(path,'top-level-query:'+params.toString()):request('GET',path);
+  return requestCachedGet(path,'top-level-query:'+params.toString());
  }
  async function queryChildren(parentId,options={}){
   const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});

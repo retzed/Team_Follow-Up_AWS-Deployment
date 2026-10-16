@@ -58,15 +58,15 @@ const sortFixtures=[
   {id:'created-earlier-updated-later',createdAt:'2026-10-01T08:00:00Z',updatedAt:'2026-10-05T08:00:00Z'},
   {id:'created-later-updated-earlier',createdAt:'2026-10-04T08:00:00Z',updatedAt:'2026-10-02T08:00:00Z'}
 ];
-assert.deepEqual(sortContext.sortChildrenByDate(sortFixtures).map(item=>item.id),
+assert.deepEqual(Array.from(sortContext.sortChildrenByDate(sortFixtures),item=>item.id),
   ['created-later-updated-earlier','created-earlier-updated-later'],
   'Last created must sort by creation time descending even when update-time order is the opposite.');
 sortContext.ui.childDateMode='created';
-assert.deepEqual(sortContext.sortChildrenByDate(sortFixtures).map(item=>item.id),
+assert.deepEqual(Array.from(sortContext.sortChildrenByDate(sortFixtures),item=>item.id),
   ['created-earlier-updated-later','created-later-updated-earlier'],
   'Created must retain its oldest-first ordering.');
 sortContext.ui.childDateMode='updated';
-assert.deepEqual(sortContext.sortChildrenByDate(sortFixtures).map(item=>item.id),
+assert.deepEqual(Array.from(sortContext.sortChildrenByDate(sortFixtures),item=>item.id),
   ['created-earlier-updated-later','created-later-updated-earlier'],
   'Last updated must continue to sort by update time descending.');
 

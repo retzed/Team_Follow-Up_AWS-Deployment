@@ -699,7 +699,11 @@ def lambda_handler(event, context):
             offset=max(0,int(qs.get('offset',0)))
             limit=max(1,min(500,int(qs.get('limit',250))))
             total=len(rows)
-            return response(200,{'items':[public_archive_item(x) for x in rows[offset:offset+limit]],'count':total,'nextOffset':offset+limit if offset+limit<total else None})
+            public_rows=[public_archive_item(x) for x in rows]
+            version=cache_version(public_rows)
+            if qs.get('cacheMode')=='1' and qs.get('cacheVersion')==version:
+                return response(200,{'notModified':True,'version':version})
+            return response(200,{'items':public_rows[offset:offset+limit],'count':total,'nextOffset':offset+limit if offset+limit<total else None,'version':version if qs.get('cacheMode')=='1' else None})
         if path=='/archive/restore' and method=='POST':
             ids=body.get('itemIds')
             if not isinstance(ids,list) or not ids:
@@ -865,11 +869,24 @@ def lambda_handler(event, context):
             result=query_work_items(qs)
             return response(200,result)
         if path=='/items/assigned-to-me' and method=='GET':
-            result=query_work_items({**qs,'assigneeUserId':profile['userId']})
-            return response(200,result)
+            filtered={**qs,'assigneeUserId':profile['userId']}
+            if qs.get('cacheMode')=='1':
+                version=cache_version(query_work_items_all(filtered))
+                if qs.get('cacheVersion')==version:
+                    return response(200,{'notModified':True,'version':version})
+                result=query_work_items(filtered);result['version']=version
+                return response(200,result)
+            return response(200,query_work_items(filtered))
         m=re.fullmatch(r'/items/([^/]+)/children',path)
         if m and method=='GET':
-            return response(200,query_work_items({**qs,'parentId':m.group(1)}))
+            filtered={**qs,'parentId':m.group(1)}
+            if qs.get('cacheMode')=='1':
+                version=cache_version(query_work_items_all(filtered))
+                if qs.get('cacheVersion')==version:
+                    return response(200,{'notModified':True,'version':version})
+                result=query_work_items(filtered);result['version']=version
+                return response(200,result)
+            return response(200,query_work_items(filtered))
         m=re.fullmatch(r'/items/([^/]+)/activity',path)
         if m and method=='GET':
             item_id=m.group(1)

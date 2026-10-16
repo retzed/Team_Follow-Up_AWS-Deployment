@@ -113,6 +113,7 @@ assert.equal(readinessContext.historyPopupReady('project-2', 'all'), false,
 readinessContext.dataLoadState.activityLoaded.add('project-2:all');
 assert.equal(readinessContext.historyPopupReady('project-2', 'all'), true,
   'An exact root-history request can satisfy popup readiness when the global cache is invalidated.');
+check(html.includes("ui.modal.historyScope===scope")&&html.includes("ui.modal.historyRefreshError=message;renderModal();"),
   'A failure must be shown only for the still-open item-history scope, not hidden by a different history request.');
 check(html.includes("activityNotLoaded:'Open Activity History to load events.'") &&
       html.includes("activityNotLoaded:'افتح سجل النشاط لتحميل الأحداث.'"),

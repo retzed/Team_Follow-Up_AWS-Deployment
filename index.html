@@ -1206,6 +1206,18 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   if(!response.ok)throw new Error(payload.message||payload.error||('API request failed ('+response.status+').'));
   return payload;
  }
+ const API_CACHE_PREFIX='team-follow-up-api-cache-v1:';
+ function readApiDiskCache(key){try{const raw=localStorage.getItem(API_CACHE_PREFIX+key);if(!raw)return null;const value=JSON.parse(raw);return value&&value.payload?value:null;}catch(error){return null;}}
+ function writeApiDiskCache(key,value){try{localStorage.setItem(API_CACHE_PREFIX+key,JSON.stringify(value));return true;}catch(error){console.warn('Could not persist the API cache to browser storage.',error);return false;}}
+ async function requestCachedGet(path,key){
+  if(mode!=='api')return request('GET',path);
+  const cached=readApiDiskCache(key);const url=new URL(String(path||''),window.location.origin);url.searchParams.set('cacheMode','1');
+  if(cached&&cached.version)url.searchParams.set('cacheVersion',String(cached.version));
+  let result=await request('GET',url.pathname+url.search);
+  if(result&&result.notModified){if(!cached){url.searchParams.delete('cacheVersion');result=await request('GET',url.pathname+url.search);}else{cached.checkedAt=Date.now();writeApiDiskCache(key,cached);return clone(cached.payload);}}
+  if(result&&result.version)writeApiDiskCache(key,{version:String(result.version),payload:clone(result),savedAt:Date.now(),checkedAt:Date.now()});
+  return result;
+ }
  function absorbCommittedResult(next,result){
   if(!result||typeof result!=='object')return;
   if(result.item&&result.item.id){
@@ -1232,14 +1244,13 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function bootstrap(onProgress){
   const notify=(snapshot,stage,extra={})=>{if(typeof onProgress==='function'){try{onProgress(clone(snapshot),{stage:stage,...extra});}catch(error){console.warn('AWS data loading progress callback failed.',error);}}};
   const snapshot={schema:4,users:[],parents:[],children:[],activity:[]};
-  const profiles=await request('GET','/users');
+  const profiles=await requestCachedGet('/users','team-users');
   const userRows=Array.isArray(profiles)?profiles:(profiles?.users||profiles?.items||[]);
   snapshot.users=userRows.map(user=>user?.id?user:toAppUser(user));
   notify(snapshot,'users',{done:true});
-  await fetchPagedItems('/items?scope=top-level&dateMode=updated&direction=desc',(page,result,total)=>{
-   snapshot.parents=[...new Map([...snapshot.parents,...page].map(row=>[String(row.id),row])).values()];
-   notify(snapshot,'parents-page',{done:result.nextOffset===undefined||result.nextOffset===null,count:total,nextOffset:result.nextOffset??null});
-  },100);
+  const top=await requestCachedGet('/items?scope=top-level&dateMode=updated&direction=desc','top-level-items');
+  snapshot.parents=(top?.items||[]).map(item=>item?.id?item:toAppItem(item)).filter(item=>['project','job'].includes(item.type));
+  notify(snapshot,'parents-page',{done:true,count:snapshot.parents.length,nextOffset:null});
   notify(snapshot,'parents-complete',{done:true,count:snapshot.parents.length});
   notify(snapshot,'complete',{done:true,count:snapshot.parents.length});
   return snapshot;
@@ -1290,6 +1301,12 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  }
  async function queryRootItems(rootParentId,options={}){
   const rootId=String(rootParentId||'');if(!rootId)throw new Error('A Project or Job ID is required to load its items.');
+  const noFilters=!options.type&&!options.status&&!options.priority&&!options.query&&!options.from&&!options.to;
+  if(mode==='api'&&noFilters&&!options.onPage&&(options.dateMode||'updated')==='updated'&&(options.direction||'desc')==='desc'){
+   const cached=await requestCachedGet('/items?rootParentId='+encodeURIComponent(rootId)+'&dateMode=updated&direction=desc','root-items:'+rootId);
+   const items=(cached?.items||[]).map(item=>item&&item.id?item:toAppItem(item)).filter(item=>String(item.id)!==rootId&&item.type!=='project'&&item.type!=='job');
+   return {items,count:items.length,nextOffset:null,version:cached?.version||''};
+  }
   const dateMode=options.dateMode||'updated';
   const params=new URLSearchParams({rootParentId:rootId,dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
@@ -1304,9 +1321,10 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  }
  async function queryActivity(itemId,scope='item',queryText=''){
   const params=new URLSearchParams({scope:scope});if(queryText)params.set('q',queryText);
-  return request('GET','/items/'+encodeURIComponent(itemId)+'/activity?'+params.toString());
+  const path='/items/'+encodeURIComponent(itemId)+'/activity?'+params.toString();
+  return mode==='api'&&!queryText?requestCachedGet(path,'activity:'+String(itemId)+':'+scope):request('GET',path);
  }
- async function queryGlobalActivity(){return request('GET','/activity?scope=application');}
+ async function queryGlobalActivity(){return mode==='api'?requestCachedGet('/activity?scope=application','activity:application'):request('GET','/activity?scope=application');}
  async function listArchive(options={},onPage){
   const pageSize=Math.max(1,Math.min(500,Number(options.limit||250)));let offset=Math.max(0,Number(options.offset||0)),all=[],result=null,pages=0;
   while(true){

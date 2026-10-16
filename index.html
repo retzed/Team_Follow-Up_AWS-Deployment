@@ -1172,6 +1172,7 @@ html[dir="rtl"] #signOutButton svg {
 <style id="activity-history-recovery-and-rtl-fixes">
 /* History header geometry is independent of flex order, grid tracks, and document bidi direction. */
 #modalRoot .modal-head{direction:ltr!important;flex-direction:row!important}
+#modalRoot .modal-head>button[data-action="close-modal"]{margin-inline-start:auto!important;flex:0 0 auto}
 #modalRoot .modal.project-history-modal>.modal-head,
 #modalRoot .modal.application-history-modal>.modal-head{position:relative!important;display:block!important}
 #modalRoot .modal.project-history-modal>.modal-head>div,

@@ -15,7 +15,7 @@ assert.doesNotMatch(persistence, /refreshActivityFor\(|changedActivityRoots/, 'W
 assert.match(persistence, /mergeActivityEventsIntoWorkspace\(desired\.activity\|\|\[\]\)/, 'Server-normalized activity events must be merged into the app model.');
 assert.match(html, /async function refreshActivityFor\(itemId,scope='all'\)/, 'Activity history has a data-API refresh path.');
 assert.match(html, /queryActivity\(String\(itemId\),scope\)/, 'Activity refresh must query the selected item/root from the data API.');
-assert.match(fn('openHistory', 'openEdit'), /refreshActivityFor\(/, 'Opening history must refresh from the API.');
+assert.match(fn('openHistory', 'openEdit'), /historyPopupReady\([\s\S]*?ensureActivityFromRootCache\(/, 'Opening child history must reuse the loaded root Activity cache and only refresh the root when needed.');
 assert.ok(html.includes("case 'detail-tab':ui.tab=actionEl.dataset.tab;renderDetail();break;"), 'Switching the dashboard Activity tab must not load Activity history.');
 assert.match(html, /result\?\.activityEvents\|\|\[\]/, 'Archive restore response events must be retained even while a DynamoDB GSI is catching up.');
 

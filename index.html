@@ -2746,7 +2746,7 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
 $('#app').addEventListener('click',ev=>{if($('#modalRoot').contains(ev.target))return;const actionEl=ev.target.closest('[data-action]');if(actionEl){if(actionEl.dataset.action==='backdrop-close'&&ev.target!==actionEl)return;ev.preventDefault();handleAction(actionEl);}});
 window.addEventListener('resize',()=>{const mobile=isMobileSidebarViewport();if(mobile!==previousMobileSidebarViewport){previousMobileSidebarViewport=mobile;ui.sidebarCollapsed=mobile;applyTranslations();}});
 $('#app').addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.parent-card[tabindex="0"]')&&!ev.target.querySelector(':focus')){ev.preventDefault();handleAction(ev.target);}});
-$('#modalRoot').addEventListener('click',ev=>{const actionEl=ev.target.closest('[data-action]');if(actionEl){if(actionEl.dataset.action==='backdrop-close'&&ev.target!==actionEl)return;if(actionEl.dataset.action==='backdrop-close'){ui.modal=null;renderModal();return;}ev.preventDefault();handleAction(actionEl);}});
+$('#modalRoot').addEventListener('click',ev=>{ev.stopPropagation();const actionEl=ev.target.closest('[data-action]');if(actionEl){if(actionEl.dataset.action==='backdrop-close'&&ev.target!==actionEl)return;if(actionEl.dataset.action==='backdrop-close'){ui.modal=null;renderModal();return;}ev.preventDefault();handleAction(actionEl);}});
 $('#modalRoot').addEventListener('submit',ev=>{if(ev.target.id==='itemForm'){ev.preventDefault();handleItemSubmit(ev.target);}});
 $('#modalRoot').addEventListener('scroll',ev=>{
  if(ui.modal?.kind!=='global-history')return;

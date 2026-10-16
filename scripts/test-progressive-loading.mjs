@@ -131,14 +131,14 @@ const globalHistoryMarkup=html.slice(historyBranchEnd,html.indexOf("} else if(m.
 check(globalHistoryMarkup.includes('let events=applicationHistoryEvents.slice();')&&globalHistoryMarkup.includes('const visibleEvents=events;'),'Global history must render only fetched pages.');
 check(globalHistoryMarkup.includes('application-history-scroll')&&html.includes('loadMoreApplicationHistory'),'Global history must load additional pages as the user reaches the end.');
 check(html.includes('function loadRemainingApplicationHistoryForSearch()')&&html.includes('queryGlobalActivity({limit:APPLICATION_HISTORY_PAGE_SIZE,offset:Number(offset)||0})'),'Search must filter loaded pages and fetch the remainder with a loading indicator.');
-check(globalHistoryMarkup.includes('data-action="history-load-more"')&&html.includes("case 'history-load-more':"),'Global history must expose incremental rendering for additional events.');
+check(html.includes('function applicationHistoryLoadTailMarkup()')&&html.includes('data-action="history-load-more"')&&html.includes("case 'history-load-more':"),'Global history must expose an incremental loading tail and load-more fallback.');
 check(html.includes('.data-loading-state.compact { justify-content:center;')&&html.includes('.history-card-list > .data-loading-state'),'Loading indicators in popup/card areas must be centered.');
 
 
 check(html.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v2:'") && html.includes('function requestCachedGet(path,key){'), 'Fetched API data must be stored persistently and conditionally revalidated.');
 check(html.includes("requestCachedGet('/users','team-users')") && html.includes("requestCachedGet('/items?scope=top-level&dateMode=updated&direction=desc','top-level-items')"), 'Startup must validate persisted profiles and top-level data.');
 check(html.includes("requestCachedGet(path,'activity:'+String(itemId)+':'+scope+':'+queryText)"), 'Item history must be conditionally revalidated from its local disk cache.');
-check(html.includes("requestCachedGet('/activity?scope=application','activity:application')"), 'Application-wide history must be conditionally revalidated from its local disk cache.');
+check(html.includes("requestCachedGet(path,'activity:application:'+params.toString())")&&html.includes('async function queryGlobalActivity(options={})'), 'Application-wide history pages must be conditionally revalidated and cached per page.');
 check(html.includes("void refreshActivityFor(id,'all')") && html.includes("void ensureActivityFromRootCache(itemId)"), 'Selecting a parent and expanding a child must reuse the root Activity cache.');
 check(html.includes('function historyRootIdFor(itemId)')&&html.includes('dataLoadState.activityLoaded.has(`${rootId}:all`)'),'Loaded parent history must satisfy descendant popup readiness.');
 check(html.includes("scope==='all'&&String(selected.id)===String(itemId)"),'The Activity tab event count must refresh when root history arrives.');

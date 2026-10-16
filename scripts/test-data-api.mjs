@@ -8,7 +8,6 @@ assert.ok(match, 'the frontend must contain the AWS data API module');
 const source = match[1];
 
 for (const forbidden of [
-  'localStorage',
   'mockRoute',
   'builtin.local',
   'memoryTables',
@@ -19,6 +18,9 @@ for (const forbidden of [
   assert.ok(!source.includes(forbidden), `AWS data adapter must not contain ${forbidden}`);
 }
 
+const storage = new Map();
+const localStorage = { getItem:key=>storage.has(key)?storage.get(key):null, setItem:(key,value)=>storage.set(key,String(value)), removeItem:key=>storage.delete(key) };
+assert.ok(source.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v1:'") && source.includes('function requestCachedGet(path,key){'), 'Only the API response cache may use browser storage.');
 const requests = [];
 const project = {
   id: 'project-1',
@@ -100,7 +102,7 @@ const window = {
     }
   }
 };
-vm.runInNewContext(source, { window, console, URL, URLSearchParams });
+vm.runInNewContext(source, { window, localStorage, console, URL, URLSearchParams });
 
 const api = window.TeamFollowUpDataApi;
 assert.ok(api, 'AWS data API must be registered');

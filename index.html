@@ -1210,7 +1210,6 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  function readApiDiskCache(key){try{const raw=localStorage.getItem(API_CACHE_PREFIX+key);if(!raw)return null;const value=JSON.parse(raw);return value&&value.payload?value:null;}catch(error){return null;}}
  function writeApiDiskCache(key,value){try{localStorage.setItem(API_CACHE_PREFIX+key,JSON.stringify(value));return true;}catch(error){console.warn('Could not persist the API cache to browser storage.',error);return false;}}
  async function requestCachedGet(path,key){
-  if(mode!=='api')return request('GET',path);
   const cached=readApiDiskCache(key);const url=new URL(String(path||''),window.location.origin);url.searchParams.set('cacheMode','1');
   if(cached&&cached.version)url.searchParams.set('cacheVersion',String(cached.version));
   let result=await request('GET',url.pathname+url.search);
@@ -1302,7 +1301,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function queryRootItems(rootParentId,options={}){
   const rootId=String(rootParentId||'');if(!rootId)throw new Error('A Project or Job ID is required to load its items.');
   const noFilters=!options.type&&!options.status&&!options.priority&&!options.query&&!options.from&&!options.to;
-  if(mode==='api'&&noFilters&&!options.onPage&&(options.dateMode||'updated')==='updated'&&(options.direction||'desc')==='desc'){
+  if(noFilters&&!options.onPage&&(options.dateMode||'updated')==='updated'&&(options.direction||'desc')==='desc'){
    const cached=await requestCachedGet('/items?rootParentId='+encodeURIComponent(rootId)+'&dateMode=updated&direction=desc','root-items:'+rootId);
    const items=(cached?.items||[]).map(item=>item&&item.id?item:toAppItem(item)).filter(item=>String(item.id)!==rootId&&item.type!=='project'&&item.type!=='job');
    return {items,count:items.length,nextOffset:null,version:cached?.version||''};
@@ -1322,9 +1321,9 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function queryActivity(itemId,scope='item',queryText=''){
   const params=new URLSearchParams({scope:scope});if(queryText)params.set('q',queryText);
   const path='/items/'+encodeURIComponent(itemId)+'/activity?'+params.toString();
-  return mode==='api'&&!queryText?requestCachedGet(path,'activity:'+String(itemId)+':'+scope):request('GET',path);
+  return !queryText?requestCachedGet(path,'activity:'+String(itemId)+':'+scope):request('GET',path);
  }
- async function queryGlobalActivity(){return mode==='api'?requestCachedGet('/activity?scope=application','activity:application'):request('GET','/activity?scope=application');}
+ async function queryGlobalActivity(){return requestCachedGet('/activity?scope=application','activity:application');}
  async function listArchive(options={},onPage){
   const pageSize=Math.max(1,Math.min(500,Number(options.limit||250)));let offset=Math.max(0,Number(options.offset||0)),all=[],result=null,pages=0;
   while(true){

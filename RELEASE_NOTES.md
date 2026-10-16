@@ -1,5 +1,16 @@
 # Release notes
 
+## 16 October 2026 — Frontend responsiveness and deployment impact
+
+- Prevented modal actions from being dispatched by both the modal and the outer workspace click delegates.
+- Replaced recursive descendant collection with iterative, cycle-safe traversal and used direct-child hierarchy checks for modal type validation.
+- Changed child-item date comparison to use per-item Activity index entries instead of repeatedly scanning the full Project/Job Activity timeline.
+- Added regression coverage for modal click propagation, cyclic/deep hierarchies, and indexed child timestamp lookup; updated the shared frontend reliability notes in both repositories.
+- **AWS impact:** frontend source and test changes only. The Cognito identity contract, HTTP API routes and payloads, Lambda handler/interface, DynamoDB table/index schema, IAM policy, Amplify environment-variable names, and SAM/CloudFormation resources are unchanged. No database migration or Lambda redeployment is required for these UI fixes.
+- **Release path:** test/build the frontend and allow the connected Amplify branch to build the new static artifact. Use the Console runbook for the normal workflow; do not run `sam deploy` solely for a frontend-only change. The optional full-stack template remains a separate from-scratch method.
+
+Validation workflows: [AWS repository validation](https://github.com/retzed/Team_Follow-Up_AWS-Deployment/actions) and [public demo test/deploy workflow](https://github.com/retzed/Team_Follow-Up/actions).
+
 ## AWS Console deployment model and complete automation template
 
 The project's primary AWS resource-creation method is the AWS Management Console. The full-stack CloudFormation/SAM template is retained as an optional automation/reference method, not as the normal deployment workflow.

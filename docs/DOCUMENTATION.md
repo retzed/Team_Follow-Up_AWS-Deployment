@@ -1097,7 +1097,7 @@ The normal release build requires real public Cognito IDs and a real HTTPS API b
 
 **Frontend responsiveness regression coverage (16 October 2026):** the progressive-loading tests also exercise the single-owner modal click handler, iterative/cycle-safe traversal using synthetic deep and cyclic hierarchies, and direct-child type validation. Child-search regression checks verify that child date comparison uses the child's indexed Activity events rather than scanning the full root timeline for each comparator call. These are frontend safeguards; they do not change the API, Cognito, table keys/indexes, or Lambda authorization model.
 
-For a frontend-only change, `npm run test:all` and `npm run build` validate the repository's UI/build path. The Amplify branch then builds/publishes the static artifact. Do not redeploy Lambda or change CloudFormation/DynamoDB resources solely for modal, hierarchy-traversal, or sorting changes. A backend contract, Lambda, IAM, or infrastructure change follows the corresponding deployment path below.
+For a frontend-only change, `npm run test:all` validates the UI/build contracts and `npm run build` creates the configured AWS frontend artifact. A local `npm run build` requires the three real public build variables (`TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, `TEAM_FOLLOW_UP_API_BASE_URL`); an Amplify build receives these from the branch configuration. The Amplify branch then builds/publishes the static artifact. Do not redeploy Lambda or change CloudFormation/DynamoDB resources solely for modal, hierarchy-traversal, or sorting changes. A backend contract, Lambda, IAM, or infrastructure change follows the corresponding deployment path below.
 
 ### 10.2 Integration test plan
 

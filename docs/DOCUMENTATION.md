@@ -2,7 +2,7 @@
 
 **Document purpose:** consolidated system analysis, design, data modeling, behavior, UI/UX, API, security, testing, operations, and deployment reference.
 
-**Documentation status:** 15 October 2026. This document describes the complete target architecture and repository implementation, while keeping the current AWS-account snapshot distinct from target-state assumptions. The primary deployment method is manual creation/configuration through the AWS Management Console. `backend/template.yaml` is maintained as an optional full-stack CloudFormation/SAM automation template for a fresh environment. A passing CI workflow is not proof of a live AWS deployment.
+**Documentation reviewed:** 16 October 2026. The account-specific resource status remains the dated 15 October 2026 snapshot recorded in the implementation record; frontend changes later than that date do not imply that AWS resources were created or modified. This document describes the complete target architecture and repository implementation, while keeping the current AWS-account snapshot distinct from target-state assumptions. The primary deployment method is manual creation/configuration through the AWS Management Console. `backend/template.yaml` is maintained as an optional full-stack CloudFormation/SAM automation template for a fresh environment. A passing CI workflow is not proof of a live AWS deployment.
 
 ## Contents
 
@@ -1095,6 +1095,10 @@ sam build --template-file backend/template.yaml
 
 The normal release build requires real public Cognito IDs and a real HTTPS API base URL; CI uses test configuration only for validating the build path.
 
+**Frontend responsiveness regression coverage (16 October 2026):** the progressive-loading tests also exercise the single-owner modal click handler, iterative/cycle-safe traversal using synthetic deep and cyclic hierarchies, and direct-child type validation. Child-search regression checks verify that child date comparison uses the child's indexed Activity events rather than scanning the full root timeline for each comparator call. These are frontend safeguards; they do not change the API, Cognito, table keys/indexes, or Lambda authorization model.
+
+For a frontend-only change, `npm run test:all` and `npm run build` validate the repository's UI/build path. The Amplify branch then builds/publishes the static artifact. Do not redeploy Lambda or change CloudFormation/DynamoDB resources solely for modal, hierarchy-traversal, or sorting changes. A backend contract, Lambda, IAM, or infrastructure change follows the corresponding deployment path below.
+
 ### 10.2 Integration test plan
 
 Run these checks in a dedicated test environment after the API and frontend have been deployed:
@@ -1259,6 +1263,9 @@ For an intentional full-stack automation experiment in a fresh environment, use 
 The table resources in the template use both `DeletionPolicy: Retain` and `UpdateReplacePolicy: Retain`. Deleting the stack therefore does not automatically delete table data; a later deployment with the same names will fail until retained tables have been deliberately inspected and reconciled. The template is a starting automation reference and should be validated in a disposable/fresh environment before use.
 
 ### 11.6 Releases, troubleshooting and recovery
+
+**Frontend-only release procedure:** run the frontend tests/build, push the reviewed source to the connected Amplify branch, and verify the new Amplify build and the key UI flows. The modal-dispatch, hierarchy traversal, and indexed timestamp changes documented on 16 October 2026 do not alter API routes/payloads, Cognito attributes or app-client settings, DynamoDB keys/indexes, IAM, or Amplify environment-variable names. They require a new static frontend artifact, not a Lambda redeployment or database migration. The optional SAM/CloudFormation stack is for infrastructure/backend changes or a from-scratch automated environment, not routine UI-only publishing.
+
 
 - **Frontend build fails:** verify all four public Amplify variables and select the correct Node.js 24 build image; then restart the build.
 - **Browser CORS failure:** compare the browser's scheme + hostname with the configured exact CORS origin. For the console workflow, adjust CORS in API Gateway; for an optional template stack, update/redeploy the template. Do not use a wildcard as a shortcut.

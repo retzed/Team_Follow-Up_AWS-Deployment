@@ -184,6 +184,6 @@ const globalHistoryScrollStart=html.indexOf("addEventListener('scroll',ev=>{if(u
 const globalHistoryScrollEnd=html.indexOf('},true);',globalHistoryScrollStart);
 check(globalHistoryScrollStart>=0&&globalHistoryScrollEnd>globalHistoryScrollStart&&html.slice(globalHistoryScrollStart,globalHistoryScrollEnd).includes(".application-history-scroll")&&html.slice(globalHistoryScrollStart,globalHistoryScrollEnd).includes('void loadMoreApplicationHistory()'), 'Reaching the bottom of the application-wide history scroll region must request the next page.');
 const searchFillStart=html.indexOf('async function loadRemainingApplicationHistoryForSearch()');
-const searchFillEnd=html.indexOf('function scheduleWorkspaceCacheSave',searchFillStart);
+const searchFillEnd=html.indexOf('function persist()',searchFillStart);
 check(searchFillStart>=0&&searchFillEnd>searchFillStart&&html.slice(searchFillStart,searchFillEnd).includes('await loadMoreApplicationHistory(true)')&&html.slice(searchFillStart,searchFillEnd).includes('while(')&&html.includes('void loadRemainingApplicationHistoryForSearch()'), 'Searching application-wide history must continue loading pages until search coverage is complete or a recoverable error occurs.');
 console.log('Progressive-loading tests passed: lean bootstrap, selected-root child hydration, popup-only activity reads, retry safety, accessible spinners, archive pagination, and mobile history controls.');

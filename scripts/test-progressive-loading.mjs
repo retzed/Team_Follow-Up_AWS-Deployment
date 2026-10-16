@@ -219,7 +219,7 @@ check(historyHeaderCss.includes('.modal.project-history-modal>.modal-head,')&&hi
 // the outer delegate must ignore those clicks rather than dispatching them twice.
 check(html.includes("$('#app').addEventListener('click',ev=>{if($('#modalRoot').contains(ev.target))return;"),
   'Modal clicks must not bubble into the workspace action dispatcher a second time.');
-check(html.includes("$('#modalRoot').addEventListener('click',ev=>{const actionEl=ev.target.closest('[data-action]');"),
+check(html.includes("$('#modalRoot').addEventListener('click',ev=>{ev.stopPropagation();const actionEl=ev.target.closest('[data-action]');"),
   'The modal must retain its own delegated action handler.');
 
 // Opening edit/new-item modals calls allDescendants() to validate hierarchy-dependent type choices.

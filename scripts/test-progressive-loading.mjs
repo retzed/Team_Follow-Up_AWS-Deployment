@@ -159,7 +159,7 @@ check(html.includes("requestCachedGet('/users','team-users')") && html.includes(
 check(html.includes("requestCachedGet(path,'activity:'+String(itemId)+':'+scope+':'+queryText)"), 'Item history must be conditionally revalidated from its local disk cache.');
 check(html.includes("requestCachedGet(path,'activity:application:'+params.toString())")&&html.includes('async function queryGlobalActivity(options={})'), 'Application-wide history pages must be conditionally revalidated and cached per page.');
 check(html.includes("void refreshActivityFor(id,'all')") && html.includes("void ensureActivityFromRootCache(itemId)"), 'Selecting a parent and expanding a child must reuse the root Activity cache.');
-check(html.includes('function historyRootIdFor(itemId)')&&html.includes('dataLoadState.activityLoaded.has(`${rootId}:all`)'),'Loaded parent history must satisfy descendant popup readiness.');
+check(html.includes('function historyRootIdFor(itemId)')&&html.includes('function ensureActivityFromRootCache(itemId){const rootId=historyRootIdFor(itemId);if(applicationHistoryCacheIsComplete()'), 'Completed application-wide history must satisfy descendant popup readiness without another API request.');
 check(html.includes("scope==='all'&&String(selected.id)===String(itemId)"),'The Activity tab event count must refresh when root history arrives.');
 check(html.includes('data-filter="urgent"')&&html.includes("ui.childPriority==='urgent'"),'Jobs must show an Urgent metric instead of Tasks.');
 check(html.includes("parent.type==='project'?\`<button") && html.includes('data-filter="tasks"'), 'The Tasks metric is rendered only for Projects, not Jobs.');

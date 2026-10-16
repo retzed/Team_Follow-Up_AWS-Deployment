@@ -1149,6 +1149,25 @@ html[dir="rtl"] #signOutButton svg {
 .application-history-load-state{display:flex;align-items:center;justify-content:center;padding:9px 4px 2px;min-height:34px}
 .application-history-load-state .data-loading-state{width:100%;justify-content:center;box-sizing:border-box}
 </style>
+
+<style id="theme-scrollbars-and-stable-history-modals">
+/* Use the active light/dark colors for native scrollbars throughout the app. */
+:root,*{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--accent) 55%,var(--muted)) var(--panel-2)}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:var(--panel-2);border-radius:999px}
+*::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--accent) 36%,var(--muted));border:2px solid var(--panel-2);border-radius:999px}
+*::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+*::-webkit-scrollbar-corner{background:var(--panel)}
+#modalRoot .modal.application-history-modal,#modalRoot .modal.project-history-modal{height:min(82dvh,760px);min-height:min(360px,calc(100dvh - 24px));max-height:calc(100dvh - 24px);box-sizing:border-box}
+#modalRoot .modal.application-history-modal>.modal-content,#modalRoot .modal.project-history-modal>.modal-content{display:flex;flex:1 1 0;flex-direction:column;min-height:0;overflow:hidden}
+#modalRoot .modal.application-history-modal .application-history-scroll{display:block;flex:1 1 0;min-height:0;max-height:none!important;overflow:auto}
+#modalRoot .modal.application-history-modal .history-card-list{max-height:none!important;overflow:visible!important}
+#modalRoot .modal.application-history-modal .history-table-wrap{max-height:none!important}
+#modalRoot .modal.project-history-modal .history-table-wrap,#modalRoot .modal.project-history-modal .history-card-list{flex:1 1 auto;min-height:0;max-height:none}
+@media(max-width:700px){
+ #modalRoot .modal.application-history-modal,#modalRoot .modal.project-history-modal{height:min(88dvh,860px);min-height:min(320px,calc(100dvh - 24px));max-height:calc(100dvh - 24px)}
+}
+</style>
 </head>
 <body>
 <section class="signin-screen" id="signInScreen" role="dialog" aria-modal="true" aria-labelledby="signInTitle" hidden>
@@ -1685,6 +1704,70 @@ let applicationHistoryGeneration=0;
 let applicationHistoryPagePromise=null;
 let applicationHistorySearchFillActive=false;
 const APPLICATION_HISTORY_PAGE_SIZE=100;
+const APPLICATION_HISTORY_CACHE_KEY='team-follow-up-application-history-v1';
+let applicationHistoryCacheChecked=false;
+let applicationHistoryCacheInvalidated=false;
+function saveApplicationHistoryCache(){
+ if(applicationHistoryCacheInvalidated)return false;
+ try{
+  localStorage.setItem(APPLICATION_HISTORY_CACHE_KEY,JSON.stringify({version:1,events:applicationHistoryEvents,nextOffset:applicationHistoryNextOffset,total:applicationHistoryTotal,hasLoaded:applicationHistoryHasLoaded,ready:applicationHistoryReady,savedAt:Date.now()}));
+  return true;
+ }catch(error){console.warn('Could not persist application-wide Activity history.',error);return false;}
+}
+function restoreApplicationHistoryCache(){
+ if(applicationHistoryCacheChecked)return applicationHistoryHasLoaded&&!applicationHistoryCacheInvalidated;
+ applicationHistoryCacheChecked=true;
+ let stored=null;
+ try{stored=JSON.parse(localStorage.getItem(APPLICATION_HISTORY_CACHE_KEY)||'null');}catch(error){}
+ if(!stored||stored.version!==1)return false;
+ if(stored.invalidated){applicationHistoryCacheInvalidated=true;return false;}
+ if(!Array.isArray(stored.events)||!stored.hasLoaded)return false;
+ applicationHistoryEvents=stored.events.map(normalizeActivityEventForUi).filter(event=>event&&event.id&&Number.isFinite(Date.parse(event.at))&&Date.parse(event.at)<=Date.now());
+ const rawNext=stored.nextOffset;
+ applicationHistoryNextOffset=rawNext===null||rawNext===undefined?null:Number(rawNext);
+ if(applicationHistoryNextOffset!==null&&!Number.isFinite(applicationHistoryNextOffset))applicationHistoryNextOffset=0;
+ applicationHistoryTotal=Number.isFinite(Number(stored.total))?Number(stored.total):applicationHistoryEvents.length;
+ applicationHistoryHasLoaded=true;
+ applicationHistoryReady=stored.ready===true||applicationHistoryNextOffset===null;
+ applicationHistoryError='';
+ applicationHistoryCacheInvalidated=false;
+ const changed=mergeActivityEventsIntoWorkspace(applicationHistoryEvents);
+ if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],applicationHistoryEvents);lastApiSnapshot.activity=merged.rows;}
+ if(changed&&typeof scheduleWorkspaceCacheSave==='function')scheduleWorkspaceCacheSave();
+ return true;
+}
+function applicationHistoryCacheIsComplete(){
+ restoreApplicationHistoryCache();
+ return applicationHistoryHasLoaded&&applicationHistoryReady&&!applicationHistoryCacheInvalidated;
+}
+function invalidateApplicationHistoryCache(){
+ applicationHistoryCacheChecked=true;applicationHistoryCacheInvalidated=true;
+ applicationHistoryGeneration++;applicationHistoryRequest++;applicationHistoryPagePromise=null;
+ applicationHistoryEvents=[];applicationHistoryNextOffset=0;applicationHistoryTotal=0;
+ applicationHistoryHasLoaded=false;applicationHistoryReady=false;applicationHistoryLoading=false;applicationHistoryError='';applicationHistorySearchFillActive=false;
+ try{localStorage.setItem(APPLICATION_HISTORY_CACHE_KEY,JSON.stringify({version:1,invalidated:true,updatedAt:Date.now()}));}catch(error){console.warn('Could not invalidate application-wide Activity history.',error);}
+ if(ui.modal?.kind==='global-history')setTimeout(()=>{if(ui.modal?.kind==='global-history')void refreshApplicationHistory(true);},0);
+}
+function updateApplicationHistoryFromCommittedEvents(rows){
+ const incoming=(rows||[]).map(normalizeActivityEventForUi).filter(event=>event&&event.id&&Number.isFinite(Date.parse(event.at))&&Date.parse(event.at)<=Date.now());
+ if(!incoming.length)return;
+ restoreApplicationHistoryCache();
+ if(applicationHistoryCacheIsComplete()){
+  const seen=new Set(applicationHistoryEvents.map(event=>String(event.id||event.eventId||'')));
+  let added=0;
+  for(const event of incoming){const id=String(event.id||event.eventId||'');if(!id||seen.has(id))continue;seen.add(id);applicationHistoryEvents.push(event);added++;}
+  if(!added)return;
+  applicationHistoryEvents.sort(stableNewestFirst);
+  applicationHistoryTotal=Math.max(applicationHistoryEvents.length,Number(applicationHistoryTotal)||0);
+  applicationHistoryNextOffset=null;applicationHistoryHasLoaded=true;applicationHistoryReady=true;applicationHistoryError='';applicationHistoryCacheInvalidated=false;
+  mergeActivityEventsIntoWorkspace(incoming);
+  if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],incoming);lastApiSnapshot.activity=merged.rows;}
+  saveApplicationHistoryCache();
+  if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();
+ }else{
+  invalidateApplicationHistoryCache();
+ }
+}
 function invalidateActivityIndexes(){activityIndexRevision++;activityIndexCache.source=null;activityRootSnapshotCache.source=null;historySearchCache.clear();}
 function ensureActivityRootSnapshotIndex(){
  const rows=Array.isArray(data.activity)?data.activity:[];
@@ -1788,11 +1871,13 @@ function ensureActivityIndex(){
 function projectActivityEvents(rootId){if(!rootId)return [];return [...(ensureActivityIndex().byRoot.get(String(rootId))||[])];}
 function eventRootName(event){const rootId=String(event.rootParentId||'');const root=rootId?allItem(rootId):null;return String(root?.name||event.rootParentName||event.rootNameSnapshot||(rootId&&rootId===event.itemId?event.itemName:'')||tr('unknownProject'));}
 function renderModalPreservingInteraction(){
- const scroller=$('#modalRoot .modal-content');const modalScrollTop=scroller?.scrollTop||0;
- const focused=document.activeElement;const focusId=focused&&$('#modalRoot')?.contains(focused)?focused.id:'';
+ const modalRoot=$('#modalRoot');const selectors=['.modal-content','.application-history-scroll','.history-table-wrap','.history-card-list','.archive-groups'];const savedScroll=[];
+ for(const selector of selectors) $(selector,modalRoot).forEach((node,index)=>savedScroll.push({selector,index,top:node.scrollTop,left:node.scrollLeft}));
+ const focused=document.activeElement;const focusId=focused&&modalRoot.contains(focused)?focused.id:'';
  const selection=focusId&&typeof focused.selectionStart==='number'?{start:focused.selectionStart,end:focused.selectionEnd}:null;
- renderModal();const nextScroller=$('#modalRoot .modal-content');if(nextScroller)nextScroller.scrollTop=modalScrollTop;
- if(focusId){const next=$(`#modalRoot #${CSS.escape(focusId)}`);if(next){next.focus({preventScroll:true});if(selection&&typeof next.setSelectionRange==='function')try{next.setSelectionRange(selection.start,selection.end);}catch(e){}}}
+ renderModal(true);
+ for(const state of savedScroll){const nodes=$(state.selector,modalRoot);const node=nodes[state.index];if(node){node.scrollTop=state.top;node.scrollLeft=state.left;}}
+ if(focusId){const next=$('#modalRoot #'+CSS.escape(focusId));if(next){next.focus({preventScroll:true});if(selection&&typeof next.setSelectionRange==='function')try{next.setSelectionRange(selection.start,selection.end);}catch(e){}}}
 }
 function renderAfterActivityRefresh(itemId,scope){
  if(ui.modal?.kind==='global-history'){renderModalPreservingInteraction();}
@@ -1835,11 +1920,10 @@ async function refreshActivityFor(itemId,scope='all'){
 }
 function applicationHistoryLoadTailMarkup(){
  if((applicationHistoryLoading&&applicationHistoryHasLoaded)||applicationHistorySearchFillActive)return `<div class="application-history-load-state">${spinnerMarkup(tr('loadingActivity'),true)}</div>`;
- if(!applicationHistoryReady&&applicationHistoryHasLoaded&&!applicationHistoryError)return `<div class="history-load-more-wrap"><button class="btn btn-small" type="button" data-action="history-load-more">${esc(tr('loadMoreActivity'))}</button></div>`;
  return '';
 }
 function refreshApplicationHistory(silent=false){
- applicationHistoryGeneration++;applicationHistoryPagePromise=null;applicationHistoryEvents=[];applicationHistoryNextOffset=0;applicationHistoryTotal=0;applicationHistoryHasLoaded=false;applicationHistoryReady=false;applicationHistoryError='';applicationHistorySearchFillActive=false;
+ applicationHistoryGeneration++;applicationHistoryPagePromise=null;applicationHistoryEvents=[];applicationHistoryNextOffset=0;applicationHistoryTotal=0;applicationHistoryHasLoaded=false;applicationHistoryReady=false;applicationHistoryError='';applicationHistorySearchFillActive=false;applicationHistoryLoading=false;applicationHistoryCacheChecked=true;applicationHistoryCacheInvalidated=false;
  return loadMoreApplicationHistory(silent);
 }
 function loadMoreApplicationHistory(silent=false){
@@ -1849,7 +1933,7 @@ function loadMoreApplicationHistory(silent=false){
  const generation=applicationHistoryGeneration;const offset=applicationHistoryHasLoaded?applicationHistoryNextOffset:0;
  if(offset===null&&applicationHistoryHasLoaded){applicationHistoryReady=true;return Promise.resolve(false);}
  const requestId=++applicationHistoryRequest;applicationHistoryLoading=true;
- if(!silent&&ui.modal?.kind==='global-history')renderModalPreservingInteraction();
+ if(!silent&&ui.modal?.kind==='global-history'&&applicationHistoryHasLoaded)renderModalPreservingInteraction();
  const promise=(async()=>{
   try{
    await apiPersistQueue.catch(()=>{});
@@ -1863,7 +1947,7 @@ function loadMoreApplicationHistory(silent=false){
    applicationHistoryTotal=Number.isFinite(Number(result?.count))?Number(result.count):applicationHistoryEvents.length;
    applicationHistoryNextOffset=result?.nextOffset===undefined?null:result.nextOffset;
    applicationHistoryHasLoaded=true;applicationHistoryReady=applicationHistoryNextOffset===null;
-   applicationHistoryError='';
+   applicationHistoryError='';applicationHistoryCacheChecked=true;applicationHistoryCacheInvalidated=false;saveApplicationHistoryCache();
    if(changed){try{if(typeof scheduleWorkspaceCacheSave==='function')scheduleWorkspaceCacheSave();}catch(e){}}
    if(ui.sidebarMode==='search')renderParentSearchList(filteredParents());
    const selected=data.parents.find(p=>String(p.id)===String(ui.selectedParentId));
@@ -1897,7 +1981,9 @@ function persist(){
  const desired=copyWorkspace(data);const previous=lastApiSnapshot;
  if(!lastApiSnapshot||!window.TeamFollowUpDataApi)return Promise.resolve();
  apiPersistQueue=apiPersistQueue.then(async()=>{
+  const previousActivityIds=new Set((lastApiSnapshot?.activity||[]).map(event=>String(event.id||event.eventId||'')));
   await window.TeamFollowUpDataApi.commitSnapshot(lastApiSnapshot,desired);
+  updateApplicationHistoryFromCommittedEvents((desired.activity||[]).filter(event=>{const id=String(event.id||event.eventId||'');return id&&!previousActivityIds.has(id);}));
   {
    for(const saved of [...desired.parents,...desired.children]){
     const live=allItem(saved.id);if(!live)continue;
@@ -2062,9 +2148,9 @@ function inlineSpinnerMarkup(){return `<span class="loading-count" role="status"
 function loadErrorMarkup(message=''){return `<div class="data-loading-error" role="alert"><span>${esc(message||tr('loadFailed'))}</span><button class="btn btn-small" type="button" data-action="retry-data-load">${esc(tr('retry'))}</button></div>`;}
 function rootChildrenReady(rootId){return dataLoadState.childrenLoaded.has(String(rootId));}
 function historyRootIdFor(itemId){const key=String(itemId||'');const item=allItem(key)||assignedItemCache.get(key)||(ui.modal?.kind==='history'&&String(ui.modal.itemId)===key?ui.modal.itemSnapshot:null);if(!item)return key;const root=['project','job'].includes(item.type)?item:rootParent(item);return String(root?.id||item.rootParentId||item.id||key);}
-function rootActivityReady(itemId,scope='all'){return dataLoadState.activityLoaded.has(`${String(itemId)}:${scope}`);}
-function historyPopupReady(itemId,scope='all'){if(dataLoadState.activityLoaded.has(`${String(itemId)}:${scope}`))return true;const rootId=historyRootIdFor(itemId);return Boolean(rootId&&dataLoadState.activityLoaded.has(`${rootId}:all`));}
-function ensureActivityFromRootCache(itemId){const rootId=historyRootIdFor(itemId);if(!rootId||dataLoadState.activityLoaded.has(`${rootId}:all`))return Promise.resolve();return refreshActivityFor(rootId,'all');}
+function rootActivityReady(itemId,scope='all'){return dataLoadState.activityLoaded.has(String(itemId)+':'+scope)||applicationHistoryCacheIsComplete();}
+function historyPopupReady(itemId,scope='all'){if(applicationHistoryCacheIsComplete())return true;if(dataLoadState.activityLoaded.has(String(itemId)+':'+scope))return true;const rootId=historyRootIdFor(itemId);return Boolean(rootId&&dataLoadState.activityLoaded.has(String(rootId)+':all'));}
+function ensureActivityFromRootCache(itemId){const rootId=historyRootIdFor(itemId);if(applicationHistoryCacheIsComplete()){if(rootId)dataLoadState.activityLoaded.add(String(rootId)+':all');return Promise.resolve();}if(!rootId||dataLoadState.activityLoaded.has(String(rootId)+':all'))return Promise.resolve();return refreshActivityFor(rootId,'all');}
 function rootLoadingError(rootId,part){return (part==='activity'?dataLoadState.rootErrors.get(`${part}:${rootId}:all`):null)||dataLoadState.rootErrors.get(`${part}:${rootId}`)||'';}
 function rootPendingMarkup(rootId,part,label){const message=rootLoadingError(rootId,part);return message?loadErrorMarkup(message):spinnerMarkup(label,true);}
 function countValueMarkup(value,ready,rootId=null,part='children'){if(ready)return String(value);const error=(rootId?rootLoadingError(rootId,part):'')||dataLoadState.initialError||'';if(error)return `<button class="loading-inline-retry" type="button" data-action="retry-data-load" title="${esc(error)}">${icon('refresh-cw',12)} ${esc(tr('retry'))}</button>`;return `<span class="metric-loading-value">${inlineSpinnerMarkup()}</span>`;}
@@ -2274,7 +2360,7 @@ function historyQueryMatches(event,query,applicationWide=false){
 }
 function stableNewestFirst(a,b){return (Date.parse(b.at)||0)-(Date.parse(a.at)||0)||String(b.id||'').localeCompare(String(a.id||''));}
 
-function renderModal(){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='';return;}const m=ui.modal;let content='';let title='',subtitle='',wide=false,footer='';
+function renderModal(preserveExisting=false){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='';return;}const m=ui.modal;let content='';let title='',subtitle='',wide=false,footer='';
  if(m.kind==='edit'||m.kind==='new-parent'||m.kind==='new-child'){
    const item=currentModalItem();const isParent=m.kind==='new-parent'||(item&&(item.type==='project'||item.type==='job'));const isNew=m.kind.startsWith('new-');const isChild=!isParent;const parent= m.parentId ? allItem(m.parentId) : (item?rootParent(item):null);const kind=isNew?(isParent?'parent': 'child'):(isParent?'parent':'child');const type=m.type||(item?.type)||(isParent?'project':'followup');title=isNew?(isParent?tr('newParentTitle'):tr('newChildTitle')):(isParent?tr(item?.type==='job'?'editJobTitle':'editParentTitle'):tr('editChildTitle'));subtitle='';
    const allowedParentChildren= m.kind==='new-child'?allowedChildTypes(m.parentId):[];
@@ -2372,7 +2458,14 @@ function renderModal(){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='
  } else if(m.kind==='confirm-delete'){
   const item=allItem(m.itemId);title=tr('deleteConfirm');subtitle=item?.name||'';const descendants=item&&(item.type==='project'||item.type==='job')?allDescendants(item.id):item&&item.type==='task'?allDescendants(item.id):[];content=`<div class="form-tip">${icon('info',15)}<span>${esc(tr('deleteWarning'))}${descendants.length?` (${descendants.length} ${esc(tr('items'))})`:''}</span></div>`;footer=`<div class="modal-footer"><span></span><div class="right"><button class="btn" data-action="close-modal" type="button">${esc(tr('cancel'))}</button><button class="btn btn-danger" data-action="confirm-delete" data-id="${esc(m.itemId)}" type="button">${icon('trash',13)} ${esc(tr('confirmDelete'))}</button></div></div>`;
  }
- const dismissOnBackdrop=m.kind==='history'||m.kind==='global-history';const archiveModal=m.kind==='archive';const appHistoryModal=m.kind==='global-history';const projectHistoryModal=m.kind==='history';root.innerHTML=`<div class="modal-backdrop" ${dismissOnBackdrop?'data-action="backdrop-close"':''}><section class="modal ${wide?'wide':''} ${archiveModal?'archive-modal':''} ${appHistoryModal?'application-history-modal':''} ${projectHistoryModal?'project-history-modal':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-head"><div><h2>${esc(title)}</h2>${subtitle?`<p dir="auto">${esc(subtitle)}</p>`:''}</div><button class="icon-btn" data-action="close-modal" type="button" aria-label="${esc(tr('close'))}">${icon('close',16)}</button></div><div class="modal-content ${archiveModal?'archive-modal-content':''}">${content}</div>${footer}</section></div>`;
+ const dismissOnBackdrop=m.kind==='history'||m.kind==='global-history';const archiveModal=m.kind==='archive';const appHistoryModal=m.kind==='global-history';const projectHistoryModal=m.kind==='history';const modalMarkup=\`<div class="modal-backdrop" \${dismissOnBackdrop?'data-action="backdrop-close"':''}><section class="modal \${wide?'wide':''} \${archiveModal?'archive-modal':''} \${appHistoryModal?'application-history-modal':''} \${projectHistoryModal?'project-history-modal':''}" data-modal-kind="\${esc(m.kind)}" role="dialog" aria-modal="true" aria-label="\${esc(title)}"><div class="modal-head"><div><h2>\${esc(title)}</h2>\${subtitle?\`<p dir="auto">\${esc(subtitle)}</p>\`:''}</div><button class="icon-btn" data-action="close-modal" type="button" aria-label="\${esc(tr('close'))}">\${icon('close',16)}</button></div><div class="modal-content \${archiveModal?'archive-modal-content':''}">\${content}</div>\${footer}</section></div>\`;
+ const existingModal=preserveExisting?root.querySelector('.modal'):null;
+ if(existingModal&&existingModal.dataset.modalKind===m.kind){
+  const headCopy=existingModal.querySelector('.modal-head > div');const heading=headCopy?.querySelector('h2');if(heading)heading.textContent=title;
+  let subtitleNode=headCopy?.querySelector('p');if(subtitle){if(!subtitleNode){subtitleNode=document.createElement('p');headCopy?.appendChild(subtitleNode);}if(subtitleNode){subtitleNode.dir='auto';subtitleNode.textContent=subtitle;}}else subtitleNode?.remove();
+  const contentNode=existingModal.querySelector('.modal-content');if(contentNode)contentNode.innerHTML=content;
+  const footerNode=existingModal.querySelector('.modal-footer');if(footerNode)footerNode.innerHTML=footer;
+ }else root.innerHTML=modalMarkup;
  if(m.focusNameOnOpen){m.focusNameOnOpen=false;const nameInput=$('#formName');if(nameInput)nameInput.focus({preventScroll:true});}
 }
 let toastTimer;
@@ -2396,7 +2489,7 @@ async function restoreSelectedArchive(){
   }
   invalidateHierarchyIndex();
   // The restore endpoint returns the committed summary events; don't wait for a GSI to become consistent.
-  mergeActivityEventsIntoWorkspace(result?.activityEvents||[]);
+  mergeActivityEventsIntoWorkspace(result?.activityEvents||[]);updateApplicationHistoryFromCommittedEvents(result?.activityEvents||[]);
   invalidateActivityIndexes();invalidateHierarchyIndex();lastApiSnapshot=copyWorkspace(data);
   
   const restoredIds=new Set((result?.restoredIds||restoredRows.map(x=>x.id||x.itemId)||selected).map(String));
@@ -2411,7 +2504,7 @@ async function restoreSelectedArchive(){
  }
 }
 function openHistory(itemId){const key=String(itemId||'');if(!key)return;const loadedItem=allItem(key)||assignedItemCache.get(key);const item=loadedItem||{id:key,type:'task',name:key,parentId:null,rootParentId:String(ui.selectedParentId||key)};if(!loadedItem)console.warn('Opening item history before its local item metadata is hydrated; resolving from the API.',key);const historyScope=item.type==='followup'?'item':'all';ui.modal={kind:'history',itemId:key,itemSnapshot:allItem(key)?null:{...item},historyQuery:'',historyScope,historyRefreshError:''};renderModal();if(!historyPopupReady(key,historyScope))void ensureActivityFromRootCache(key);}
-function openApplicationHistory(){applicationHistoryReady=false;applicationHistoryError='';ui.modal={kind:'global-history',historyQuery:'',historyUserFilter:'all',historyVisibleCount:100,historyRefreshError:''};renderModal();void refreshApplicationHistory();}
+function openApplicationHistory(){restoreApplicationHistoryCache();ui.modal={kind:'global-history',historyQuery:'',historyUserFilter:'all',historyVisibleCount:100,historyRefreshError:''};renderModal();if(applicationHistoryCacheInvalidated||!applicationHistoryHasLoaded)void refreshApplicationHistory();}
 function openEdit(id){const item=allItem(id);if(!item)return;ui.modal={kind:'edit',itemId:id};renderModal();}
 function openNewParent(){ui.modal={kind:'new-parent',type:'project',focusNameOnOpen:true};renderModal();}
 function openNewChild(parentId,type){const allowed=allowedChildTypes(parentId);if(!allowed.length){toast(tr('invalidChild'),true);return;}if(!allowed.includes(type))type=allowed[0];ui.modal={kind:'new-child',parentId,type,focusNameOnOpen:true};renderModal();}
@@ -2463,7 +2556,6 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
  }
  case 'open-archive':openArchive();break;
  case 'global-history':openApplicationHistory();break;
- case 'history-load-more':if(ui.modal?.kind==='global-history')void loadMoreApplicationHistory();break;
  case 'retry-data-load':if(ui.modal?.kind==='history')void refreshActivityFor(ui.modal.itemId,allItem(ui.modal.itemId)?.type==='followup'?'item':(ui.modal.historyScope||'all'));else if(ui.modal?.kind==='global-history')void refreshApplicationHistory();else if(!dataLoadState.parentsReady||dataLoadState.initialError)void startWorkspaceHydration();else if(ui.selectedParentId)void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});break;
  case 'archive-toggle-group':toggleArchiveGroup(actionEl.dataset.rootId);break;
  case 'archive-select-parent':toggleArchiveParent(actionEl.dataset.id);break;
@@ -2616,7 +2708,7 @@ async function startWorkspaceHydration(){
   dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;
   if(!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0]?.id||'';
   invalidateActivityIndexes();skipNextSidebarApiRefresh=true;render();
-  if(ui.selectedParentId){void ensureRootChildrenLoaded(ui.selectedParentId);void refreshActivityFor(ui.selectedParentId,'all');}
+  if(ui.selectedParentId){void ensureRootChildrenLoaded(ui.selectedParentId);}
  }catch(error){
   if(hydrationRun!==workspaceHydrationGeneration)return;
   dataLoadState.initialComplete=true;dataLoadState.initialError=String(error?.message||tr('loadFailed'));

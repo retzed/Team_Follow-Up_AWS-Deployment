@@ -37,8 +37,10 @@ check(itemPopup.includes('renderModal();if(!historyPopupReady(key,historyScope))
   'Child history popups must reuse cached parent Activity and load the root scope only when needed.');
 check(itemPopup.includes('const item=loadedItem||{id:key,type:\'task\',name:key'),
   'An item history popup must still open with a safe fallback snapshot when the local hierarchy has not hydrated that item.');
-check(appPopup.includes('renderModal();void refreshApplicationHistory()'),
-  'Application-wide Activity must be requested only when its popup opens.');
+check(appPopup.includes('restoreApplicationHistoryCache()') &&
+      appPopup.includes('if(applicationHistoryCacheInvalidated||!applicationHistoryHasLoaded)void refreshApplicationHistory()') &&
+      !appPopup.includes('applicationHistoryReady=false'),
+  'Reopening application-wide Activity must reuse persistent history and only fetch when the cache is missing or invalidated.');
 check(!appPopup.includes('refreshActivityFor('), 'The application-wide popup opener must not trigger unrelated item history.');
 
 const tabHandlerStart = html.indexOf("case 'detail-tab':");
@@ -46,8 +48,9 @@ check(tabHandlerStart >= 0, 'The dashboard detail-tab handler must exist.');
 const tabHandler = html.slice(tabHandlerStart, tabHandlerStart + 260);
 check(!tabHandler.includes('refreshActivityFor('),
   'Switching to the dashboard Activity tab must not issue an Activity-table request.');
-check(html.includes("if(ui.selectedParentId){void ensureRootChildrenLoaded(ui.selectedParentId);void refreshActivityFor(ui.selectedParentId,'all');}"),
-  'The initially selected Project/Job must preload its Activity history.');
+check(html.includes("if(ui.selectedParentId){void ensureRootChildrenLoaded(ui.selectedParentId);}") &&
+      !html.includes("if(ui.selectedParentId){void ensureRootChildrenLoaded(ui.selectedParentId);void refreshActivityFor(ui.selectedParentId,'all');}"),
+  'Startup must load the selected Project/Job items without preloading the Activity table.');
 
 const persistStart = html.indexOf('function persist()');
 const persistEnd = html.indexOf('const localizedUserNames', persistStart);
@@ -62,12 +65,13 @@ check(html.includes('function refreshApplicationHistory(') && html.includes('fun
   'The application-wide history loader and paged continuation must remain available for popup open, scroll and retry.');
 check(html.includes("ev.target.id==='historyScopeFilter'") && html.includes('void refreshActivityFor(itemId,scope)'),
   'Changing item-history scope inside the popup must fetch the newly selected scope.');
-check(html.includes('function rootActivityReady(') && !html.slice(html.indexOf('function rootActivityReady('),html.indexOf('function historyPopupReady(')).includes('applicationHistoryReady'),
-  'The Activity tab must track selected-root history readiness, not global-history readiness.');
+check(html.includes('function rootActivityReady(') &&
+      html.slice(html.indexOf('function rootActivityReady('),html.indexOf('function historyPopupReady(')).includes('applicationHistoryCacheIsComplete()'),
+  'Activity readiness may reuse the completed persistent application-history cache without preloading history at startup.');
 const popupReadyStart=html.indexOf('function historyPopupReady(');
 const popupReadyEnd=html.indexOf('function rootLoadingError(',popupReadyStart);
-check(popupReadyStart>=0&&popupReadyEnd>popupReadyStart&&!html.slice(popupReadyStart,popupReadyEnd).includes('applicationHistoryReady'),
-  'An application-wide Activity load must never mark every item-specific history popup as loaded.');
+check(popupReadyStart>=0&&popupReadyEnd>popupReadyStart&&html.slice(popupReadyStart,popupReadyEnd).includes('applicationHistoryCacheIsComplete()'),
+  'A complete persistent application-history cache may satisfy item popup readiness without another API request.');
 const itemHistoryBranch=html.slice(html.indexOf("} else if(m.kind==='history'){"),html.indexOf("} else if(m.kind==='global-history')"));
 check(itemHistoryBranch.includes('const historyReady=historyPopupReady(m.itemId,historyScope);'),
   'The item popup must use exact item-and-scope readiness, independently of application-wide history.');
@@ -81,7 +85,10 @@ const readinessEnd = html.indexOf('function rootLoadingError(', readinessStart);
 assert.ok(readinessStart >= 0 && readinessEnd > readinessStart, 'History readiness helpers must be present.');
 const readinessContext = {
   dataLoadState: { activityLoaded: new Set() },
-  applicationHistoryReady: true,
+  applicationHistoryHasLoaded: true,
+  applicationHistoryReady: false,
+  applicationHistoryCacheInvalidated: false,
+  applicationHistoryCacheIsComplete: () => readinessContext.applicationHistoryHasLoaded && readinessContext.applicationHistoryReady && !readinessContext.applicationHistoryCacheInvalidated,
   allItem: id => ({ id: String(id), type: 'project' }),
   assignedItemCache: new Map(),
   ui: { modal: null },
@@ -92,13 +99,20 @@ vm.runInNewContext(
   readinessContext
 );
 assert.equal(readinessContext.rootActivityReady('project-2', 'all'), false,
-  'Application-wide history alone must not mark the selected Project history as loaded.');
+  'An incomplete application-history cache must not mark root Activity as loaded.');
 assert.equal(readinessContext.historyPopupReady('project-2', 'all'), false,
-  'Application-wide history must not satisfy item-popup readiness.');
+  'An incomplete application-history cache must not satisfy item-popup readiness.');
+readinessContext.applicationHistoryReady = true;
+assert.equal(readinessContext.rootActivityReady('project-2', 'all'), true,
+  'A complete persistent application-history cache satisfies Activity readiness without a root-specific request.');
+assert.equal(readinessContext.historyPopupReady('project-2', 'all'), true,
+  'A complete persistent application-history cache satisfies item-popup readiness.');
+readinessContext.applicationHistoryCacheInvalidated = true;
+assert.equal(readinessContext.historyPopupReady('project-2', 'all'), false,
+  'An invalidated application-history cache must not satisfy item-popup readiness.');
 readinessContext.dataLoadState.activityLoaded.add('project-2:all');
 assert.equal(readinessContext.historyPopupReady('project-2', 'all'), true,
-  'The item popup becomes ready only after its exact item-and-scope query succeeds.');
-check(html.includes('ui.modal.historyScope===scope')&&html.includes('ui.modal.historyRefreshError=message;renderModal();'),
+  'An exact root-history request can satisfy popup readiness when the global cache is invalidated.');
   'A failure must be shown only for the still-open item-history scope, not hidden by a different history request.');
 check(html.includes("activityNotLoaded:'Open Activity History to load events.'") &&
       html.includes("activityNotLoaded:'افتح سجل النشاط لتحميل الأحداث.'"),
@@ -130,10 +144,13 @@ check(itemHistoryMarkup.includes('const historyReady=historyPopupReady(m.itemId,
 const globalHistoryMarkup=html.slice(historyBranchEnd,html.indexOf("} else if(m.kind==='archive')",historyBranchEnd));
 check(globalHistoryMarkup.includes('let events=applicationHistoryEvents.slice();')&&globalHistoryMarkup.includes('const visibleEvents=events;'),'Global history must render only fetched pages.');
 check(globalHistoryMarkup.includes("${query?events.length:applicationHistoryTotal}"), 'Global history count should show an integer count, not a loaded/total fraction.');
-check(globalHistoryMarkup.includes('application-history-scroll')&&html.includes('loadMoreApplicationHistory'),'Global history must load additional pages as the user reaches the end.');
-check(html.includes('applicationHistoryGeneration++;applicationHistoryPagePromise=null;applicationHistoryEvents=[];'), 'Reopening application history must not reuse an in-flight stale page promise.');
+check(globalHistoryMarkup.includes('application-history-scroll')&&html.includes('loadMoreApplicationHistory')&&html.includes("scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<180")&&!html.includes('data-action="history-load-more"'),'Global history must load additional pages at the scroll boundary without a button.');
+check(html.includes("APPLICATION_HISTORY_CACHE_KEY='team-follow-up-application-history-v1'")&&html.includes('function saveApplicationHistoryCache()')&&html.includes('function restoreApplicationHistoryCache()')&&html.includes('function invalidateApplicationHistoryCache()'), 'Application-wide history must be persisted and restored independently of the workspace snapshot.');
+check(html.includes('function renderModal(preserveExisting=false)')&&html.includes('renderModal(true);')&&html.includes('existingModal.dataset.modalKind===m.kind'), 'Asynchronous popup refreshes must update the existing modal shell to prevent entrance-animation flicker.');
+check(html.includes('theme-scrollbars-and-stable-history-modals')&&html.includes('*::-webkit-scrollbar-thumb')&&html.includes('scrollbar-color:'), 'Workspace and popup scrollbars must follow the active application theme.');
+check(html.includes('applicationHistoryGeneration++;applicationHistoryPagePromise=null;applicationHistoryEvents=[];'), 'An explicit global-history refresh resets stale page state; ordinary popup reopen reuses the persistent cache.');
 check(html.includes('function loadRemainingApplicationHistoryForSearch()')&&html.includes('queryGlobalActivity({limit:APPLICATION_HISTORY_PAGE_SIZE,offset:Number(offset)||0})'),'Search must filter loaded pages and fetch the remainder with a loading indicator.');
-check(html.includes('function applicationHistoryLoadTailMarkup()')&&html.includes('data-action="history-load-more"')&&html.includes("case 'history-load-more':"),'Global history must expose an incremental loading tail and load-more fallback.');
+check(html.includes('function applicationHistoryLoadTailMarkup()')&&!html.includes('data-action="history-load-more"')&&!html.includes("case 'history-load-more':"),'Global history must use its loading indicator and scroll-triggered pagination without a Load more button.');
 check(html.includes('.data-loading-state.compact { justify-content:center;')&&html.includes('.history-card-list > .data-loading-state'),'Loading indicators in popup/card areas must be centered.');
 
 

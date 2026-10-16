@@ -95,10 +95,11 @@ assert.ok(context.stableNewestFirst(sameTimeB,sameTimeA)<0,'Equal-time history r
 const compareStart=html.indexOf("function compareByDateMode(a,b,mode,source='application'){");
 const compareEnd=html.indexOf('\nfunction parentDateForMode(',compareStart);
 const childSortStart=html.indexOf('function sortChildrenByDate(items){');
+const childSortModeStart=html.indexOf('function childDateSortMode(mode=ui.childDateMode){');
 const childSortEnd=html.indexOf('\nfunction childCard(',childSortStart);
-assert.ok(compareStart>=0&&compareEnd>compareStart&&childSortStart>=0&&childSortEnd>childSortStart,'Could not isolate the list sort helpers.');
+assert.ok(compareStart>=0&&compareEnd>compareStart&&childSortModeStart>=0&&childSortStart>=childSortModeStart&&childSortEnd>childSortStart,'Could not isolate the list sort helpers and their child-mode mapper.');
 const sortContext={activityTimestamp:(item,mode)=>Date.parse(mode==='updated'?(item.latestActivityAt||item.updatedAt):(item.createdAt))||0,ui:{childDateMode:'updated'}};
-vm.runInNewContext(html.slice(compareStart,compareEnd)+';this.compareByDateMode=compareByDateMode;'+html.slice(childSortStart,childSortEnd)+';this.sortChildrenByDate=sortChildrenByDate;',sortContext);
+vm.runInNewContext(html.slice(compareStart,compareEnd)+';this.compareByDateMode=compareByDateMode;'+html.slice(childSortModeStart,childSortEnd)+';this.childDateSortMode=childDateSortMode;this.sortChildrenByDate=sortChildrenByDate;',sortContext);
 const freshRestored={id:'restored-task',updatedAt:'2026-10-01T10:00:00.000Z',latestActivityAt:'2026-10-14T10:00:00.000Z',createdAt:'2026-10-01T10:00:00.000Z'};
 const oldItem={id:'old-task',updatedAt:'2026-10-13T10:00:00.000Z',createdAt:'2026-10-01T09:00:00.000Z'};
 assert.ok(sortContext.compareByDateMode(freshRestored,oldItem,'updated')<0,'An item with newer canonical activity sorts ahead even if its stored updatedAt is stale.');

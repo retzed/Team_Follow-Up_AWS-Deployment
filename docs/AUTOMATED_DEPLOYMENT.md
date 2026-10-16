@@ -355,24 +355,41 @@ A successful CloudFormation stack and a healthy website are necessary but not su
 
 ## 10. Updating the automated environment
 
-For a code/template change:
+First identify which layer changed. The optional template provisions the full stack from scratch; it is not the routine release command for every frontend source change.
 
-1. Review the Git changes and make sure the update is intended for the automated environment.
-2. From the repository root, validate and rebuild:
+### Frontend-only change
+
+Changes limited to `index.html`, frontend JavaScript/styles, UI tests, or other frontend-only files do not change the Cognito/API/DynamoDB contract. The Amplify branch created by the template has automatic builds enabled and points at the configured GitHub branch.
+
+1. Run the repository checks locally where practical:
+   ```powershell
+   npm run test:all
+   npm run build
+   ```
+2. Commit and push the reviewed change to the configured Amplify branch (normally `main`). Watch **Amplify → Hosting → Build history** and confirm the published artifact is healthy.
+3. Exercise sign-in, item creation/editing, modal close/save behavior, child hierarchy/search/sort, item Activity, and application-wide Activity. Confirm failures show a retryable state instead of an indefinite loading indicator.
+4. Do **not** run `sam deploy`, rebuild the Lambda ZIP, change API Gateway/CORS, alter Cognito, or modify DynamoDB solely for a frontend-only change.
+
+If the branch's automatic build is disabled, start a new build for that branch in Amplify Console. The standard build remains defined by `amplify.yml`: Node.js 24, `node scripts/build.mjs`, and publishing `dist/`.
+
+### Lambda, API, or infrastructure change
+
+For changes under `backend/src/`, `backend/template.yaml`, IAM, Cognito, DynamoDB schema, API configuration, or Amplify branch configuration:
+
+1. Review the Git changes and identify whether the Lambda package, infrastructure template, or both need to change.
+2. Validate and build the full template:
    ```powershell
    sam validate --lint --template-file backend/template.yaml
    sam build --template-file backend/template.yaml
    ```
-3. Deploy the built template again using the same CloudFormation stack name and the same `ResourceNamePrefix`. Re-enter the required parameters when prompted; keep `GitHubAccessToken` and `BudgetNotificationEmail` out of `samconfig.toml`.
+3. If deploying this optional automated environment, deploy the built template with the same CloudFormation stack name and resource prefix:
    ```powershell
    sam deploy --guided --template-file .aws-sam/build/template.yaml --capabilities CAPABILITY_NAMED_IAM
    ```
-4. Review the changeset carefully, especially any table replacement, IAM changes, Cognito replacement, or Amplify branch changes. Approve only if the changes match the intended update.
-5. Verify stack status and outputs again. Check the Amplify build and run relevant acceptance tests.
+4. Review the CloudFormation changeset carefully, especially any table replacement, IAM, Cognito replacement, or Amplify branch change. Approve only if the changes are intended.
+5. Verify stack status and outputs, review Amplify build results, and run relevant acceptance tests.
 
-Do not change `ResourceNamePrefix` on an existing stack casually: it is used by several physical resource names and may cause resource replacement rather than a simple rename. To create a separate test environment, use a separate stack name and distinct prefix.
-
----
+Keep `GitHubAccessToken` and `BudgetNotificationEmail` out of `samconfig.toml` and source control. Do not change `ResourceNamePrefix` on an existing stack casually: doing so may replace physical resources. To create a separate test environment, use a separate stack name and distinct prefix. The console-first deployment remains the project's primary path; use this procedure only for the optional automated environment.
 
 ## 11. Delete an automated test stack safely
 

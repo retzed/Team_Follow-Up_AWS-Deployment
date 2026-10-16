@@ -16,7 +16,7 @@ assert.match(appHistory, /subject\.isParent\?'<span class="history-dash">—<\/s
 
 // Test the actual shared helper functions with a small deterministic workspace.
 const helperStart = html.indexOf('function historySubjectMarkup(name,type){');
-const helperEnd = html.indexOf('\nfunction renderModal(preserveExisting=false)', helperStart);
+const helperEnd = html.indexOf('\nfunction renderModal(preserveExisting=true)', helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'Could not isolate history helpers.');
 const itemMap = new Map([
   ['p1',{id:'p1',type:'project',name:'Platform Refresh',rootParentId:'p1'}],

@@ -1185,8 +1185,8 @@ html[dir="rtl"] #signOutButton svg {
 /* One vertical scroll owner for app-wide history prevents nested mobile card scrolling from
    bypassing the scroll-to-load-more listener. */
 #modalRoot .modal.application-history-modal>.modal-content{display:flex!important;flex-direction:column!important;min-height:0!important;overflow:hidden!important}
-#modalRoot .modal.application-history-modal .application-history-scroll{display:block!important;flex:1 1 0!important;min-height:0!important;height:auto!important;max-height:none!important;overflow-x:auto!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;touch-action:pan-y;-webkit-overflow-scrolling:touch}
-#modalRoot .modal.application-history-modal .history-table-wrap{overflow-x:auto!important;overflow-y:hidden!important;max-height:none!important}
+#modalRoot .modal.application-history-modal .application-history-scroll{display:block!important;flex:1 1 0!important;min-width:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;min-height:0!important;height:auto!important;max-height:none!important;overflow-x:auto!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+#modalRoot .modal.application-history-modal .history-table-wrap{overflow:visible!important;max-height:none!important}
 #modalRoot .modal.application-history-modal .history-card-list{display:flex!important;flex:0 0 auto!important;flex-direction:column!important;min-height:0!important;height:auto!important;max-height:none!important;overflow:visible!important}
 #modalRoot .modal.application-history-modal .application-history-scroll>.history-table-desktop,
 #modalRoot .modal.application-history-modal .application-history-scroll>.history-card-list{flex:0 0 auto!important}
@@ -2049,7 +2049,8 @@ async function loadRemainingApplicationHistoryForSearch(){
  if(!searchQuery&&searchUser==='all')return;
  const searchRequest=++applicationHistorySearchRequest;
  applicationHistorySearchFillActive=true;
- if(ui.modal?.kind==='global-history')renderModalPreservingInteraction();
+ applicationHistoryError='';
+ if(ui.modal?.kind==='global-history'){ui.modal.historyRefreshError='';renderModalPreservingInteraction();}
  try{
   while(searchRequest===applicationHistorySearchRequest&&ui.modal?.kind==='global-history'&&String(ui.modal.historyQuery||'').trim()===searchQuery&&String(ui.modal.historyUserFilter||'all')===searchUser&&!applicationHistoryReady&&!applicationHistoryError){
    /* Yield between requests so searching never monopolizes the browser's main thread. */

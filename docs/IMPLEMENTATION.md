@@ -184,3 +184,12 @@ The deliberate Scan operations work with the current no-GSI Activity and Users t
 - Amplify/API/backend deployment remained pending in this dated account snapshot; those resources are to be created manually through the console in the primary workflow.
 
 These settings reduce avoidable optional features but do not guarantee that all future AWS services or request usage will always cost $0. Review the Free account plan status, credit balance, budget notifications, and current service pricing as the implementation progresses.
+
+## 8. Frontend release impact recorded on 16 October 2026
+
+The frontend reliability work completed after this account snapshot is client-side only: modal click propagation, hierarchy traversal/type-validation work, and Activity-index lookups used by child-item sorting. It does **not** change the Cognito pool/client contract, the `custom:teamUserId` attribute, API routes or JSON payloads, Lambda handler interface, IAM permissions, the four DynamoDB tables/five GSIs, or Amplify environment-variable names. No migration, index creation, API Gateway change, or Lambda redeployment is required solely for those changes.
+
+For the primary console deployment, publish the new frontend by running `npm run test:all` and `npm run build`, pushing the reviewed source to the Amplify-connected branch, and confirming the new Amplify build is successful. If automatic builds are disabled, start one in Amplify Console. The optional SAM template remains a separate from-scratch automation path and should not be run over the console-created resources merely to release frontend changes.
+
+This note records the operational impact of a code release, **not** a new inspection of AWS resources. The account state and pending-resource checklist above remain the dated 15 October 2026 snapshot; update those entries only after the corresponding console resources are actually verified.
+

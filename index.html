@@ -2360,7 +2360,7 @@ function historyQueryMatches(event,query,applicationWide=false){
 }
 function stableNewestFirst(a,b){return (Date.parse(b.at)||0)-(Date.parse(a.at)||0)||String(b.id||'').localeCompare(String(a.id||''));}
 
-function renderModal(preserveExisting=false){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='';return;}const m=ui.modal;let content='';let title='',subtitle='',wide=false,footer='';
+function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.modal){root.innerHTML='';return;}const m=ui.modal;let content='';let title='',subtitle='',wide=false,footer='';
  if(m.kind==='edit'||m.kind==='new-parent'||m.kind==='new-child'){
    const item=currentModalItem();const isParent=m.kind==='new-parent'||(item&&(item.type==='project'||item.type==='job'));const isNew=m.kind.startsWith('new-');const isChild=!isParent;const parent= m.parentId ? allItem(m.parentId) : (item?rootParent(item):null);const kind=isNew?(isParent?'parent': 'child'):(isParent?'parent':'child');const type=m.type||(item?.type)||(isParent?'project':'followup');title=isNew?(isParent?tr('newParentTitle'):tr('newChildTitle')):(isParent?tr(item?.type==='job'?'editJobTitle':'editParentTitle'):tr('editChildTitle'));subtitle='';
    const allowedParentChildren= m.kind==='new-child'?allowedChildTypes(m.parentId):[];

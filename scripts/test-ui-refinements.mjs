@@ -178,4 +178,11 @@ assert.ok(
   'Create/edit popup fields cannot expand the form grid or date input beyond the viewport.'
 );
 
+
+const modalDirectionFixStart=html.indexOf('<style id="activity-history-recovery-and-rtl-fixes">');
+const modalDirectionFixEnd=html.indexOf('</style>',modalDirectionFixStart);
+assert.ok(modalDirectionFixStart>=0&&modalDirectionFixEnd>modalDirectionFixStart,'The final activity-history recovery stylesheet must exist.');
+const modalDirectionFix=html.slice(modalDirectionFixStart,modalDirectionFixEnd);
+assert.ok(modalDirectionFix.includes('#modalRoot .modal-head{direction:ltr!important;flex-direction:row!important}'),'RTL must not reverse the modal header row on the first render.');
+assert.ok(modalDirectionFix.includes('#modalRoot .modal-head>button[data-action="close-modal"]{margin-inline-start:auto!important;flex:0 0 auto}'),'The modal close button must anchor to the right edge independently of RTL heading text.');
 console.log('UI refinement tests passed: history widths/action labels, bilingual helper removal, concise sidebar cards, labeled child assignees, modal focus/layout and English/Arabic normalization across history views.');

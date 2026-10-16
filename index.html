@@ -2336,9 +2336,10 @@ function renderParentList({skipRemote=false}={}){
   }catch(error){console.warn('Sidebar API query failed; keeping cached workspace results.',error);}
  },120);
 }
-function sortChildrenByDate(items){const mode=ui.childDateMode==='updated'?'updated':'created';return [...items].sort((a,b)=>compareByDateMode(a,b,mode,'project'));}
+function childDateSortMode(mode=ui.childDateMode){return mode==='updated'?'updated':mode==='created'?'created':'last-created';}
+function sortChildrenByDate(items){const mode=childDateSortMode();return [...items].sort((a,b)=>compareByDateMode(a,b,mode,'project'));}
 function childCard(item,parent,{nested=false,filteredNested=null}={}){
- const kids= item.type==='task' ? (filteredNested??childrenOf(item.id)) : [];
+ const kids= item.type==='task' ? sortChildrenByDate(filteredNested??childrenOf(item.id)) : [];
  const expanded=ui.expanded.has(item.id);
  return `<article class="child-card ${nested?'nested-followup':''}" id="card-${esc(item.id)}"><div class="child-card-inner"><div class="child-top"><span class="child-icon">${typeIcon(item.type)}</span><div class="child-main"><div class="child-title-row"><span class="child-title" dir="auto">${esc(item.name)}</span><span class="type-pill">${esc(typeName(item.type))}</span></div><div class="created-label child-created-label">${creatorLabel(item)}</div><p class="child-description" dir="auto">${esc(item.description||tr('noDescription'))}</p><div class="child-meta">${statusPill(item.status)}${item.priority?priorityPill(item.priority):''}${item.dueDate?`<span class="meta-piece">${icon('calendar',13)} ${esc(fmtDate(item.dueDate,{month:'short',day:'numeric',year:'numeric'}))}</span>`:''}<span class="owner-pill assigned-owner child-assignee">${icon('user',14)}<span class="assigned-label">${esc(tr('assignee'))}:</span>${item.ownerId?userAvatar(item.ownerId):''}<span class="assigned-person">${roleLabel(item.ownerId)}</span></span></div></div><div class="child-actions"><button class="icon-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',14)}</button></div></div><div class="child-foot audit-only"><div class="audit-line">${auditLabel(item)}</div></div>${item.type==='task'?`<button class="nested-toggle" type="button" data-action="toggle-nested" data-id="${esc(item.id)}" aria-expanded="${expanded}"><span class="left">${icon('chevron',13)} ${esc(tr('openFollowups'))} (${kids.length})</span><span>${expanded?esc(ui.lang==='ar'?'إخفاء':'Hide'):esc(ui.lang==='ar'?'عرض':'View')}</span></button><div class="nested-list" ${expanded?'':'hidden'}>${kids.length?kids.map(k=>childCard(k,parent,{nested:true})).join(''):`<div class="empty-state">${esc(tr('noChildItems'))}</div>`}${!rootChildrenReady(parent.id)?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}${rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):''}${!nested?`<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button>`:''}</div>`:''}</div></article>`;
 }
@@ -2348,7 +2349,7 @@ function renderOverview(parent){const all=allDescendants(parent.id);const counts
 function childTreeFiltered(parent){
  const top=childrenOf(parent.id);
  const hasFilters=!!(ui.childQuery.trim()||ui.childType!=='all'||ui.childStatus!=='all'||ui.childPriority!=='all'||ui.childDateFrom||ui.childDateTo||ui.childScope!=='all');
- const order=(a,b)=>compareByDateMode(a.item,b.item,ui.childDateMode==='created'?'created':'updated');
+ const order=(a,b)=>compareByDateMode(a.item,b.item,childDateSortMode());
  if(ui.childScope==='direct-followups'||ui.childType==='followup')return top.filter(item=>item.type==='followup'&&childMatches(item)).map(item=>({item,nested:[]})).sort(order);
  if(ui.childType==='task')return top.filter(item=>item.type==='task'&&childMatches(item)).map(item=>({item,nested:null})).sort(order);
  const rows=[];

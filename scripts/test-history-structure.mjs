@@ -9,7 +9,7 @@ assert.ok(projectHistory.includes("<th>${esc(tr('time'))}</th><th>${esc(tr('date
 assert.ok(appHistory.includes("<th>${esc(tr('time'))}</th><th>${esc(tr('date'))}</th><th>${esc(tr('user'))}</th><th>${esc(tr('parentItem'))}</th><th>${esc(tr('childItem'))}</th><th>${esc(tr('action'))}</th>"));
 
 const relatedTreeStart = html.indexOf('function treeActivity(parent){');
-const relatedTreeEnd = html.indexOf('\\nfunction timelineEvents(', relatedTreeStart);
+const relatedTreeEnd = html.indexOf('function timelineEvents(', relatedTreeStart);
 assert.ok(relatedTreeStart >= 0 && relatedTreeEnd > relatedTreeStart, 'The related-item hierarchy renderer must exist.');
 const relatedTree = html.slice(relatedTreeStart, relatedTreeEnd);
 assert.ok(relatedTree.includes('childrenOf(parent.id).sort(newestCreatedFirst)') &&

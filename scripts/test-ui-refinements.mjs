@@ -197,6 +197,7 @@ assert.ok(
   'The final history-table row retains its bottom divider when fewer rows are shown.'
 );
 
+const check = (condition, message) => assert.ok(condition, message);
 // Account Search, navigation, and profile-layout regression coverage.
 check(html.includes("labelArabicLabel:'Label (Arabic)'") &&
       html.includes("labelArabicLabel:'المسمى (بالعربية)'") &&

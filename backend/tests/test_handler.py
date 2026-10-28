@@ -326,7 +326,7 @@ class HandlerHelperTests(unittest.TestCase):
 
     def test_public_team_user_separates_private_contact_and_defaults_first_admin(self):
         row = {
-            "userId": "u1", "displayName": "Marwa", "role": "Team Leader",
+            "userId": "u1", "displayName": "Marwa", "displayNameArabic": "مروة", "role": "Team Leader", "roleArabic": "قائد الفريق",
             "phoneNumber": "+20 123", "email": "marwa@example.com",
             "preferences": {"lang": "ar", "theme": "light"},
             "pinnedItemIds": ["p1"], "cognitoSub": "private-subject",
@@ -337,6 +337,8 @@ class HandlerHelperTests(unittest.TestCase):
             self.assertNotIn(key, public)
         private = handler.public_team_user(row, include_private=True)
         self.assertEqual(private["email"], "marwa@example.com")
+        self.assertEqual(private["nameArabic"], "مروة")
+        self.assertEqual(private["roleArabic"], "قائد الفريق")
         self.assertEqual(private["pinnedItemIds"], ["p1"])
 
     def test_privilege_manager_bootstrap_and_explicit_demotion(self):
@@ -355,15 +357,18 @@ class HandlerHelperTests(unittest.TestCase):
             "preferences": {"lang": "en", "theme": "dark"},
         }
         updates = handler.normalize_profile_updates({
-            "name": "  Zyad Ibrahim  ", "phoneNumber": "+20 123",
-            "email": "zyad@example.com", "role": "Cloud Engineer",
+            "name": "  Zyad Ibrahim  ", "nameArabic": " زياد إبراهيم ", "phoneNumber": "+20 123",
+            "email": "zyad@example.com", "role": "Cloud Engineer", "roleArabic": "مهندس سحابة",
             "icon": "briefcase", "preferences": {"lang": "ar", "theme": "light"},
         }, actor, target)
         self.assertEqual(updates["displayName"], "Zyad Ibrahim")
+        self.assertEqual(updates["displayNameArabic"], "زياد إبراهيم")
         self.assertEqual(updates["phoneNumber"], "+20 123")
         self.assertEqual(updates["email"], "zyad@example.com")
         self.assertEqual(updates["role"], "Cloud Engineer")
+        self.assertEqual(updates["roleArabic"], "مهندس سحابة")
         self.assertEqual(updates["icon"], "briefcase")
+        self.assertEqual(handler.normalize_profile_updates({"icon": "cowboy-hat"}, actor, target)["icon"], "cowboy-hat")
         self.assertEqual(updates["preferences"], {"lang": "ar", "theme": "light"})
 
     def test_profile_update_rejects_unauthorized_privilege_bad_email_and_root(self):

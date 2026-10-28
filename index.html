@@ -2378,7 +2378,7 @@ function renderParentList({skipRemote=false}={}){
    const result=await api.queryTopLevel(options);
    if(token!==sidebarQuerySequence||ui.sidebarMode!==modeAtRender)return;
    renderParentSearchList(filteredParents(result.items||[]));
-  }catch(error){console.warn('Sidebar API query failed; keeping cached workspace results.',error);}  }catch(error){console.warn('Sidebar API query failed; keeping cached workspace results.',error);}
+  }catch(error){console.warn('Sidebar API query failed; keeping cached workspace results.',error);}
  },120);
 }
 function childDateSortMode(mode=ui.childDateMode){return mode==='updated'?'updated':mode==='created'?'created':'last-created';}

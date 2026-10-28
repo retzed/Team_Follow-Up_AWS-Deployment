@@ -272,7 +272,60 @@ check(assignedAction.includes("ui.page='workspace'") && assignedAction.includes(
 const sidebarActionStart=html.indexOf("case 'sidebar-toggle':");
 const pinActionStart=html.indexOf("case 'toggle-pin':",sidebarActionStart);
 const sidebarAction=html.slice(sidebarActionStart,pinActionStart);
-check(sidebarAction.includes('renderDetail()') && sidebarAction.includes('void ensureRootChildrenLoaded(selectedId)'),
-  'Expanding Search restores the selected workspace detail after reloading root children.');
+check(sidebarAction.includes('setWorkspaceSidebarCollapsed(!ui.sidebarCollapsed)') &&
+      sidebarAction.includes('const shouldExpand=ui.sidebarCollapsed') &&
+      sidebarAction.includes('renderDetail()') && sidebarAction.includes('void ensureRootChildrenLoaded(selectedId)'),
+  'The Search toggle uses a dedicated state transition and restores selected workspace detail only when expanding.');
 
-console.log('UI refinement tests passed: history widths/action labels, bilingual helper removal, concise sidebar cards, labeled child assignees, modal focus/layout and English/Arabic normalization across history views.');
+// Workspace Search sidebar close/reopen regression coverage.
+check(/const ui=\\{[^\\n]*sidebarCollapsed:true,/.test(html) &&
+      html.includes('data-action="sidebar-toggle" aria-expanded="false"'),
+  'Workspace Search starts collapsed, including its initial accessible expanded state.');
+check(html.includes('function syncWorkspaceSidebarVisibility()') &&
+      html.includes('function setWorkspaceSidebarCollapsed(collapsed)') &&
+      html.includes('sidebarQuerySequence++') &&
+      html.includes('token!==sidebarQuerySequence') &&
+      html.includes('sidebarQueryTimer=null;'),
+  'Closing Search cancels a queued sidebar refresh and invalidates in-flight result renders.');
+check(!html.includes('ui.sidebarCollapsed=false;applyTranslations();') &&
+      html.includes('previousMobileSidebarViewport=mobile;syncWorkspaceSidebarVisibility();'),
+  'Viewport changes preserve the user-selected collapsed state instead of forcibly reopening Search.');
+check(parentAction.includes("const enteringWorkspace=ui.page==='account'") &&
+      parentAction.includes('if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);') &&
+      assignedAction.includes("const enteringWorkspace=ui.page==='account'") &&
+      assignedAction.includes('if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);'),
+  'Workspace navigation from Account starts with Search collapsed, while workspace-to-workspace navigation keeps the chosen state.');
+
+const sidebarHelpersStart=html.indexOf('function syncWorkspaceSidebarVisibility(){');
+const sidebarHelpersEnd=html.indexOf('\\nfunction renderParentList(',sidebarHelpersStart);
+assert.ok(sidebarHelpersStart>=0 && sidebarHelpersEnd>sidebarHelpersStart,
+  'Workspace sidebar state helpers must be defined before the list renderer.');
+const sidebarHelpers=html.slice(sidebarHelpersStart,sidebarHelpersEnd);
+const sidebarNodes={
+  layout:{collapsed:false,classList:{toggle(name,value){if(name==='sidebar-is-collapsed')sidebarNodes.layout.collapsed=value;}}},
+  content:{hidden:false},
+  toggle:{hidden:false,title:'',attributes:{},innerHTML:'',setAttribute(name,value){this.attributes[name]=value;}}
+};
+const clearedSidebarTimers=[];
+const sidebarContext={
+  ui:{sidebarCollapsed:false,page:'workspace'},
+  $:(selector)=>selector==='.layout'?sidebarNodes.layout:selector==='#sidebarContent'?sidebarNodes.content:selector==='#sidebarToggleFloat'?sidebarNodes.toggle:null,
+  tr:(key)=>({expandSidebar:'Expand project search',collapseSidebar:'Collapse project search'})[key]||key,
+  icon:()=>'<svg></svg>',
+  clearTimeout:(timer)=>clearedSidebarTimers.push(timer)
+};
+vm.runInNewContext(`let sidebarQueryTimer=77,sidebarQuerySequence=10;\\n${sidebarHelpers}\\nthis.setSidebarCollapsed=setWorkspaceSidebarCollapsed;this.readSidebarInternals=()=>({timer:sidebarQueryTimer,sequence:sidebarQuerySequence});`,sidebarContext);
+sidebarContext.setSidebarCollapsed(true);
+assert.equal(sidebarContext.ui.sidebarCollapsed,true,'Collapsing Search updates the single source of truth.');
+assert.equal(sidebarNodes.layout.collapsed,true,'Collapsing Search applies the zero-width sidebar layout.');
+assert.equal(sidebarNodes.content.hidden,true,'Collapsing Search hides its content panel.');
+assert.equal(sidebarNodes.toggle.attributes['aria-expanded'],'false','The toggle reports the collapsed state accessibly.');
+assert.deepEqual(clearedSidebarTimers,[77],'Closing Search clears a queued sidebar timer.');
+assert.deepEqual(sidebarContext.readSidebarInternals(),{timer:null,sequence:11},'Closing Search invalidates queued/in-flight search responses.');
+sidebarContext.setSidebarCollapsed(false);
+assert.equal(sidebarContext.ui.sidebarCollapsed,false,'Expanding Search updates the same state source.');
+assert.equal(sidebarNodes.layout.collapsed,false,'Expanding Search restores the workspace grid.');
+assert.equal(sidebarNodes.content.hidden,false,'Expanding Search restores its content panel.');
+assert.equal(sidebarNodes.toggle.attributes['aria-expanded'],'true','The toggle reports the expanded state accessibly.');
+
+console.log('UI refinement tests passed: activity history, bilingual UI, profile/Search filters, workspace navigation, responsive layout and safe Search sidebar lifecycle.');

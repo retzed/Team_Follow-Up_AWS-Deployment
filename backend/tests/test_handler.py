@@ -324,5 +324,81 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(json.loads(result["body"])["message"], "Internal server error.")
 
 
+    def test_public_team_user_separates_private_contact_and_defaults_first_admin(self):
+        row = {
+            "userId": "u1", "displayName": "Marwa", "role": "Team Leader",
+            "phoneNumber": "+20 123", "email": "marwa@example.com",
+            "preferences": {"lang": "ar", "theme": "light"},
+            "pinnedItemIds": ["p1"], "cognitoSub": "private-subject",
+        }
+        public = handler.public_team_user(row)
+        self.assertEqual(public["privilege"], "Administrator")
+        for key in ("email", "phoneNumber", "pinnedItemIds", "cognitoSub"):
+            self.assertNotIn(key, public)
+        private = handler.public_team_user(row, include_private=True)
+        self.assertEqual(private["email"], "marwa@example.com")
+        self.assertEqual(private["pinnedItemIds"], ["p1"])
+
+    def test_privilege_manager_bootstrap_and_explicit_demotion(self):
+        self.assertTrue(handler.is_privilege_manager({"userId": "root"}))
+        self.assertTrue(handler.is_privilege_manager({"userId": "u1"}))
+        self.assertTrue(handler.is_privilege_manager({"userId": "u1", "privilege": "Administrator"}))
+        self.assertFalse(handler.is_privilege_manager({"userId": "u1", "privilege": "User"}))
+        self.assertFalse(handler.is_privilege_manager({"userId": "u2"}))
+        self.assertFalse(handler.is_privilege_manager({"userId": "u2", "privilege": "Editor"}))
+
+    def test_profile_update_validation_and_field_mapping(self):
+        actor = {"userId": "u2", "privilege": "User"}
+        target = {
+            "userId": "u2", "displayName": "Zyad", "phoneNumber": "",
+            "email": "", "role": "AWS Engineer", "icon": "terminal",
+            "preferences": {"lang": "en", "theme": "dark"},
+        }
+        updates = handler.normalize_profile_updates({
+            "name": "  Zyad Ibrahim  ", "phoneNumber": "+20 123",
+            "email": "zyad@example.com", "role": "Cloud Engineer",
+            "icon": "briefcase", "preferences": {"lang": "ar", "theme": "light"},
+        }, actor, target)
+        self.assertEqual(updates["displayName"], "Zyad Ibrahim")
+        self.assertEqual(updates["phoneNumber"], "+20 123")
+        self.assertEqual(updates["email"], "zyad@example.com")
+        self.assertEqual(updates["role"], "Cloud Engineer")
+        self.assertEqual(updates["icon"], "briefcase")
+        self.assertEqual(updates["preferences"], {"lang": "ar", "theme": "light"})
+
+    def test_profile_update_rejects_unauthorized_privilege_bad_email_and_root(self):
+        target = {"userId": "u2", "displayName": "Zyad"}
+        with self.assertRaises(PermissionError):
+            handler.normalize_profile_updates(
+                {"privilege": "Administrator"},
+                {"userId": "u2", "privilege": "User"}, target,
+            )
+        with self.assertRaises(ValueError):
+            handler.normalize_profile_updates(
+                {"email": "not-an-email"},
+                {"userId": "u2", "privilege": "User"}, target,
+            )
+        with self.assertRaises(PermissionError):
+            handler.normalize_profile_updates(
+                {"name": "Changed"}, {"userId": "root"},
+                {"userId": "root", "displayName": "root"},
+            )
+        with self.assertRaises(ValueError):
+            handler.normalize_profile_updates(
+                {"privilege": "Superuser"}, {"userId": "root"}, target,
+            )
+
+    def test_profile_activity_is_global_and_has_change_action(self):
+        event = handler.profile_audit_event(
+            {"userId": "u1"}, {"userId": "u2", "displayName": "Zyad"},
+            "Updated profile name", at="2026-10-28T10:00:00.000Z",
+        )
+        self.assertEqual(event["actorUserId"], "u1")
+        self.assertEqual(event["itemId"], "PROFILE#u2")
+        self.assertEqual(event["rootParentId"], "USER_PROFILES")
+        self.assertEqual(event["rootParentName"], "User profiles")
+        self.assertEqual(event["action"], "Updated profile name")
+
+
 if __name__ == "__main__":
     unittest.main()

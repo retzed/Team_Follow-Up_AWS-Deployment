@@ -30,7 +30,7 @@ The JavaScript Quick setup guide was selected for reference. The app client ID i
 ### Cognito items still pending
 
 - No Cognito managed-login domain, callback URL, or sign-out URL is configured. The current frontend uses direct SRP sign-in, so a hosted-login domain is not required.
-- The six team accounts have not been created, and their `custom:teamUserId` values have not been assigned.
+- The six standard team accounts and the protected `root` account have not been created, and their `custom:teamUserId` values have not been assigned.
 - The operator confirmed that the custom attribute was added, Read is enabled, and Write is disabled for the `Team_FollowUp` app client. Write permission must also be verified as disabled on **every other** app client in the pool. The repository has not queried the live AWS configuration to verify those settings.
 - The Quick setup language selector reverting to Angular is only a guide display preference; it does not change the pool configuration.
 
@@ -144,7 +144,7 @@ The handler and `backend/table-schema.json` use the physical table keys and inde
 
 - **Items:** top-level project/job listing uses `WorkspaceIndex` (`workspaceKey` / `createdAt`); child listing and hierarchy traversal use `ParentIdIndex` (`parentId` / `createdAt`); assigned work uses `AssignedToIndex` (`assignedTo` / `updatedAt`). The API keeps `ownerId` as the UI field and materializes `assignedTo` for the existing index. Only top-level records receive `workspaceKey=WORKSPACE`.
 - **Activity:** event rows use the actual `itemId` partition key and `activityKey` sort key, where `activityKey` is the UTC event timestamp plus `#` plus the event ID. `eventId` is a regular attribute, not the primary key. There are no Activity GSIs, so single-item history uses Query while application-wide history uses Scan.
-- **Users:** the primary key remains `userId`. Cognito `sub` values are stored in `cognitoSub`; because this table has no Cognito-subject GSI, Lambda scans this deliberately small six-user table and denies missing, duplicate, or disabled mappings.
+- **Users:** the primary key remains `userId`. Cognito `sub` values are stored in `cognitoSub`; because this table has no Cognito-subject GSI, Lambda scans this deliberately small seven-profile table and denies missing, duplicate, or disabled mappings.
 - **Archive:** the existing `archiveId` key, `GSI_ArchiveIndex`, and `GSI_ArchiveRoot` remain unchanged. Archiving/restore uses the existing table and transaction logic.
 
 ### Optional full-stack automation template
@@ -169,7 +169,7 @@ The template calculates the exact branch origin from Amplify's generated app dom
 
 1. In the current account, verify the operator-confirmed `custom:teamUserId` schema settings (String, length 1–32, mutable), Read enabled / Write disabled for `Team_FollowUp`, and Write disabled for every other app client. Confirm this app client has no client secret and supports SRP sign-in.
 2. Verify all four DynamoDB tables and their GSIs match the tables above and are `ACTIVE`. Do not recreate or replace tables which already contain application data.
-3. Create the six administrator-managed Cognito accounts and assign unique `custom:teamUserId` values `u1`–`u6`. Seed the matching `cognitoSub` values to the Users table with the trusted seeding script after a dry run.
+3. Create the six standard administrator-managed Cognito accounts with `custom:teamUserId` values `u1`–`u6`, then create the protected `root` Cognito account with `custom:teamUserId=root`. Set its initial password to `root@1234` (temporary/force-change behavior is controlled by Cognito). Run the profile seed script in dry-run mode, then seed all seven profiles into Users.
 4. Create Amplify Hosting, Lambda, API Gateway and CloudWatch resources manually using [`DEPLOYMENT.md`](DEPLOYMENT.md). Apply the exact branch HTTPS URL to API CORS and configure the four public Amplify environment variables.
 5. If testing the optional template, use a separate clean environment or a different resource prefix and review the changeset before approval. A successful validation/build or CI run does not deploy resources or verify the live AWS account.
 
@@ -193,3 +193,10 @@ For the primary console deployment, publish the new frontend by running `npm run
 
 This note records the operational impact of a code release, **not** a new inspection of AWS resources. The account state and pending-resource checklist above remain the dated 15 October 2026 snapshot; update those entries only after the corresponding console resources are actually verified.
 
+
+
+## Account page, root profile, and password handling (28 October 2026)
+
+The frontend opens on **My Account → Assigned Items**. The Account page has Profile, Assigned Items, Pinned Items, and Search tabs; the Projects workspace keeps its own Search sidebar and provides a floating collapse/expand control, expanded by default. Display name is separate from Cognito username and is stored in `displayName`; optional Arabic display name and label use `displayNameArabic` and `roleArabic`. Profile edits save profile fields only; language/theme changes persist immediately as separate preference updates. The profile icon choices are stored as names, include `cowboy-hat` and other outline icons, and show a preview before saving.
+
+**Do not replace or bypass Cognito authentication.** Passwords remain Cognito-managed; the app calls Cognito's authenticated password-update API. Do not put plaintext passwords or app-level password hashes in DynamoDB. Create the `root` Cognito identity as an administrator-managed account, set `custom:teamUserId=root` through the trusted console/admin workflow, and add its profile mapping to the Users table using the seeding script. The root profile must have `userId=root`, `displayName=root`, `role=Root`, `icon=crown`, `privilege=Administrator`, the Cognito `sub` in `cognitoSub`, and `enabled=true`. The application/backend prohibit editing the root profile and protect it from privilege changes; root password changes are handled by Cognito, not by editing the DynamoDB profile.

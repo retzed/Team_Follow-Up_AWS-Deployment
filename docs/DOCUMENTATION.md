@@ -65,7 +65,7 @@ The project addresses this problem by providing one authenticated workspace wher
 
 **In scope**
 
-- Cognito sign-in, sign-out, supported account challenges, and password recovery flows.
+- Cognito sign-in, sign-out, supported account challenges, password recovery, and signed-in password changes through Amplify Auth `updatePassword`.
 - Team identity mapping from the Cognito custom attribute to an application team profile.
 - Creation, viewing, searching, filtering, assignment, and editing of work items.
 - Overview metrics, item-level history, hierarchy-level history, application-wide history, Archive listing, and restore.
@@ -242,7 +242,7 @@ flowchart TB
 ### 3.4 Authentication and request-flow summary
 
 1. The user signs in through Cognito using the browser authentication integration.
-2. The frontend reads the configured custom attribute **custom:teamUserId** and expects one of the configured team IDs **u1–u6**. If the account has no valid team ID, the frontend blocks entry to the workspace.
+2. The frontend reads the configured custom attribute **custom:teamUserId** and expects one of the configured team IDs **u1–u6** or **root**. If the account has no valid team ID, the frontend blocks entry to the workspace.
 3. The frontend obtains a token and sends it in the **Authorization: Bearer** header.
 4. API Gateway validates the JWT against the configured Cognito user-pool issuer and public app-client audience.
 5. Lambda maps the verified token's **sub** to exactly one enabled Users-table row using **cognitoSub**. Missing, duplicate, or disabled mappings are denied.

@@ -3,7 +3,7 @@
 
 Prefer seed_user_profiles_from_cognito.py, which discovers sub values directly
 from Cognito. This manual alternative overwrites the listed profile rows, so
-review the dry-run output before applying it.
+review the dry-run output before applying it. Include the protected root account.
 """
 import argparse
 import json
@@ -19,6 +19,7 @@ EXPECTED = {
     "u4": ("Omar", "AWS Engineer"),
     "u5": ("Haneen", "AWS Engineer"),
     "u6": ("Dina", "AWS Engineer"),
+    "root": ("root", "Root"),
 }
 
 
@@ -27,13 +28,13 @@ def normalize_profiles(rows):
     if not isinstance(rows, list):
         raise ValueError("Mapping file must contain a JSON array.")
     if len(rows) != len(EXPECTED) or any(not isinstance(row, dict) for row in rows):
-        raise ValueError("Mapping file must contain exactly six profile objects (u1 through u6).")
+        raise ValueError("Mapping file must contain exactly seven profile objects (u1 through u6 and root).")
 
     ids = [row.get("userId") for row in rows]
     if any(not isinstance(user_id, str) for user_id in ids):
         raise ValueError("Every profile must have a string userId.")
     if len(set(ids)) != len(EXPECTED) or set(ids) != set(EXPECTED):
-        raise ValueError("Mapping file must contain each ID u1 through u6 exactly once.")
+        raise ValueError("Mapping file must contain each ID u1 through u6 and root exactly once.")
 
     normalized = []
     seen_subs = set()
@@ -62,6 +63,8 @@ def normalize_profiles(rows):
             "userId": user_id,
             "displayName": display_name,
             "role": role,
+            "icon": "crown" if user_id == "root" else ("compass" if user_id == "u1" else "terminal"),
+            "privilege": "Administrator" if user_id in {"u1", "root"} else "User",
             "cognitoSub": sub,
             "enabled": enabled,
         })
@@ -80,7 +83,7 @@ def load_profiles(path):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--file", required=True, help="Private JSON file containing the six actual Cognito sub values.")
+    parser.add_argument("--file", required=True, help="Private JSON file containing the seven actual Cognito sub values, including root.")
     parser.add_argument("--table", required=True, help="Existing Users table name; use TeamFollowUp-Users in the current lab.")
     parser.add_argument("--region", required=True, help="AWS Region where the table exists.")
     parser.add_argument("--dry-run", action="store_true", help="Validate and preview the mapping without writing records.")

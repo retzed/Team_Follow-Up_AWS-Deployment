@@ -5,4 +5,5 @@
   {"userId":"u4","displayName":"Omar","role":"AWS Engineer","cognitoSub":"REPLACE_WITH_COGNITO_SUB_U4","enabled":true},
   {"userId":"u5","displayName":"Haneen","role":"AWS Engineer","cognitoSub":"REPLACE_WITH_COGNITO_SUB_U5","enabled":true},
   {"userId":"u6","displayName":"Dina","role":"AWS Engineer","cognitoSub":"REPLACE_WITH_COGNITO_SUB_U6","enabled":true}
+  {"userId":"root","displayName":"root","role":"Root","icon":"crown","privilege":"Administrator","cognitoSub":"REPLACE_WITH_COGNITO_SUB_ROOT","enabled":true}
 ]

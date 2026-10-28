@@ -27,10 +27,10 @@ def valid_rows():
 
 
 class ManualProfileSeederTests(unittest.TestCase):
-    def test_normalizes_six_profiles_in_expected_order(self):
+    def test_normalizes_seven_profiles_in_expected_order(self):
         normalized = manual_seed.normalize_profiles(list(reversed(valid_rows())))
         self.assertEqual([row["userId"] for row in normalized], list(manual_seed.EXPECTED))
-        self.assertEqual(len({row["cognitoSub"] for row in normalized}), 6)
+        self.assertEqual(len({row["cognitoSub"] for row in normalized}), 7)
 
     def test_rejects_duplicate_or_missing_team_ids(self):
         rows = valid_rows()
@@ -43,7 +43,7 @@ class ManualProfileSeederTests(unittest.TestCase):
             manual_seed.normalize_profiles({})
         rows = valid_rows()
         rows[0] = None
-        with self.assertRaisesRegex(ValueError, "six profile objects"):
+        with self.assertRaisesRegex(ValueError, "seven profile objects"):
             manual_seed.normalize_profiles(rows)
 
     def test_rejects_placeholder_and_duplicate_cognito_subjects(self):
@@ -66,7 +66,7 @@ class ManualProfileSeederTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "mapping.json"
             path.write_text(json.dumps(valid_rows()), encoding="utf-8")
-            self.assertEqual(len(manual_seed.load_profiles(path)), 6)
+            self.assertEqual(len(manual_seed.load_profiles(path)), 7)
 
 
 class FakePaginator:

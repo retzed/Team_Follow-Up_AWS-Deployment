@@ -198,6 +198,24 @@ assert.ok(
 );
 
 const check = (condition, message) => assert.ok(condition, message);
+
+// Model aliases and mobile interaction safety.
+check(html.includes('item.createdByUserId') && html.includes('item.updatedByUserId') &&
+      html.includes('item.assignedToUserId') && html.includes('item.assigneeUserId'),
+  'User search covers both demo aliases and the canonical AWS user-ID fields.');
+const searchMarkupStart=html.indexOf('function accountSearchResultsMarkup()');
+const searchMarkupEnd=html.indexOf('function refreshAccountSearchResults()',searchMarkupStart);
+const searchMarkup=html.slice(searchMarkupStart,searchMarkupEnd);
+check(!searchMarkup.includes('<article class="parent-card" tabindex="0">'),
+  'Search result cards are not falsely keyboard-focusable without a card-level action.');
+check(html.includes('@media(max-width:820px){.account-search-controls{grid-template-columns:repeat(2,minmax(0,1fr))}') &&
+      html.includes('.account-search-controls .account-search-query-field{grid-column:1/-1}'),
+  'Account Search filters collapse to a two-column, shrink-safe layout on tablet and mobile widths.');
+const assignAfterLoad=html.indexOf('void ensureRootChildrenLoaded(selectedRootId).then(()=>{');
+const assignAfterLoadEnd=html.indexOf("break;}  case 'open-archive':",assignAfterLoad);
+const assignAfterLoadBody=html.slice(assignAfterLoad,assignAfterLoadEnd);
+check(assignAfterLoadBody.includes('seenAfterLoad') && assignAfterLoadBody.includes("if(ancestor.type==='task')ui.expanded.add(String(ancestor.id))"),
+  'Assigned/Pinned navigation recalculates and expands task ancestors after root child hydration.');
 // Account Search, navigation, and profile-layout regression coverage.
 check(html.includes("labelArabicLabel:'Label (Arabic)'") &&
       html.includes("labelArabicLabel:'المسمى (بالعربية)'") &&

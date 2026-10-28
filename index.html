@@ -1209,7 +1209,7 @@ html[dir="rtl"] #signOutButton svg {
 </style>
 <style id="account-hub-styles">
 .brand{border:0;background:transparent;color:inherit;padding:0;text-align:start;cursor:pointer}.acting-user{font:inherit;text-align:start;cursor:pointer}
-#sidebarAssignedTab{display:none!important}.sidebar-mode-tabs{grid-template-columns:1fr!important}
+.sidebar-mode-tabs{grid-template-columns:1fr!important}
 .account-page{width:100%;padding:clamp(16px,3vw,34px);min-width:0}.account-page-inner{width:min(1150px,100%);margin:0 auto;display:flex;flex-direction:column;gap:20px}
 .account-hero{display:flex;align-items:center;gap:16px;padding:22px;background:var(--panel);border:1px solid var(--border);border-radius:18px}.account-hero-avatar{width:58px;height:58px;border-radius:17px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:none}.account-hero-avatar svg{width:27px;height:27px}.account-hero-copy{min-width:0;flex:1}
 .account-hero h1{font-size:clamp(21px,3vw,28px);letter-spacing:-.7px;margin:0 0 6px;overflow-wrap:anywhere}.account-hero p{font-size:12px;color:var(--muted);line-height:1.6;margin:0}
@@ -2510,9 +2510,16 @@ async function saveUserPrivilege(userId){
  catch(error){toast(String(error?.message||tr('accountError')),true);}
 }
 async function changeUserPreference(key,value){
- const user=rawCurrentUser();if(!user||user.id==='root')return;const oldLang=ui.lang,oldTheme=ui.theme;if(key==='lang')ui.lang=value;else if(key==='theme')ui.theme=value;render();
- try{const prefs={...(user.preferences||{}),lang:ui.lang,theme:ui.theme,[key]:value};const result=await window.TeamFollowUpDataApi.updateMyProfile({preferences:prefs});if(result?.user)mergeProfileIntoData(result.user);}
- catch(error){ui.lang=oldLang;ui.theme=oldTheme;render();toast(String(error?.message||tr('accountError')),true);}
+ const user=rawCurrentUser();if(!user||user.id==='root')return;
+ const oldLang=ui.lang,oldTheme=ui.theme;
+ if(key==='lang')ui.lang=value;else if(key==='theme')ui.theme=value;
+ render();
+ try{
+  const prefs={...(user.preferences||{}),lang:ui.lang,theme:ui.theme,[key]:value};
+  const result=await window.TeamFollowUpDataApi.updateMyProfile({preferences:prefs});
+  if(result?.user)mergeProfileIntoData(result.user);
+  render();
+ }catch(error){ui.lang=oldLang;ui.theme=oldTheme;render();toast(String(error?.message||tr('accountError')),true);}
 }
 function render(){applyTranslations();if(ui.page==='account'){renderAccountPage();renderModal();return;}renderParentList();renderDetail();renderModal();}
 function userOptions(current,includeNone=true){return `${includeNone?`<option value="" ${!current?'selected':''}>${esc(tr('none'))}</option>`:''}${data.users.map(raw=>{const u=person(raw.id);return `<option value="${esc(u.id)}" ${u.id===current?'selected':''}>${esc(u.name)} — ${esc(u.role)}</option>`;}).join('')}`;}
@@ -2876,7 +2883,7 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
  default:break;
 }}
 $('#app').addEventListener('click',ev=>{if($('#modalRoot').contains(ev.target))return;const actionEl=ev.target.closest('[data-action]');if(actionEl){if(actionEl.dataset.action==='backdrop-close'&&ev.target!==actionEl)return;ev.preventDefault();handleAction(actionEl);}});
-window.addEventListener('resize',()=>{const mobile=isMobileSidebarViewport();if(mobile!==previousMobileSidebarViewport){previousMobileSidebarViewport=mobile;ui.sidebarCollapsed=mobile;applyTranslations();}});
+window.addEventListener('resize',()=>{const mobile=isMobileSidebarViewport();if(mobile!==previousMobileSidebarViewport){previousMobileSidebarViewport=mobile;ui.sidebarCollapsed=false;applyTranslations();}});
 $('#app').addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.parent-card[tabindex="0"]')&&!ev.target.querySelector(':focus')){ev.preventDefault();handleAction(ev.target);}});
 $('#modalRoot').addEventListener('click',ev=>{ev.stopPropagation();const actionEl=ev.target.closest('[data-action]');if(actionEl){if(actionEl.dataset.action==='backdrop-close'&&ev.target!==actionEl)return;if(actionEl.dataset.action==='backdrop-close'){ui.modal=null;renderModal();return;}ev.preventDefault();handleAction(actionEl);}});
 $('#modalRoot').addEventListener('submit',ev=>{if(ev.target.id==='itemForm'){ev.preventDefault();handleItemSubmit(ev.target);}});

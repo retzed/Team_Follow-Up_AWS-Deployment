@@ -647,6 +647,167 @@ def restore_root_completion_positions(ordered, selected_roots, selected_under):
     return positions
 
 
+PROFILE_PRIVILEGES = {"Administrator", "Editor", "User"}
+PROFILE_ICONS = {"user", "compass", "terminal", "shield", "briefcase", "wrench", "settings", "cpu", "clipboard", "search"}
+PROFILE_PREFERENCE_LANGS = {"en", "ar"}
+PROFILE_PREFERENCE_THEMES = {"light", "dark"}
+
+
+def public_team_user(row, include_private=False):
+    """Shape a team profile for the browser without exposing private fields to the team list."""
+    result = {
+        "id": str(row.get("userId") or ""),
+        "name": str(row.get("displayName") or ""),
+        "role": str(row.get("role") or "Team member"),
+        "icon": str(row.get("icon") or "user"),
+        "privilege": str(row.get("privilege") or "User"),
+        "enabled": row.get("enabled", True) is not False,
+    }
+    if include_private:
+        result.update({
+            "phoneNumber": str(row.get("phoneNumber") or ""),
+            "email": str(row.get("email") or ""),
+            "preferences": row.get("preferences") if isinstance(row.get("preferences"), dict) else {},
+            "pinnedItemIds": list(dict.fromkeys(str(value) for value in row.get("pinnedItemIds", []) if isinstance(value, (str, int)))) if isinstance(row.get("pinnedItemIds"), list) else [],
+        })
+    return result
+
+
+def is_privilege_manager(profile):
+    return str(profile.get("userId") or "") == "root" or profile.get("privilege") == "Administrator"
+
+
+def profile_audit_event(actor, target, action, at=None):
+    """Build an append-only app-wide event for a profile field change."""
+    target_id = str(target.get("userId") or "")
+    target_name = str(target.get("displayName") or target_id or "User")
+    return activity_item({
+        "eventId": "evt_profile_" + uuid.uuid4().hex,
+        "itemId": "PROFILE#" + target_id,
+        "actorUserId": str(actor.get("userId") or ""),
+        "itemNameSnapshot": target_name,
+        "itemTypeSnapshot": "profile",
+        "rootParentId": "USER_PROFILES",
+        "rootParentName": "User profiles",
+        "rootParentType": "profile",
+        "action": action,
+        "kind": "profile",
+        "at": at or now(),
+    })
+
+
+def normalize_profile_updates(body, actor, target):
+    """Validate editable profile fields. Authentication identity/passwords are not editable here."""
+    if not isinstance(body, dict) or not body:
+        raise ValueError("Provide at least one profile field to update.")
+    if str(target.get("userId") or "") == "root":
+        raise PermissionError("The root profile is database-managed and cannot be edited in the application.")
+    allowed = {"name", "phoneNumber", "email", "icon", "role", "preferences", "privilege"}
+    unknown = set(body) - allowed
+    if unknown:
+        raise ValueError("Unsupported profile field: " + sorted(unknown)[0])
+    if "privilege" in body and not is_privilege_manager(actor):
+        raise PermissionError("Only an Administrator or root can change user privileges.")
+    normalized = {}
+    if "name" in body:
+        value = body["name"]
+        if not isinstance(value, str) or not value.strip() or len(value.strip()) > 100:
+            raise ValueError("Name must contain 1-100 characters.")
+        normalized["displayName"] = value.strip()
+    if "phoneNumber" in body:
+        value = body["phoneNumber"]
+        if not isinstance(value, str) or len(value.strip()) > 40:
+            raise ValueError("Phone number must be text with at most 40 characters.")
+        normalized["phoneNumber"] = value.strip()
+    if "email" in body:
+        value = body["email"]
+        candidate = value.strip() if isinstance(value, str) else None
+        if candidate is None or len(candidate) > 254 or (candidate and not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", candidate)):
+            raise ValueError("Enter a valid e-mail address.")
+        normalized["email"] = candidate
+    if "icon" in body:
+        value = body["icon"]
+        if not isinstance(value, str) or value not in PROFILE_ICONS:
+            raise ValueError("Select a supported profile icon.")
+        normalized["icon"] = value
+    if "role" in body:
+        value = body["role"]
+        if not isinstance(value, str) or not value.strip() or len(value.strip()) > 80:
+            raise ValueError("Label must contain 1-80 characters.")
+        normalized["role"] = value.strip()
+    if "privilege" in body:
+        value = body["privilege"]
+        if not isinstance(value, str) or value not in PROFILE_PRIVILEGES:
+            raise ValueError("Privilege must be Administrator, Editor, or User.")
+        normalized["privilege"] = value
+    if "preferences" in body:
+        value = body["preferences"]
+        if not isinstance(value, dict) or set(value) - {"lang", "theme"}:
+            raise ValueError("Preferences may contain only language and theme.")
+        preferences = dict(target.get("preferences") or {})
+        if "lang" in value:
+            if value["lang"] not in PROFILE_PREFERENCE_LANGS:
+                raise ValueError("Language must be en or ar.")
+            preferences["lang"] = value["lang"]
+        if "theme" in value:
+            if value["theme"] not in PROFILE_PREFERENCE_THEMES:
+                raise ValueError("Theme must be light or dark.")
+            preferences["theme"] = value["theme"]
+        normalized["preferences"] = preferences
+    if not normalized:
+        raise ValueError("No editable profile fields were supplied.")
+    return normalized
+
+
+def commit_profile_update(actor, target, normalized):
+    """Atomically update a profile and append an audit event for each required field change."""
+    old = dict(target)
+    changed_target = {**old, **normalized}
+    action_by_field = (
+        ("displayName", "Updated profile name"),
+        ("phoneNumber", "Updated profile phone number"),
+        ("email", "Updated profile e-mail"),
+        ("role", "Updated profile label"),
+        ("privilege", "Updated user privilege"),
+    )
+    events = [
+        profile_audit_event(actor, changed_target, action)
+        for field, action in action_by_field
+        if field in normalized and old.get(field, "") != normalized[field]
+    ]
+    names = {"#userId": "userId", "#profileVersion": "profileVersion"}
+    values = {":versionIncrement": SERIALIZER.serialize(1), ":zero": SERIALIZER.serialize(0)}
+    clauses = ["#profileVersion = if_not_exists(#profileVersion, :zero) + :versionIncrement"]
+    for index, (field, value) in enumerate(normalized.items()):
+        alias = "#field" + str(index)
+        token = ":value" + str(index)
+        names[alias] = field
+        values[token] = SERIALIZER.serialize(value)
+        clauses.append(alias + " = " + token)
+    writes = [{
+        "Update": {
+            "TableName": USERS.name,
+            "Key": av_map({"userId": str(target["userId"])}),
+            "UpdateExpression": "SET " + ", ".join(clauses),
+            "ExpressionAttributeNames": names,
+            "ExpressionAttributeValues": values,
+            "ConditionExpression": "attribute_exists(#userId)",
+        }
+    }]
+    for event in events:
+        writes.append({
+            "Put": {
+                "TableName": ACTIVITY.name,
+                "Item": av_map(event),
+                "ConditionExpression": "attribute_not_exists(#activityKey)",
+                "ExpressionAttributeNames": {"#activityKey": "activityKey"},
+            }
+        })
+    ddb.meta.client.transact_write_items(TransactItems=writes)
+    updated = USERS.get_item(Key={"userId": str(target["userId"])}, ConsistentRead=True).get("Item") or changed_target
+    return public_team_user(updated, include_private=True), [public_event(event) for event in events]
+
+
 def lambda_handler(event, context):
     """Handle API Gateway HTTP API requests."""
     request_id = getattr(context, "aws_request_id", None) or event.get("requestContext", {}).get("requestId", "unknown")
@@ -676,11 +837,51 @@ def lambda_handler(event, context):
             # profiles. Descendant items and Activity history are fetched on demand.
             parents=query_work_items_all({'scope':'top-level','dateMode':'updated','direction':'desc'})
             user_rows=scan_pages(USERS)
-            users=[{'id':u['userId'],'name':u.get('displayName',''),'role':u.get('role','AWS Engineer')} for u in user_rows if u.get('enabled',True)]
+            users=[public_team_user(u) for u in user_rows if u.get('enabled',True)]
             return response(200,{'items':parents,'users':users})
+        if method=='GET' and path=='/users/me':
+            return response(200, {'user': public_team_user(profile, include_private=True)})
+        if method=='PATCH' and path=='/users/me':
+            updates = normalize_profile_updates(body, profile, profile)
+            user, events = commit_profile_update(profile, profile, updates)
+            return response(200, {'user': user, 'activityEvents': events})
+        if method=='PATCH' and path=='/users/me/pins':
+            ids = body.get('itemIds')
+            if not isinstance(ids, list) or len(ids) > 500:
+                raise ValueError('Pinned item IDs must be a list containing at most 500 items.')
+            pinned = list(dict.fromkeys(str(value).strip() for value in ids if isinstance(value, (str, int)) and str(value).strip()))
+            for item_id in pinned:
+                row = WORK.get_item(Key={'itemId': item_id}).get('Item')
+                if not row or row.get('deletedAt'):
+                    raise ValueError('A pinned item no longer exists. Refresh the pinned list and try again.')
+            USERS.update_item(
+                Key={'userId': str(profile['userId'])},
+                UpdateExpression='SET #pins = :pins, #profileVersion = if_not_exists(#profileVersion, :zero) + :one',
+                ExpressionAttributeNames={'#pins':'pinnedItemIds','#profileVersion':'profileVersion'},
+                ExpressionAttributeValues={':pins':pinned,':zero':0,':one':1},
+                ConditionExpression='attribute_exists(userId)',
+            )
+            latest = USERS.get_item(Key={'userId': str(profile['userId'])}, ConsistentRead=True).get('Item') or profile
+            return response(200, {'user': public_team_user(latest, include_private=True)})
+        if method=='PATCH' and path.startswith('/users/'):
+            target_id = path.rsplit('/', 1)[-1]
+            if not target_id or target_id == 'me':
+                return response(404, {'message':'User profile not found.'})
+            if not is_privilege_manager(profile):
+                raise PermissionError('Only an Administrator or root can change user privileges.')
+            if target_id == 'root':
+                raise PermissionError('The root profile is database-managed and cannot be edited in the application.')
+            target = USERS.get_item(Key={'userId': target_id}, ConsistentRead=True).get('Item')
+            if not target or target.get('enabled', True) is False:
+                return response(404, {'message':'User profile not found.'})
+            if set(body) != {'privilege'}:
+                raise ValueError('This route only allows changing another user\'s privilege.')
+            updates = normalize_profile_updates(body, profile, target)
+            user, events = commit_profile_update(profile, target, updates)
+            return response(200, {'user': user, 'activityEvents': events})
         if method=='GET' and path=='/users':
             rows=scan_pages(USERS)
-            users=[{'id':u['userId'],'name':u.get('displayName',''),'role':u.get('role','AWS Engineer')} for u in rows if u.get('enabled',True)]
+            users=[public_team_user(u) for u in rows if u.get('enabled',True)]
             version=cache_version(users)
             if qs.get('cacheMode')=='1' and qs.get('cacheVersion')==version:
                 return response(200,{'notModified':True,'version':version})
@@ -862,6 +1063,16 @@ def lambda_handler(event, context):
                 completed_root_ids.update(chunk_root_ids)
                 all_events.extend(public_event(e) for e in chunk_events)
             return response(200,{'ok':True,'restoredIds':restored_ids,'restoredItems':restored_items,'activityEvents':all_events})
+        if path=='/items/resolve' and method=='GET':
+            requested = list(dict.fromkeys(value.strip() for value in str(qs.get('ids') or '').split(',') if value.strip()))
+            if len(requested) > 100:
+                raise ValueError('Resolve at most 100 item IDs at a time.')
+            rows = []
+            for item_id in requested:
+                row = WORK.get_item(Key={'itemId': item_id}).get('Item')
+                if row and not row.get('deletedAt'):
+                    rows.append(public_item(row))
+            return response(200, {'items': rows, 'count': len(rows)})
         if path=='/items' and method=='GET':
             # Cache-aware clients ask for a compact validator before re-downloading
             # the current collection. The returned version is based on the complete

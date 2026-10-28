@@ -1188,7 +1188,7 @@ Run a dry run first, replacing `<POOL_ID>` with the real pool ID from the consol
 python backend/scripts/seed_user_profiles_from_cognito.py --user-pool-id <POOL_ID> --table TeamFollowUp-Users --region us-east-1 --dry-run
 ~~~
 
-Confirm the six expected IDs/names and enabled states, then repeat without `--dry-run` to write the corresponding `cognitoSub` profile mappings. The script can overwrite the six matching Users profile rows; review before running the write operation. Use administrator credentials with Cognito `ListUsers` and DynamoDB `BatchWriteItem` permission on Users. Do not grant those administration permissions to the application Lambda, and do not commit real `sub` values or usernames.
+Confirm the six standard IDs/names plus `root`, the unique mapping, and enabled states, then repeat without `--dry-run` to write the corresponding `cognitoSub` profile mappings. The script can overwrite the seven matching Users profile rows; review before running the write operation. Use administrator credentials with Cognito `ListUsers` and DynamoDB `BatchWriteItem` permission on Users. Do not grant those administration permissions to the application Lambda, and do not commit real `sub` values or usernames.
 
 ### 11.3 AWS Console Amplify, Lambda and API setup
 
@@ -1324,3 +1324,14 @@ The table resources in the template use both `DeletionPolicy: Retain` and `Updat
 - [SAM backend template](../backend/template.yaml) — API, Lambda, IAM, and monitoring infrastructure definition.
 - [Lambda API handler](../backend/src/handler.py) — routing, validation, identity resolution, transactions, activity, and archive logic.
 - [GitHub Actions](https://github.com/retzed/Team_Follow-Up_AWS-Deployment/actions) — automated validation history.
+
+
+## 14. Account page and profile behavior (28 October 2026)
+
+The signed-in application opens on **My Account → Assigned Items**. Account tabs are **Profile**, **Assigned Items**, **Pinned Items**, and **Search**. The Projects workspace retains its own Search sidebar, expanded by default and collapsible/expandable with a floating control; the old “Assigned to me” sidebar mode has been removed. Item assignment remains represented by the Account Assigned Items tab.
+
+The profile's **Name** is a display name, not the Cognito username; Cognito username is not shown in the normal UI and is never changed by a profile save. Users can optionally enter Arabic display-name and Arabic label values. The UI selects the Arabic value when Arabic is active and the value is non-empty. A profile icon selector lists icon names, includes modern outline icons (including `cowboy-hat`), and previews the selected icon before save. **Save changes** saves profile fields only. Theme and language changes take effect immediately and are persisted by separate preference updates. Name, Arabic name, phone, e-mail, label, Arabic label, and privilege changes are logged to application-wide activity history by the profile API; language/theme settings are preferences and are not profile audit events. Password change uses Cognito's authenticated password-update flow.
+
+### Protected root identity
+
+The AWS implementation retains Cognito as its only application authentication provider. Create the administrator-managed Cognito user `root` with `custom:teamUserId=root`, an initial password of `root@1234`, and a Users-table mapping with `userId=root`, `displayName=root`, `role=Root`, `icon=crown`, `privilege=Administrator`, `cognitoSub` set to the real Cognito `sub`, and `enabled=true`. The updated Cognito seeding scripts expect six standard users plus root. Do not persist plaintext passwords or a second password hash in DynamoDB: Cognito owns password storage, password hashing, reset, and change operations. The app and backend make the root profile database-managed and reject profile edits and privilege changes through the app. Account creation and the initial password must be completed by a trusted Cognito administrator; this repository cannot create identities in the live AWS account by itself.

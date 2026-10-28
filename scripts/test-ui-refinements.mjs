@@ -293,6 +293,14 @@ check(html.includes('function syncWorkspaceSidebarVisibility()') &&
 check(!html.includes('ui.sidebarCollapsed=false;applyTranslations();') &&
       html.includes('previousMobileSidebarViewport=mobile;syncWorkspaceSidebarVisibility();'),
   'Viewport changes preserve the user-selected collapsed state instead of forcibly reopening Search.');
+const collapsedLayoutStart=html.indexOf('.layout.sidebar-is-collapsed{');
+const collapsedLayoutEnd=html.indexOf('}',collapsedLayoutStart);
+const collapsedLayoutCss=collapsedLayoutStart>=0&&collapsedLayoutEnd>collapsedLayoutStart?html.slice(collapsedLayoutStart,collapsedLayoutEnd+1):'';
+check(collapsedLayoutCss.includes('grid-template-columns:minmax(0,1fr)!important') &&
+      !collapsedLayoutCss.includes('grid-template-columns:0 minmax(0,1fr)') &&
+      html.includes('.layout.sidebar-is-collapsed>.sidebar{display:none!important}') &&
+      html.includes('<main class="main" id="mainContent"'),
+  'When Search is collapsed, the hidden sidebar is removed and the main workspace keeps a full-width grid column instead of landing in a zero-width track.');
 check(parentAction.includes("const enteringWorkspace=ui.page==='account'") &&
       parentAction.includes('if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);') &&
       assignedAction.includes("const enteringWorkspace=ui.page==='account'") &&

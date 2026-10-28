@@ -193,6 +193,12 @@ Modal clicks are stopped by the modal's own delegated handler before the action 
 
 These front-end safeguards do not change the AWS infrastructure. They add no API routes, request parameters required by the backend, environment variables, DynamoDB attributes/indexes, Lambda permissions, Cognito configuration, or migration steps. See the frontend-only update procedure in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#frontend-only-releases).
 
+## Account Search and responsive navigation
+
+The application opens on **My Account → Assigned Items**. Profile fields are Display name, optional Arabic display name, phone, e-mail, Label, Label (Arabic), and Profile icon. The privilege indicator remains beside the name; privilege management is a separate authorized operation, and root remains protected. Cognito is still the only authentication provider.
+
+Account Search filters top-level Projects/Jobs by type, status, associated users, sort date, and inclusive From/To dates. It includes canonical AWS user-ID fields such as `createdByUserId`, `updatedByUserId`, `ownerId`, and `assignedTo`. Each result has separate Open in workspace, Activity history, and pin controls. Assigned/Pinned rows have workspace and history actions. Child navigation recalculates Task ancestors after root hydration and restores the selected child into view. At widths up to 820 CSS pixels the account filters use two shrink-safe columns; date controls are width-constrained and action controls wrap for narrow screens. These are frontend-only changes and require no API, Lambda, DynamoDB, or Cognito migration. See [the complete behavior and testing notes](docs/DOCUMENTATION.md#14-account-page-search-navigation-and-mobile-reliability-28-october-2026).
+
 ## API documentation
 
 The AWS-backed application uses a JSON HTTP API. The frontend sends authenticated requests to the configured `TEAM_FOLLOW_UP_API_BASE_URL`; API Gateway validates the Cognito JWT, and Lambda resolves the verified Cognito `sub` to one enabled team profile. All routes below require a valid mapped team identity. Send `Accept: application/json`; JSON request bodies use `Content-Type: application/json`.

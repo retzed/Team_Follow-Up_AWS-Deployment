@@ -132,3 +132,11 @@ This template is **not** the planned day-to-day deployment method. Run `sam vali
 ## 7. Current-account checkpoint
 
 This architecture deliberately describes the complete target regardless of which resources currently exist. The dated [implementation record](IMPLEMENTATION.md) states that the user's `us-east-1` account has already had a Cognito pool/client, the four DynamoDB tables and the $1 monthly budget created manually; Amplify Hosting, API Gateway/Lambda and CloudWatch observability were still pending in that record. Those facts describe the current account snapshot, not requirements that other environments or the full-stack template may assume.
+
+## Account Search and mobile interaction contract (28 October 2026)
+
+The account hub defaults to Assigned Items. Search operates on top-level Projects/Jobs and filters their current metadata by type, status, date sort/range, and creator/updater/owner/assignee identity. Its user matching accepts canonical backend fields as well as frontend aliases. A result has explicit Open in workspace, Activity history, and pin actions; the result card itself is not an action. Assigned/Pinned entries also expose workspace and history actions.
+
+Workspace navigation switches page state first, selects the root, and loads children on demand. For assigned/pinned child navigation, Task ancestors are recomputed after the hierarchy response arrives to avoid hiding a selected child whose Task ancestor was absent from the initial assignment cache. Expanding the workspace Search sidebar restores the selected detail and keeps the selection after lazy hydration. Item history remains lazily loaded; account listing does not fetch the entire Activity dataset.
+
+The account filters collapse to two shrink-safe columns at viewport widths of 820 CSS pixels and below; query input spans the row, date/select controls are bounded by their columns, and item actions wrap. English LTR and Arabic RTL share the same responsive structure. These are frontend-only changes and do not alter Cognito, API Gateway, Lambda, DynamoDB, IAM, environment configuration, or deployment resources. CI validates source and build contracts, but live mobile/browser acceptance remains a separate manual check.

@@ -1,5 +1,14 @@
 # Release notes
 
+## 28 October 2026 — Account Search, workspace navigation and mobile hardening
+
+- Added Account Search date sort/range and user filters; text search covers item fields and canonical backend identity fields (`createdByUserId`, `updatedByUserId`, `ownerId`, `assignedTo` and related assignee aliases).
+- Added explicit Open in workspace and Activity history buttons to Search results, and history actions to Assigned/Pinned rows. Navigation now switches pages, waits for root-child hydration, expands Task ancestors, and scrolls the selected child into view.
+- Removed the privilege textbox from the profile form, preserved the top-level privilege indicator and separate authorized privilege-management flow, corrected the Arabic label text/order, and moved Profile icon last.
+- Added tablet/mobile Search grid rules, shrink-safe date/select controls, wrapping action controls, and regression coverage for user alias matching, profile field order, keyboard focus, and post-hydration navigation.
+- **AWS impact:** these are frontend/controller/style/test/documentation changes only. Cognito authentication and account mapping, API Gateway routes/payloads, Lambda code, DynamoDB schema/indexes and IAM policies are unchanged. No backend redeployment or data migration is required for these UI changes; publish the new frontend artifact through the connected Amplify branch after review.
+- Automated CI validates the app source and deployment artifacts; use the expanded [Console acceptance checklist](docs/DEPLOYMENT.md#11-acceptance-checklist) for live account/mobile testing. Passing CI alone does not establish the state of the live AWS resources or prove browser rendering on physical devices.
+
 ## 16 October 2026 — Frontend responsiveness and deployment impact
 
 - Prevented modal actions from being dispatched by both the modal and the outer workspace click delegates.

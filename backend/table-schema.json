@@ -123,13 +123,15 @@
       "businessFields": [
         "userId",
         "displayName",
+        "displayNameArabic",
         "role",
+        "roleArabic",
         "enabled",
         "cognitoSub"
       ],
       "notes": [
-        "The small six-member user table stores Cognito subject mappings in cognitoSub; Lambda scans it because no Cognito-subject GSI exists.",
-        "Target schema for both deployment paths. Cognito subject lookup scans the small six-member table because no cognitoSub GSI is defined."
+        "The small seven-profile user table stores Cognito subject mappings in cognitoSub; Lambda scans it because no Cognito-subject GSI exists.",
+        "Target schema for both deployment paths. Cognito subject lookup scans the small seven-profile table because no cognitoSub GSI is defined."
       ]
     },
     {

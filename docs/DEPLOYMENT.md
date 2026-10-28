@@ -320,6 +320,15 @@ Review the CloudFormation changeset before approval. The template uses `Deletion
 For production use, reevaluate DynamoDB capacity, point-in-time recovery, alarms/action notifications, identity governance and backup/recovery objectives before increasing data volume or exposing the application to a larger team.
 
 
+### Workspace Search sidebar close/reopen acceptance
+
+Verify this on desktop and at narrow mobile widths in both English LTR and Arabic RTL:
+
+1. Open the workspace from Account and confirm Search starts collapsed with its floating toggle showing `aria-expanded="false"`.
+2. Expand Search, choose a Project/Job, then collapse it repeatedly. The workspace must remain usable, retain its selection, and not become blank or crash.
+3. Collapse while the parent list is refreshing, then reopen. A response started before close must not overwrite the state after collapse; the current parent list must remain usable.
+4. Resize across the 820 CSS-pixel breakpoint while collapsed and while expanded. Visibility should remain as chosen rather than being forcibly reset.
+
 ### Protected root account (additional Cognito mapping)
 
 Create the protected root application identity as a Cognito account through a trusted administrator workflow, using `custom:teamUserId=root`. The existing pool's sign-in selection is documented as email-only, so users may need to sign in with the account's registered email; do not change the pool's authentication mode just to expose a username field. Set `root@1234` as the initial/temporary password only if it satisfies the pool's configured password policy; otherwise update the Cognito policy or use a Cognito-approved temporary password and then change it through Cognito. The application does not create a parallel root login and does not store passwords in DynamoDB. After the standard users and root exist, the profile seeding script includes all seven IDs and stores the Cognito `sub` mapping. Check the dry-run before writing. Root's Users-table profile must remain enabled and have Administrator privilege and the `crown` icon; the backend prevents profile/privilege editing through the application.

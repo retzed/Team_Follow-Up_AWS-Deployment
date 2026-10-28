@@ -324,7 +324,8 @@ assert.equal(sidebarNodes.layout.collapsed,true,'Collapsing Search applies the z
 assert.equal(sidebarNodes.content.hidden,true,'Collapsing Search hides its content panel.');
 assert.equal(sidebarNodes.toggle.attributes['aria-expanded'],'false','The toggle reports the collapsed state accessibly.');
 assert.deepEqual(clearedSidebarTimers,[77],'Closing Search clears a queued sidebar timer.');
-assert.deepEqual(sidebarContext.readSidebarInternals(),{timer:null,sequence:11},'Closing Search invalidates queued/in-flight search responses.');
+assert.equal(sidebarContext.readSidebarInternals().timer,null,'Closing Search clears the stored timer handle.');
+assert.equal(sidebarContext.readSidebarInternals().sequence,11,'Closing Search invalidates queued/in-flight search responses.');
 sidebarContext.setSidebarCollapsed(false);
 assert.equal(sidebarContext.ui.sidebarCollapsed,false,'Expanding Search updates the same state source.');
 assert.equal(sidebarNodes.layout.collapsed,false,'Expanding Search restores the workspace grid.');

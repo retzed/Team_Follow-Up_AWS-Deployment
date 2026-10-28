@@ -662,7 +662,7 @@ def public_team_user(row, include_private=False):
         "role": str(row.get("role") or "Team member"),
         "roleArabic": str(row.get("roleArabic") or ""),
         "icon": str(row.get("icon") or "user"),
-        "privilege": str(row.get("privilege") or ("Administrator" if str(row.get("userId") or "") == "u1" else "User")),
+        "privilege": str(row.get("privilege") or ("Administrator" if str(row.get("userId") or "") in {"u1", "root"} else "User")),
         "enabled": row.get("enabled", True) is not False,
     }
     if include_private:

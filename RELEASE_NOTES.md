@@ -15,6 +15,7 @@
 - Replaced the collapse path's broad translation refresh with a dedicated visibility-state update.
 - Cancelled queued sidebar refreshes and invalidated in-flight query results when closing to avoid stale DOM updates.
 - Preserved collapse/expand state across viewport changes and added direct regression coverage for the toggle lifecycle.
+- Fixed the root layout defect by switching collapsed mode to one flexible grid column, keeping the main workspace visible when Search is hidden.
 - Frontend-only: Cognito, API Gateway, Lambda, DynamoDB and deployment resource configuration are unchanged.
 
 ## 16 October 2026 — Frontend responsiveness and deployment impact

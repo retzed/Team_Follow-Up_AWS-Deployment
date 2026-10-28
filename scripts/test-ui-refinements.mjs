@@ -199,6 +199,17 @@ assert.ok(
 
 const check = (condition, message) => assert.ok(condition, message);
 
+// Execute the real user-matching predicate against demo and canonical AWS-shaped records.
+const userMatchStart=html.indexOf('function accountSearchUserMatches(item,userId)');
+const userMatchEnd=html.indexOf('function accountSearchResultsMarkup()',userMatchStart);
+assert.ok(userMatchStart>=0&&userMatchEnd>userMatchStart,'The user-matching predicate must be available for direct regression checks.');
+const accountUserMatches=vm.runInNewContext('('+html.slice(userMatchStart,userMatchEnd)+')');
+assert.equal(accountUserMatches({createdByUserId:'u2'},'u2'),true,'Canonical creator IDs must match.');
+assert.equal(accountUserMatches({updatedByUserId:'u3'},'u3'),true,'Canonical updater IDs must match.');
+assert.equal(accountUserMatches({ownerId:'u4',assignedTo:'u4'},'u4'),true,'Owner/assignee fields must match.');
+assert.equal(accountUserMatches({assignees:[{userId:'u5'}]},'u5'),true,'Object-shaped assignee records must match.');
+assert.equal(accountUserMatches({createdByUserId:'u2'},'u3'),false,'Unrelated user IDs must not match.');
+assert.equal(accountUserMatches({createdByUserId:'u2'},'all'),false,'The all-users sentinel must not be treated as an associated identity.');
 // Model aliases and mobile interaction safety.
 check(html.includes('item.createdByUserId') && html.includes('item.updatedByUserId') &&
       html.includes('item.assignedToUserId') && html.includes('item.assigneeUserId'),

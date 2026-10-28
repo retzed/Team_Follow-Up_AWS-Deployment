@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Seed the existing TeamFollowUp-Users table from administrator-managed Cognito team IDs.
+"""Seed the existing TeamFollowUp-Users table from Cognito team IDs.
 
-Each of the six Cognito users must have custom:teamUserId set to u1..u6.
-The script resolves Cognito sub values itself so operators do not copy them
-by hand. Run it from a trusted admin environment with cognito-idp:ListUsers
-and dynamodb:BatchWriteItem permissions.
+Each standard user must have custom:teamUserId set to u1..u6 and the protected
+root Cognito user must be mapped to root. The script resolves sub values itself.
+Run it from a trusted admin environment with cognito-idp:ListUsers and
+DynamoDB BatchWriteItem permissions.
 """
 import argparse
 import sys
@@ -18,6 +18,7 @@ EXPECTED = {
     "u4": ("Omar", "AWS Engineer"),
     "u5": ("Haneen", "AWS Engineer"),
     "u6": ("Dina", "AWS Engineer"),
+    "root": ("root", "Root"),
 }
 
 
@@ -64,6 +65,8 @@ def list_team_users(cognito, user_pool_id):
                 "userId": team_user_id,
                 "displayName": display_name,
                 "role": role,
+                "icon": "crown" if team_user_id == "root" else ("compass" if team_user_id == "u1" else "terminal"),
+                "privilege": "Administrator" if team_user_id in {"u1", "root"} else "User",
                 "cognitoSub": sub,
                 "enabled": bool(user.get("Enabled", True)),
             }
@@ -82,7 +85,7 @@ def main(argv=None):
     parser.add_argument("--user-pool-id", required=True, help="Deployed Cognito User Pool ID.")
     parser.add_argument("--table", required=True, help="Existing Users table name; use TeamFollowUp-Users in the current lab.")
     parser.add_argument("--region", required=True, help="AWS Region for Cognito and DynamoDB.")
-    parser.add_argument("--dry-run", action="store_true", help="Validate account mapping without writing records.")
+    parser.add_argument("--dry-run", action="store_true", help="Validate account mapping (including root) without writing records.")
     args = parser.parse_args(argv)
 
     try:

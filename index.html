@@ -1260,7 +1260,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   for(const key of ['archiveId','archivePK','archiveSort','archiveRootPK','archiveRootSort','archiveParentId','archivedByUserId','deletedAt'])delete item[key];
   return item;
  }
- function toAppUser(user){return {id:String(user.userId||user.id||''),name:String(user.displayName||user.name||''),role:String(user.role||'AWS Engineer')};}
+ function toAppUser(user){const id=String(user.userId||user.id||'');return {id,name:String(user.displayName||user.name||''),role:String(user.role||'AWS Engineer'),icon:String(user.icon||((id==='u1'||user.role==='Team Leader')?'compass':'terminal')),privilege:String(user.privilege||(id==='u1'?'Administrator':'User')),phoneNumber:String(user.phoneNumber||''),email:String(user.email||''),preferences:{lang:['en','ar'].includes(user.preferences?.lang)?user.preferences.lang:'en',theme:['light','dark'].includes(user.preferences?.theme)?user.preferences.theme:'dark'},pinnedItemIds:Array.isArray(user.pinnedItemIds)?[...new Set(user.pinnedItemIds.map(String))]:[]};}
  async function request(method,path,body){
   const auth=window.TeamFollowUpAuth;
   if(!auth||typeof auth.authenticatedFetch!=='function')throw new Error('The Cognito-authenticated API client is unavailable. Sign in again.');
@@ -1407,7 +1407,12 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   return {...(result||{}),items:all,count:result?.count??all.length,nextOffset:null};
  }
  async function restoreArchive(itemIds){return request('POST','/archive/restore',{itemIds:[...new Set((itemIds||[]).map(String))]});}
- window.TeamFollowUpDataApi=Object.freeze({remoteApi:true,request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryRootItems,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive});
+ async function getMyProfile(){return request('GET','/users/me');}
+ async function updateMyProfile(fields){return request('PATCH','/users/me',fields);}
+ async function updateUserPrivilege(userId,privilege){return request('PATCH','/users/'+encodeURIComponent(userId),{privilege});}
+ async function updateMyPins(itemIds){return request('PATCH','/users/me/pins',{itemIds:[...new Set((itemIds||[]).map(String))]});}
+ async function resolveItems(ids){const params=new URLSearchParams({ids:[...new Set((ids||[]).map(String))].join(',')});return request('GET','/items/resolve?'+params.toString());}
+ window.TeamFollowUpDataApi=Object.freeze({remoteApi:true,request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryRootItems,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive,getMyProfile,updateMyProfile,updateUserPrivilege,updateMyPins,resolveItems});
 })();
 </script>
 

@@ -238,7 +238,7 @@ class HandlerHelperTests(unittest.TestCase):
 
         self.assertEqual(result["statusCode"], 200)
         payload = json.loads(result["body"])
-        self.assertEqual(payload, {"items": parents, "users": [{"id": "u1", "name": "Marwa", "role": "Team Leader"}]})
+        self.assertEqual(payload, {"items": parents, "users": [{"id": "u1", "name": "Marwa", "role": "Team Leader", "icon": "user", "privilege": "Administrator", "enabled": True}]})
         query_items.assert_called_once_with(
             {"scope": "top-level", "dateMode": "updated", "direction": "desc"}
         )

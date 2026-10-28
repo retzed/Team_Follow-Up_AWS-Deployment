@@ -9,6 +9,14 @@
 - **AWS impact:** these are frontend/controller/style/test/documentation changes only. Cognito authentication and account mapping, API Gateway routes/payloads, Lambda code, DynamoDB schema/indexes and IAM policies are unchanged. No backend redeployment or data migration is required for these UI changes; publish the new frontend artifact through the connected Amplify branch after review.
 - Automated CI validates the app source and deployment artifacts; use the expanded [Console acceptance checklist](docs/DEPLOYMENT.md#11-acceptance-checklist) for live account/mobile testing. Passing CI alone does not establish the state of the live AWS resources or prove browser rendering on physical devices.
 
+## 28 October 2026 — Workspace Search collapse stability
+
+- Changed workspace Search to start collapsed, including when navigating from Account.
+- Replaced the collapse path's broad translation refresh with a dedicated visibility-state update.
+- Cancelled queued sidebar refreshes and invalidated in-flight query results when closing to avoid stale DOM updates.
+- Preserved collapse/expand state across viewport changes and added direct regression coverage for the toggle lifecycle.
+- Frontend-only: Cognito, API Gateway, Lambda, DynamoDB and deployment resource configuration are unchanged.
+
 ## 16 October 2026 — Frontend responsiveness and deployment impact
 
 - Prevented modal actions from being dispatched by both the modal and the outer workspace click delegates.

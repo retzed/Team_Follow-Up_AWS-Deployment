@@ -213,9 +213,11 @@ for(const control of ['accountSearchDateMode','accountSearchDateFrom','accountSe
   check(html.includes(control), `Account Search exposes its date and user filter control: ${control}.`);
 }
 check(html.includes('function accountSearchUserMatches') &&
+      !html.includes("function accountSearchUserMatches(item,userId){if(!userId||userId==='all')return true;") &&
+      html.includes("if(userId!=='all'&&!accountSearchUserMatches(item,userId))return false;") &&
       html.includes('function accountSearchResultsMarkup()') &&
       html.includes("if(!matchesDate(item,dateMode,dateFrom,dateTo,'application'))return false;"),
-  'Account Search filters by user and date range.');
+  'Account Search filters by user and date range without treating every user as related to every result.');
 const accountSearchStart=html.indexOf('function accountSearchResultsMarkup()');
 const accountSearchEnd=html.indexOf('function refreshAccountSearchResults()',accountSearchStart);
 check(accountSearchStart>=0 && accountSearchEnd>accountSearchStart &&

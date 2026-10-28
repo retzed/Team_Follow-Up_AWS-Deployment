@@ -1612,7 +1612,7 @@ $('signInForm').addEventListener('submit',handleSubmit);
     </div>
   </header>
   <section class="account-page" id="accountPage" hidden aria-label="Account"></section>
-  <button id="sidebarToggleFloat" class="sidebar-toggle-float" type="button" data-action="sidebar-toggle" aria-expanded="true"></button>
+  <button id="sidebarToggleFloat" class="sidebar-toggle-float" type="button" data-action="sidebar-toggle" aria-expanded="false"></button>
   <div class="layout">
     <aside class="sidebar" aria-label="Project and job search">
       <div class="sidebar-mode-tabs" role="tablist" aria-label="Project search">
@@ -1757,7 +1757,7 @@ function detectInitialPreferences(){
 const initialPreferences=detectInitialPreferences();
 function isMobileSidebarViewport(){try{return typeof window.matchMedia==='function'&&window.matchMedia('(max-width: 820px)').matches;}catch{return false;}}
 let previousMobileSidebarViewport=isMobileSidebarViewport();
-const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:false,selectedParentId:'',tab:'overview',page:'account',accountTab:'assigned',accountLoading:true,accountSaving:false,accountMessage:'',accountProfileDraft:null,accountError:'',accountAssignedRows:[],accountAssignedLoaded:false,accountAssignedLoading:false,accountAssignedError:'',accountPinnedRows:[],accountPinnedLoaded:false,accountPinnedLoading:false,accountPinnedError:'',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||''),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all',accountSearchQuery:'',accountSearchType:'all',accountSearchStatus:'all',accountSearchDateMode:'updated',accountSearchDateFrom:'',accountSearchDateTo:'',accountSearchUser:'all'};
+const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:true,selectedParentId:'',tab:'overview',page:'account',accountTab:'assigned',accountLoading:true,accountSaving:false,accountMessage:'',accountProfileDraft:null,accountError:'',accountAssignedRows:[],accountAssignedLoaded:false,accountAssignedLoading:false,accountAssignedError:'',accountPinnedRows:[],accountPinnedLoaded:false,accountPinnedLoading:false,accountPinnedError:'',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||''),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all',accountSearchQuery:'',accountSearchType:'all',accountSearchStatus:'all',accountSearchDateMode:'updated',accountSearchDateFrom:'',accountSearchDateTo:'',accountSearchUser:'all'};
 const activityRefreshRequests=new Map();
 const rootChildrenRequests=new Map();
 const assignedItemCache=new Map();
@@ -2346,6 +2346,31 @@ function applyTranslations(){const a=$('#app');a.classList.toggle('arabic',ui.la
 function filteredAssignedItems(baseItems=[...data.parents,...data.children]){const query=ui.parentQuery.trim().toLocaleLowerCase();const list=baseItems.filter(item=>{if(item.ownerId!==ui.actingUserId)return false;if(query&&!`${item.name} ${typeName(item.type)} ${statusName(item.status,'en')} ${statusName(item.status,'ar')} ${person(item.createdBy).name} ${person(item.updatedBy).name}`.toLocaleLowerCase().includes(query))return false;if(ui.parentType!=='all'&&item.type!==ui.parentType)return false;if(!matchesStatusFilter(item.status,ui.parentStatus))return false;if(!matchesDate(item,ui.parentDateMode,ui.parentDateFrom,ui.parentDateTo))return false;return true;});list.sort((a,b)=>compareByDateMode(a,b,ui.parentDateMode));return list;}
 function assignmentContextMarkup(item){if(item.type==='project'||item.type==='job')return esc(typeName(item.type));const parent=allItem(item.parentId);const root=rootParent(item);const parts=[esc(typeName(item.type))];if(parent?.type==='task')parts.push(`<bdi dir="auto">${esc(parent.name)}</bdi>`);if(root?.name)parts.push(`<bdi dir="auto">${esc(root.name)}</bdi>`);return parts.join(' · ');}
 let sidebarQueryTimer=null,sidebarQuerySequence=0;
+function syncWorkspaceSidebarVisibility(){
+ const collapsed=Boolean(ui.sidebarCollapsed);
+ const layout=$('.layout'),content=$('#sidebarContent'),toggle=$('#sidebarToggleFloat');
+ if(layout)layout.classList.toggle('sidebar-is-collapsed',collapsed);
+ if(content)content.hidden=collapsed;
+ if(toggle){
+  toggle.hidden=ui.page==='account';
+  const label=collapsed?tr('expandSidebar'):tr('collapseSidebar');
+  toggle.title=label;
+  toggle.setAttribute('aria-label',label);
+  toggle.setAttribute('aria-expanded',String(!collapsed));
+  toggle.innerHTML=icon('sidebar',16);
+ }
+}
+function setWorkspaceSidebarCollapsed(collapsed){
+ const next=Boolean(collapsed);
+ ui.sidebarCollapsed=next;
+ if(next){
+  /* Invalidate any delayed or in-flight top-level search refresh before hiding its DOM. */
+  sidebarQuerySequence++;
+  if(sidebarQueryTimer!==null){clearTimeout(sidebarQueryTimer);sidebarQueryTimer=null;}
+ }
+ syncWorkspaceSidebarVisibility();
+}
+
 function renderAssignedList(listOverride=null){
  const list=Array.isArray(listOverride)?listOverride:filteredAssignedItems();
  $('#parentCount').innerHTML=!dataLoadState.initialComplete&&!list.length?inlineSpinnerMarkup():`${list.length} ${esc(tr('items'))}${!dataLoadState.initialComplete?` ${inlineSpinnerMarkup()}`:''}`;
@@ -2363,13 +2388,14 @@ function renderParentSearchList(list){
 }
 function sidebarQueryOptions(includeText=true){return {type:ui.parentType,status:ui.parentStatus,dateMode:ui.parentDateMode,direction:ui.parentDateMode==='created'?'asc':'desc',from:'',to:'',query:includeText?ui.parentQuery:'',limit:250};}
 function renderParentList({skipRemote=false}={}){
- const modeAtRender='search';ui.sidebarMode='search';renderParentSearchList(filteredParents()); if(sidebarQueryTimer)clearTimeout(sidebarQueryTimer);
+ const modeAtRender='search';ui.sidebarMode='search';renderParentSearchList(filteredParents()); if(sidebarQueryTimer!==null){clearTimeout(sidebarQueryTimer);sidebarQueryTimer=null;}
  if(!dataLoadState.initialComplete)return;
  if(skipRemote)return;
  if(skipNextSidebarApiRefresh){skipNextSidebarApiRefresh=false;return;}
  const token=++sidebarQuerySequence;
  // Render the current AWS-sourced workspace snapshot, then refresh visible rows through the API.
  sidebarQueryTimer=setTimeout(async()=>{
+  sidebarQueryTimer=null;
   try{
    const api=window.TeamFollowUpDataApi;if(!api)return;
    await apiPersistQueue.catch(()=>{});
@@ -2827,11 +2853,11 @@ function clearParentFilters(){ui.parentQuery='';ui.parentType='all';ui.parentSta
 function clearChildFilters(){ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';renderDetail();}
 function handleAction(target){const actionEl=target.closest('[data-action]');if(!actionEl)return;const action=actionEl.dataset.action;const id=actionEl.dataset.id;const parentId=actionEl.dataset.parentId;if(!dataLoadState.initialComplete&&['new-parent','edit-item','new-child','delete-item','delete-from-modal','confirm-delete','archive-restore-selected'].includes(action)){toast(tr('loadingData'),true);return;}switch(action){
  case 'account-tab':void openAccountTab(actionEl.dataset.tab);break;case 'clear-account-search':ui.accountSearchQuery='';ui.accountSearchType='all';ui.accountSearchStatus='all';ui.accountSearchDateMode='updated';ui.accountSearchDateFrom='';ui.accountSearchDateTo='';ui.accountSearchUser='all';renderAccountPage();break;
- case 'sidebar-toggle':{ui.sidebarCollapsed=!ui.sidebarCollapsed;applyTranslations();if(!ui.sidebarCollapsed){renderParentList({skipRemote:true});const selectedId=String(ui.selectedParentId||'');if(ui.page==='workspace'&&selectedId){renderDetail();void ensureRootChildrenLoaded(selectedId).then(()=>{if(!ui.sidebarCollapsed&&ui.page==='workspace'&&String(ui.selectedParentId)===selectedId){renderDetail();if(ui.selectedAssignedItemId){const selectedCard=document.getElementById('card-'+String(ui.selectedAssignedItemId));if(selectedCard)selectedCard.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}}}).catch(error=>console.warn('Could not restore the selected workspace item after expanding Search.',error));}}break;}
+ case 'sidebar-toggle':{const shouldExpand=ui.sidebarCollapsed;setWorkspaceSidebarCollapsed(!ui.sidebarCollapsed);if(shouldExpand){renderParentList({skipRemote:true});const selectedId=String(ui.selectedParentId||'');if(ui.page==='workspace'&&selectedId){renderDetail();void ensureRootChildrenLoaded(selectedId).then(()=>{if(!ui.sidebarCollapsed&&ui.page==='workspace'&&String(ui.selectedParentId)===selectedId){renderDetail();if(ui.selectedAssignedItemId){const selectedCard=document.getElementById('card-'+String(ui.selectedAssignedItemId));if(selectedCard)selectedCard.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}}}).catch(error=>console.warn('Could not restore the selected workspace item after expanding Search.',error));}}break;}
  case 'toggle-pin':void togglePinnedItem(id);break;
  case 'save-user-privilege':void saveUserPrivilege(actionEl.dataset.userId);break;
- case 'select-parent':{const parent=data.parents.find(row=>String(row.id)===String(id));if(!parent)break;const selectedId=String(parent.id);ui.page='workspace';ui.selectedParentId=parent.id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();applyTranslations();renderParentList({skipRemote:true});renderDetail();void ensureRootChildrenLoaded(id).then(()=>{if(ui.page==='workspace'&&String(ui.selectedParentId)===selectedId)renderDetail();}).catch(error=>console.warn('Could not finish loading the selected workspace item.',error));void refreshActivityFor(id,'all');break;}  case 'sidebar-mode':{ui.sidebarMode='search';if(!['all','project','job'].includes(ui.parentType))ui.parentType='all';applyTranslations();renderParentList();break;}
- case 'select-assigned':{const item=allItem(id)||assignedItemCache.get(String(id))||ui.accountAssignedRows.find(row=>String(row.id||row.itemId)===String(id))||ui.accountPinnedRows.find(row=>String(row.id||row.itemId)===String(id));const rootId=String(item?.rootParentId||((item?.type==='project'||item?.type==='job')?item.id:(item?rootParent(item)?.id:''))||'');const root=data.parents.find(parent=>String(parent.id)===rootId)||(item?rootParent(item):null);if(!item||!root)break;const isRootItem=item.type==='project'||item.type==='job';const selectedItemId=String(item.id||id),selectedRootId=String(root.id);ui.page='workspace';ui.selectedAssignedItemId=isRootItem?null:item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}applyTranslations();renderParentList({skipRemote:true});renderDetail();void refreshActivityFor(root.id,'all');void ensureRootChildrenLoaded(selectedRootId).then(()=>{if(ui.page!=='workspace'||String(ui.selectedParentId)!==selectedRootId)return;if(!isRootItem){let ancestor=allItem(selectedItemId)||item;const seenAfterLoad=new Set();while(ancestor&&String(ancestor.id)!==selectedRootId&&!seenAfterLoad.has(String(ancestor.id))){seenAfterLoad.add(String(ancestor.id));if(ancestor.type==='task')ui.expanded.add(String(ancestor.id));ancestor=ancestor.parentId?allItem(ancestor.parentId):null;}}renderDetail();if(!isRootItem){const selectedCard=document.getElementById('card-'+selectedItemId);if(selectedCard)selectedCard.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}}).catch(error=>console.warn('Could not finish loading the selected assigned or pinned item.',error));break;}  case 'open-archive':openArchive();break;
+ case 'select-parent':{const enteringWorkspace=ui.page==='account';const parent=data.parents.find(row=>String(row.id)===String(id));if(!parent)break;const selectedId=String(parent.id);ui.page='workspace';if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedParentId=parent.id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();applyTranslations();renderParentList({skipRemote:true});renderDetail();void ensureRootChildrenLoaded(id).then(()=>{if(ui.page==='workspace'&&String(ui.selectedParentId)===selectedId)renderDetail();}).catch(error=>console.warn('Could not finish loading the selected workspace item.',error));void refreshActivityFor(id,'all');break;}  case 'sidebar-mode':{ui.sidebarMode='search';if(!['all','project','job'].includes(ui.parentType))ui.parentType='all';applyTranslations();renderParentList();break;}
+ case 'select-assigned':{const enteringWorkspace=ui.page==='account';const item=allItem(id)||assignedItemCache.get(String(id))||ui.accountAssignedRows.find(row=>String(row.id||row.itemId)===String(id))||ui.accountPinnedRows.find(row=>String(row.id||row.itemId)===String(id));const rootId=String(item?.rootParentId||((item?.type==='project'||item?.type==='job')?item.id:(item?rootParent(item)?.id:''))||'');const root=data.parents.find(parent=>String(parent.id)===rootId)||(item?rootParent(item):null);if(!item||!root)break;const isRootItem=item.type==='project'||item.type==='job';const selectedItemId=String(item.id||id),selectedRootId=String(root.id);ui.page='workspace';if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedAssignedItemId=isRootItem?null:item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}applyTranslations();renderParentList({skipRemote:true});renderDetail();void refreshActivityFor(root.id,'all');void ensureRootChildrenLoaded(selectedRootId).then(()=>{if(ui.page!=='workspace'||String(ui.selectedParentId)!==selectedRootId)return;if(!isRootItem){let ancestor=allItem(selectedItemId)||item;const seenAfterLoad=new Set();while(ancestor&&String(ancestor.id)!==selectedRootId&&!seenAfterLoad.has(String(ancestor.id))){seenAfterLoad.add(String(ancestor.id));if(ancestor.type==='task')ui.expanded.add(String(ancestor.id));ancestor=ancestor.parentId?allItem(ancestor.parentId):null;}}renderDetail();if(!isRootItem){const selectedCard=document.getElementById('card-'+selectedItemId);if(selectedCard)selectedCard.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});}}).catch(error=>console.warn('Could not finish loading the selected assigned or pinned item.',error));break;}  case 'open-archive':openArchive();break;
  case 'global-history':openApplicationHistory();break;
  case 'retry-data-load':if(ui.modal?.kind==='history')void refreshActivityFor(ui.modal.itemId,allItem(ui.modal.itemId)?.type==='followup'?'item':(ui.modal.historyScope||'all'));else if(ui.modal?.kind==='global-history')void refreshApplicationHistory();else if(!dataLoadState.parentsReady||dataLoadState.initialError)void startWorkspaceHydration();else if(ui.selectedParentId)void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});break;
  case 'archive-toggle-group':toggleArchiveGroup(actionEl.dataset.rootId);break;
@@ -2870,7 +2896,7 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
  default:break;
 }}
 $('#app').addEventListener('click',ev=>{if($('#modalRoot').contains(ev.target))return;const actionEl=ev.target.closest('[data-action]');if(actionEl){if(actionEl.dataset.action==='backdrop-close'&&ev.target!==actionEl)return;ev.preventDefault();handleAction(actionEl);}});
-window.addEventListener('resize',()=>{const mobile=isMobileSidebarViewport();if(mobile!==previousMobileSidebarViewport){previousMobileSidebarViewport=mobile;ui.sidebarCollapsed=false;applyTranslations();}});
+window.addEventListener('resize',()=>{const mobile=isMobileSidebarViewport();if(mobile!==previousMobileSidebarViewport){previousMobileSidebarViewport=mobile;syncWorkspaceSidebarVisibility();}});
 $('#app').addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.parent-card[tabindex="0"]')&&!ev.target.querySelector(':focus')){ev.preventDefault();handleAction(ev.target);}});
 $('#modalRoot').addEventListener('click',ev=>{ev.stopPropagation();const actionEl=ev.target.closest('[data-action]');if(actionEl){if(actionEl.dataset.action==='backdrop-close'&&ev.target!==actionEl)return;if(actionEl.dataset.action==='backdrop-close'){ui.modal=null;renderModal();return;}ev.preventDefault();handleAction(actionEl);}});
 $('#modalRoot').addEventListener('submit',ev=>{if(ev.target.id==='itemForm'){ev.preventDefault();handleItemSubmit(ev.target);}});

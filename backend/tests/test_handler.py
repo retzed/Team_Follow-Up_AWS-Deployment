@@ -369,6 +369,7 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(updates["roleArabic"], "مهندس سحابة")
         self.assertEqual(updates["icon"], "briefcase")
         self.assertEqual(handler.normalize_profile_updates({"icon": "cowboy-hat"}, actor, target)["icon"], "cowboy-hat")
+        self.assertEqual(handler.normalize_profile_updates({"icon": "hard-hat"}, actor, target)["icon"], "hard-hat")
         self.assertEqual(updates["preferences"], {"lang": "ar", "theme": "light"})
 
     def test_profile_update_rejects_unauthorized_privilege_bad_email_and_root(self):

@@ -278,8 +278,11 @@ Use two independent team accounts in separate browsers or sessions:
 4. Edit title, description, priority, status, due date and assignee; verify activity events identify the authenticated actor.
 5. Archive an item with descendants, confirm active items disappear and archive rows remain, then restore and verify relationships.
 6. Verify selected-item and all-activity history, search/filter behavior, English/Arabic mode, dark/light mode, and mobile layout.
-7. Send an unauthenticated API request and confirm the JWT authorizer denies it. Check CORS from the exact Amplify origin.
-8. Inspect Lambda/API logs, the dashboard and alarm state. Confirm the budget notifications are configured but do not treat the budget as a spending limit.
+7. In My Account, verify Profile field order, Label / Label (Arabic) adjacency, Profile icon last, and the privilege indicator beside the name without a privilege textbox. Verify Search date sorting, inclusive From/To filters, user filter, Clear, and explicit Open in workspace / Activity history actions.
+8. Open an assigned or pinned Task whose parent Task is assigned to a different user; confirm the workspace expands the ancestor chain after hydration and scrolls the selected item into view. Collapse/expand the workspace Search sidebar and confirm the selected Project/Job and child remain visible.
+9. Repeat Account Search and navigation at 320, 375, 560, 768, and 820 CSS pixel widths in both English LTR and Arabic RTL. Check date controls do not overflow, buttons wrap, text remains readable, and the workspace does not become blank after sidebar expansion.
+10. Send an unauthenticated API request and confirm the JWT authorizer denies it. Check CORS from the exact Amplify origin.
+11. Inspect Lambda/API logs, the dashboard and alarm state. Confirm the budget notifications are configured but do not treat the budget as a spending limit.
 
 ## 12. Optional full-stack automation reference (not the primary method)
 

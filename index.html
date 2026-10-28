@@ -1756,7 +1756,7 @@ function detectInitialPreferences(){
  }catch{return fallback;}
 }
 const initialPreferences=detectInitialPreferences();
-function isMobileSidebarViewport(){try{return typeof window.matchMedia==='function'&&window.matchMedia('(max-width: 820px)').matches;}catch{return false;}}
+function isMobileSidebarViewport(){try{return typeof window.matchMedia==='function'&&isMobileSidebarViewport();}catch{return false;}}
 let previousMobileSidebarViewport=isMobileSidebarViewport();
 const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:true,selectedParentId:'',tab:'overview',page:'account',accountTab:'assigned',accountLoading:true,accountSaving:false,accountMessage:'',accountProfileDraft:null,accountError:'',accountAssignedRows:[],accountAssignedLoaded:false,accountAssignedLoading:false,accountAssignedError:'',accountPinnedRows:[],accountPinnedLoaded:false,accountPinnedLoading:false,accountPinnedError:'',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||''),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all',accountSearchQuery:'',accountSearchType:'all',accountSearchStatus:'all',accountSearchDateMode:'updated',accountSearchDateFrom:'',accountSearchDateTo:'',accountSearchUser:'all'};
 const activityRefreshRequests=new Map();
@@ -2353,7 +2353,7 @@ function syncWorkspaceSidebarVisibility(){
  if(layout)layout.classList.toggle('sidebar-is-collapsed',collapsed);
  if(content)content.hidden=collapsed;
  if(toggle){
-  toggle.hidden=ui.page==='account'||window.matchMedia('(max-width: 820px)').matches;
+  toggle.hidden=ui.page==='account'||isMobileSidebarViewport();
   const label=collapsed?tr('expandSidebar'):tr('collapseSidebar');
   toggle.title=label;
   toggle.setAttribute('aria-label',label);
@@ -2361,7 +2361,7 @@ function syncWorkspaceSidebarVisibility(){
   toggle.innerHTML=icon('sidebar',16);
  }
  if(mobileToggle){
-  mobileToggle.hidden=ui.page==='account'||!window.matchMedia('(max-width: 820px)').matches;
+  mobileToggle.hidden=ui.page==='account'||!isMobileSidebarViewport();
   mobileToggle.textContent=tr('parentSearchTitle');
   mobileToggle.setAttribute('aria-expanded',String(!collapsed));
   mobileToggle.setAttribute('aria-label',tr('parentSearchTitle'));

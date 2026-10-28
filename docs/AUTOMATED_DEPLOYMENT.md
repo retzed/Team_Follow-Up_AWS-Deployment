@@ -33,7 +33,7 @@ The four DynamoDB tables use **DeletionPolicy: Retain** and **UpdateReplacePolic
 
 ### What it does not create
 
-- It does not create the six real Cognito team accounts or populate the Users table with their profiles. Those steps are performed after deployment using Cognito administration and the trusted seeding script.
+- It does not create the six standard Cognito team accounts or the protected root account, nor does it populate their Users-table profiles. Those steps are performed after deployment using Cognito administration and the trusted seeding script.
 - It does not add a Cognito managed-login/hosted-UI domain. The frontend uses direct Cognito SRP sign-in, so a hosted login domain and OAuth callback URLs are not required.
 - It does not create sample projects/tasks or migrate data from the manual environment.
 - It does not configure email/SNS actions for CloudWatch alarms. The AWS Budget has its own email subscribers.
@@ -265,9 +265,9 @@ If the first build fails, check the build log for Node.js version/setup or missi
 
 ---
 
-## 8. Create the six team accounts and seed Users profiles
+## 8. Create team accounts and seed Users profiles
 
-CloudFormation creates the Cognito schema and the Users table, but it intentionally does not create real team accounts or store user email addresses in the template. Create the six administrator-managed Cognito users for this environment.
+CloudFormation creates the Cognito schema and the Users table, but it intentionally does not create real team accounts or store user email addresses in the template. Create the six standard administrator-managed Cognito users and the protected `root` Cognito user for this environment.
 
 ### 8.1 Create Cognito users
 
@@ -285,6 +285,7 @@ CloudFormation creates the Cognito schema and the Users table, but it intentiona
 | `u4` | Omar | AWS Engineer |
 | `u5` | Haneen | AWS Engineer |
 | `u6` | Dina | AWS Engineer |
+| `root` | root | Root |
 
 The browser app client can read `custom:teamUserId` but cannot write it. Only the trusted administrator should assign or correct these values. Do not store real email addresses in the repository.
 
@@ -318,7 +319,7 @@ First run a dry run:
 python backend/scripts/seed_user_profiles_from_cognito.py --user-pool-id $UserPoolId --table $UsersTable --region $Region --dry-run
 ```
 
-Check that all six expected IDs and display names are found and enabled. The script does not print Cognito `sub` values. If any account is missing, duplicated, or has an unsupported `custom:teamUserId`, stop and fix the Cognito accounts before writing.
+Check that the six standard IDs and the protected `root` ID are found and enabled. The script does not print Cognito `sub` values. If any account is missing, duplicated, or has an unsupported `custom:teamUserId`, stop and fix the Cognito accounts before writing.
 
 Only after the dry run is correct, run the same command without `--dry-run`:
 
@@ -326,7 +327,7 @@ Only after the dry run is correct, run the same command without `--dry-run`:
 python backend/scripts/seed_user_profiles_from_cognito.py --user-pool-id $UserPoolId --table $UsersTable --region $Region
 ```
 
-The write operation creates/overwrites the six corresponding profile rows. Review the output before running it again.
+The write operation creates/overwrites seven corresponding profile rows, including the protected root mapping. Review the output before running it again.
 
 ---
 
@@ -440,3 +441,6 @@ The monthly $1 budget does not automatically stop spend; verify that the intende
 - [SAM `deploy` command reference](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-cli-command-reference-sam-deploy.html)
 - [Setting up AWS Amplify access to GitHub repositories](https://docs.aws.amazon.com/amplify/latest/userguide/setting-up-GitHub-access.html)
 - [AWS CloudFormation resource reference: Amplify App](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-amplify-app.html)
+
+
+**Root credentials:** create the Cognito user `root`, set `custom:teamUserId=root`, and use `root@1234` as its initial/temporary password when creating the account. The seeding script then creates the corresponding root profile row. Cognito remains the password store and verifier; this template does not create a separate database-password authentication path. Root's application profile is read-only and its privilege cannot be changed through the UI.

@@ -278,7 +278,10 @@ check(sidebarAction.includes('setWorkspaceSidebarCollapsed(!ui.sidebarCollapsed)
   'The Search toggle uses a dedicated state transition and restores selected workspace detail only when expanding.');
 
 // Workspace Search sidebar close/reopen regression coverage.
-check(/const ui=\\{[^\\n]*sidebarCollapsed:true,/.test(html) &&
+const uiDeclarationStart=html.indexOf('const ui={');
+const uiDeclarationEnd=html.indexOf('\\n',uiDeclarationStart);
+check(uiDeclarationStart>=0 && uiDeclarationEnd>uiDeclarationStart &&
+      html.slice(uiDeclarationStart,uiDeclarationEnd).includes('sidebarCollapsed:true,') &&
       html.includes('data-action="sidebar-toggle" aria-expanded="false"'),
   'Workspace Search starts collapsed, including its initial accessible expanded state.');
 check(html.includes('function syncWorkspaceSidebarVisibility()') &&

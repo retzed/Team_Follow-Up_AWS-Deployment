@@ -279,7 +279,7 @@ check(sidebarAction.includes('setWorkspaceSidebarCollapsed(!ui.sidebarCollapsed)
 
 // Workspace Search sidebar close/reopen regression coverage.
 const uiDeclarationStart=html.indexOf('const ui={');
-const uiDeclarationEnd=html.indexOf('\\n',uiDeclarationStart);
+const uiDeclarationEnd=html.indexOf('\n',uiDeclarationStart);
 check(uiDeclarationStart>=0 && uiDeclarationEnd>uiDeclarationStart &&
       html.slice(uiDeclarationStart,uiDeclarationEnd).includes('sidebarCollapsed:true,') &&
       html.includes('data-action="sidebar-toggle" aria-expanded="false"'),
@@ -300,7 +300,7 @@ check(parentAction.includes("const enteringWorkspace=ui.page==='account'") &&
   'Workspace navigation from Account starts with Search collapsed, while workspace-to-workspace navigation keeps the chosen state.');
 
 const sidebarHelpersStart=html.indexOf('function syncWorkspaceSidebarVisibility(){');
-const sidebarHelpersEnd=html.indexOf('\\nfunction renderParentList(',sidebarHelpersStart);
+const sidebarHelpersEnd=html.indexOf('\nfunction renderParentList(',sidebarHelpersStart);
 assert.ok(sidebarHelpersStart>=0 && sidebarHelpersEnd>sidebarHelpersStart,
   'Workspace sidebar state helpers must be defined before the list renderer.');
 const sidebarHelpers=html.slice(sidebarHelpersStart,sidebarHelpersEnd);
@@ -317,7 +317,7 @@ const sidebarContext={
   icon:()=>'<svg></svg>',
   clearTimeout:(timer)=>clearedSidebarTimers.push(timer)
 };
-vm.runInNewContext(`let sidebarQueryTimer=77,sidebarQuerySequence=10;\\n${sidebarHelpers}\\nthis.setSidebarCollapsed=setWorkspaceSidebarCollapsed;this.readSidebarInternals=()=>({timer:sidebarQueryTimer,sequence:sidebarQuerySequence});`,sidebarContext);
+vm.runInNewContext(`let sidebarQueryTimer=77,sidebarQuerySequence=10;\n${sidebarHelpers}\nthis.setSidebarCollapsed=setWorkspaceSidebarCollapsed;this.readSidebarInternals=()=>({timer:sidebarQueryTimer,sequence:sidebarQuerySequence});`,sidebarContext);
 sidebarContext.setSidebarCollapsed(true);
 assert.equal(sidebarContext.ui.sidebarCollapsed,true,'Collapsing Search updates the single source of truth.');
 assert.equal(sidebarNodes.layout.collapsed,true,'Collapsing Search applies the zero-width sidebar layout.');

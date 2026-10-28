@@ -2563,6 +2563,14 @@ function historyActionLabel(event){
   return statuses[key]||original;
  };
  const countSuffix=bulkCount?(isArabic?` · ${bulkCount} عنصر فرعي`:` · ${bulkCount} child item${bulkCount===1?'':'s'}`):'';
+ const profileActions={
+  'updated profile name':isArabic?'تم تحديث اسم الملف الشخصي':'Updated profile name',
+  'updated profile phone number':isArabic?'تم تحديث رقم هاتف الملف الشخصي':'Updated profile phone number',
+  'updated profile e-mail':isArabic?'تم تحديث البريد الإلكتروني للملف الشخصي':'Updated profile e-mail',
+  'updated profile label':isArabic?'تم تحديث المسمى الوظيفي':'Updated profile label',
+  'updated user privilege':isArabic?'تم تحديث صلاحية المستخدم':'Updated user privilege'
+ };
+ if(profileActions[raw.toLowerCase()])return profileActions[raw.toLowerCase()];
  const typeVerb=raw.match(/^(Created|Deleted|Restored|Archived|Moved)\s+(project|job|task|follow-?up)(?:\s+to Archive)?\s*:\s*.+?\.?$/i);
  if(typeVerb){const verb=typeVerb[1].toLowerCase();const key=verb==='created'?'create':verb==='deleted'?'delete':verb==='restored'?'restore':verb==='moved'?'move':'archived';return (labels[key]||labels.update)+(key==='delete'||key==='restore'?countSuffix:'');}
  const structuredUpdate=raw.match(/^Updated\s+(.+?)\s+for\s+(?:project|job|task|follow-?up):\s*.+?\.?$/i);

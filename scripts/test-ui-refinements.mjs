@@ -320,6 +320,7 @@ const sidebarNodes={
 const clearedSidebarTimers=[];
 const sidebarContext={
   ui:{sidebarCollapsed:false,page:'workspace'},
+  isMobileSidebarViewport:()=>false,
   $:(selector)=>selector==='.layout'?sidebarNodes.layout:selector==='#sidebarContent'?sidebarNodes.content:selector==='#sidebarToggleFloat'?sidebarNodes.toggle:null,
   tr:(key)=>({expandSidebar:'Expand project search',collapseSidebar:'Collapse project search'})[key]||key,
   icon:()=>'<svg></svg>',

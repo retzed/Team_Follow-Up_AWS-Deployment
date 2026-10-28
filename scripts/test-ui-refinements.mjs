@@ -196,4 +196,51 @@ assert.ok(
   html.includes('.history-table tbody tr:last-child td{border-bottom:1px solid var(--border)}'),
   'The final history-table row retains its bottom divider when fewer rows are shown.'
 );
+
+// Account Search, navigation, and profile-layout regression coverage.
+check(html.includes("labelArabicLabel:'Label (Arabic)'") &&
+      html.includes("labelArabicLabel:'المسمى (بالعربية)'") &&
+      !html.includes("Label (Arabic, optional)") &&
+      !html.includes('id="accountPrivilege"'),
+  'The profile omits its redundant privilege field and uses the concise bilingual Arabic Label text.');
+const profileRolePos=html.indexOf('for="accountRole"');
+const profileRoleArabicPos=html.indexOf('for="accountRoleArabic"');
+const profileIconPos=html.indexOf('for="accountIcon"');
+check(profileRolePos>=0 && profileRoleArabicPos>profileRolePos && profileIconPos>profileRoleArabicPos,
+  'Profile Label fields remain adjacent with Profile icon as the final personal-detail field.');
+for(const control of ['accountSearchDateMode','accountSearchDateFrom','accountSearchDateTo','accountSearchUser','clear-account-search']) {
+  check(html.includes(control), `Account Search exposes its date and user filter control: ${control}.`);
+}
+check(html.includes('function accountSearchUserMatches') &&
+      html.includes('function accountSearchResultsMarkup()') &&
+      html.includes("if(!matchesDate(item,dateMode,dateFrom,dateTo,'application'))return false;"),
+  'Account Search filters by user and date range.');
+const accountSearchStart=html.indexOf('function accountSearchResultsMarkup()');
+const accountSearchEnd=html.indexOf('function refreshAccountSearchResults()',accountSearchStart);
+check(accountSearchStart>=0 && accountSearchEnd>accountSearchStart &&
+      html.slice(accountSearchStart,accountSearchEnd).includes('data-action="select-parent"') &&
+      html.slice(accountSearchStart,accountSearchEnd).includes('data-action="history"') &&
+      !html.slice(accountSearchStart,accountSearchEnd).includes('<article class="parent-card" data-action="select-parent"'),
+  'Search results use explicit Open in workspace and Activity history buttons rather than selecting on card click.');
+check(html.includes('data-action="history" data-item-id="${esc(id)}"') &&
+      html.includes('data-action="select-assigned" data-id="${esc(id)}"'),
+  'Assigned and pinned item rows expose both workspace navigation and item activity history.');
+const parentActionStart=html.indexOf("case 'select-parent':");
+const sidebarModeActionStart=html.indexOf("case 'sidebar-mode':",parentActionStart);
+const parentAction=html.slice(parentActionStart,sidebarModeActionStart);
+check(parentAction.includes("ui.page='workspace'") && parentAction.includes('applyTranslations()') &&
+      parentAction.includes('void ensureRootChildrenLoaded(id)'),
+  'Opening a Search result switches to the visible workspace and preserves lazy child loading.');
+const assignedActionStart=html.indexOf("case 'select-assigned':");
+const archiveActionStart=html.indexOf("case 'open-archive':",assignedActionStart);
+const assignedAction=html.slice(assignedActionStart,archiveActionStart);
+check(assignedAction.includes("ui.page='workspace'") && assignedAction.includes('applyTranslations()') &&
+      assignedAction.includes('void ensureRootChildrenLoaded(selectedRootId)'),
+  'Opening an assigned or pinned item switches to the visible workspace and hydrates its root.');
+const sidebarActionStart=html.indexOf("case 'sidebar-toggle':");
+const pinActionStart=html.indexOf("case 'toggle-pin':",sidebarActionStart);
+const sidebarAction=html.slice(sidebarActionStart,pinActionStart);
+check(sidebarAction.includes('renderDetail()') && sidebarAction.includes('void ensureRootChildrenLoaded(selectedId)'),
+  'Expanding Search restores the selected workspace detail after reloading root children.');
+
 console.log('UI refinement tests passed: history widths/action labels, bilingual helper removal, concise sidebar cards, labeled child assignees, modal focus/layout and English/Arabic normalization across history views.');

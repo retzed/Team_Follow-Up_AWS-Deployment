@@ -342,8 +342,8 @@ assert.equal(sidebarNodes.toggle.attributes['aria-expanded'],'true','The toggle 
 
 // Mobile-only Search toggle and account/assigned card width regressions.
 check(html.includes('id="mobileSearchToggle" class="mobile-search-toggle"') &&
-      html.includes("mobileToggle.hidden=ui.page==='account'||!window.matchMedia('(max-width: 820px)').matches;") &&
-      html.includes("toggle.hidden=ui.page==='account'||window.matchMedia('(max-width: 820px)').matches;"),
+      html.includes("mobileToggle.hidden=ui.page==='account'||!isMobileSidebarViewport();") &&
+      html.includes("toggle.hidden=ui.page==='account'||isMobileSidebarViewport();"),
   'The labelled Search projects & Jobs control is mobile-only, while the floating icon is desktop-only.');
 check(html.includes('.mobile-search-toggle:not([hidden]){display:flex;') &&
       html.includes('.account-search-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));') &&

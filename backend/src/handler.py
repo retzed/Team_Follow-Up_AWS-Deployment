@@ -660,7 +660,7 @@ def public_team_user(row, include_private=False):
         "name": str(row.get("displayName") or ""),
         "role": str(row.get("role") or "Team member"),
         "icon": str(row.get("icon") or "user"),
-        "privilege": str(row.get("privilege") or "User"),
+        "privilege": str(row.get("privilege") or ("Administrator" if str(row.get("userId") or "") == "u1" else "User")),
         "enabled": row.get("enabled", True) is not False,
     }
     if include_private:
@@ -674,7 +674,8 @@ def public_team_user(row, include_private=False):
 
 
 def is_privilege_manager(profile):
-    return str(profile.get("userId") or "") == "root" or profile.get("privilege") == "Administrator"
+    user_id = str(profile.get("userId") or "")
+    return user_id == "root" or profile.get("privilege") == "Administrator" or (user_id == "u1" and not profile.get("privilege"))
 
 
 def profile_audit_event(actor, target, action, at=None):
@@ -722,7 +723,7 @@ def normalize_profile_updates(body, actor, target):
     if "email" in body:
         value = body["email"]
         candidate = value.strip() if isinstance(value, str) else None
-        if candidate is None or len(candidate) > 254 or (candidate and not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", candidate)):
+        if candidate is None or len(candidate) > 254 or (candidate and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", candidate)):
             raise ValueError("Enter a valid e-mail address.")
         normalized["email"] = candidate
     if "icon" in body:
@@ -846,6 +847,8 @@ def lambda_handler(event, context):
             user, events = commit_profile_update(profile, profile, updates)
             return response(200, {'user': user, 'activityEvents': events})
         if method=='PATCH' and path=='/users/me/pins':
+            if str(profile.get('userId') or '') == 'root':
+                raise PermissionError('The root profile is database-managed and cannot be edited in the application.')
             ids = body.get('itemIds')
             if not isinstance(ids, list) or len(ids) > 500:
                 raise ValueError('Pinned item IDs must be a list containing at most 500 items.')

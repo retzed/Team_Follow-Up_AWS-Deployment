@@ -133,6 +133,7 @@ Create one Cognito account for each team member through Cognito's administrator 
 | `u4` | Omar | AWS Engineer |
 | `u5` | Haneen | AWS Engineer |
 | `u6` | Dina | AWS Engineer |
+| `root` | root | Root |
 
 Role labels are descriptive only; they do not grant extra privileges. The assigned `custom:teamUserId` value must match the profile table's `userId`. The sign-in screen's username field accepts the account's email sign-in identifier.
 
@@ -144,7 +145,7 @@ Dry-run:
 
     python backend/scripts/seed_user_profiles_from_cognito.py --user-pool-id <POOL_ID> --table TeamFollowUp-Users --region us-east-1 --dry-run
 
-Review the six expected IDs/names and mapping results. Only then repeat without `--dry-run`. This script is an administrative data-seeding tool, not an infrastructure deployment method. Use credentials with Cognito ListUsers and DynamoDB BatchWriteItem access to the Users table; do not grant those privileges to Lambda. Never commit the real Cognito subject values or account details.
+Review the six standard IDs/names plus `root` and the mapping results. Only then repeat without `--dry-run`. The script expects seven unique Cognito mappings. This script is an administrative data-seeding tool, not an infrastructure deployment method. Use credentials with Cognito ListUsers and DynamoDB BatchWriteItem access to the Users table; do not grant those privileges to Lambda. Never commit the real Cognito subject values or account details.
 
 ## 6. Amplify Hosting — create through the console
 
@@ -314,3 +315,8 @@ Review the CloudFormation changeset before approval. The template uses `Deletion
 | Cost alert arrives | Treat it as a warning, inspect Billing/Cost Explorer and credits, and stop/delete unneeded billable resources through the console. A $1 budget does not enforce a cap. |
 
 For production use, reevaluate DynamoDB capacity, point-in-time recovery, alarms/action notifications, identity governance and backup/recovery objectives before increasing data volume or exposing the application to a larger team.
+
+
+### Protected root account (additional Cognito mapping)
+
+Create a Cognito user with username `root`, set its initial/temporary password to `root@1234`, and set `custom:teamUserId` to `root` through the AWS Console or a trusted Cognito administrator operation. Use the pool's temporary-password policy so the requested default can be accepted; Cognito may require the user to choose a new password at first sign-in. The application does not create a parallel root login and does not store passwords in DynamoDB. After the standard users and root exist, the profile seeding script includes all seven IDs and stores the Cognito `sub` mapping. Check the dry-run before writing. Root's Users-table profile must remain enabled and have Administrator privilege and the `crown` icon; the backend prevents profile/privilege editing through the application.

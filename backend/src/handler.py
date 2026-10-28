@@ -648,7 +648,7 @@ def restore_root_completion_positions(ordered, selected_roots, selected_under):
 
 
 PROFILE_PRIVILEGES = {"Administrator", "Editor", "User"}
-PROFILE_ICONS = {"user", "compass", "terminal", "shield", "briefcase", "wrench", "settings", "cpu", "clipboard", "search"}
+PROFILE_ICONS = {"user", "compass", "terminal", "shield", "briefcase", "wrench", "settings", "cpu", "clipboard", "search", "code", "database", "monitor", "rocket", "hard-hat", "crown", "badge-check", "cowboy-hat", "layers", "sparkles", "target", "graduation-cap"}
 PROFILE_PREFERENCE_LANGS = {"en", "ar"}
 PROFILE_PREFERENCE_THEMES = {"light", "dark"}
 
@@ -658,7 +658,9 @@ def public_team_user(row, include_private=False):
     result = {
         "id": str(row.get("userId") or ""),
         "name": str(row.get("displayName") or ""),
+        "nameArabic": str(row.get("displayNameArabic") or ""),
         "role": str(row.get("role") or "Team member"),
+        "roleArabic": str(row.get("roleArabic") or ""),
         "icon": str(row.get("icon") or "user"),
         "privilege": str(row.get("privilege") or ("Administrator" if str(row.get("userId") or "") == "u1" else "User")),
         "enabled": row.get("enabled", True) is not False,
@@ -703,7 +705,7 @@ def normalize_profile_updates(body, actor, target):
         raise ValueError("Provide at least one profile field to update.")
     if str(target.get("userId") or "") == "root":
         raise PermissionError("The root profile is database-managed and cannot be edited in the application.")
-    allowed = {"name", "phoneNumber", "email", "icon", "role", "preferences", "privilege"}
+    allowed = {"name", "nameArabic", "phoneNumber", "email", "icon", "role", "roleArabic", "preferences", "privilege"}
     unknown = set(body) - allowed
     if unknown:
         raise ValueError("Unsupported profile field: " + sorted(unknown)[0])
@@ -715,6 +717,11 @@ def normalize_profile_updates(body, actor, target):
         if not isinstance(value, str) or not value.strip() or len(value.strip()) > 100:
             raise ValueError("Name must contain 1-100 characters.")
         normalized["displayName"] = value.strip()
+    if "nameArabic" in body:
+        value = body["nameArabic"]
+        if not isinstance(value, str) or len(value.strip()) > 100:
+            raise ValueError("Arabic display name must contain at most 100 characters.")
+        normalized["displayNameArabic"] = value.strip()
     if "phoneNumber" in body:
         value = body["phoneNumber"]
         if not isinstance(value, str) or len(value.strip()) > 40:
@@ -736,6 +743,11 @@ def normalize_profile_updates(body, actor, target):
         if not isinstance(value, str) or not value.strip() or len(value.strip()) > 80:
             raise ValueError("Label must contain 1-80 characters.")
         normalized["role"] = value.strip()
+    if "roleArabic" in body:
+        value = body["roleArabic"]
+        if not isinstance(value, str) or len(value.strip()) > 80:
+            raise ValueError("Arabic label must contain at most 80 characters.")
+        normalized["roleArabic"] = value.strip()
     if "privilege" in body:
         value = body["privilege"]
         if not isinstance(value, str) or value not in PROFILE_PRIVILEGES:
@@ -766,9 +778,11 @@ def commit_profile_update(actor, target, normalized):
     changed_target = {**old, **normalized}
     action_by_field = (
         ("displayName", "Updated profile name"),
+        ("displayNameArabic", "Updated Arabic profile name"),
         ("phoneNumber", "Updated profile phone number"),
         ("email", "Updated profile e-mail"),
         ("role", "Updated profile label"),
+        ("roleArabic", "Updated Arabic profile label"),
         ("privilege", "Updated user privilege"),
     )
     events = [

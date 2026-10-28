@@ -2800,9 +2800,13 @@ function handleItemSubmit(form){const fd=new FormData(form);const kind=form.data
 function clearParentFilters(){ui.parentQuery='';ui.parentType='all';ui.parentStatus='all';ui.parentDateMode='updated';ui.parentDateFrom='';ui.parentDateTo='';$('#parentQuery').value='';$('#parentDateFrom').value='';$('#parentDateTo').value='';render();toast(tr('filtersCleared'));}
 function clearChildFilters(){ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';renderDetail();}
 function handleAction(target){const actionEl=target.closest('[data-action]');if(!actionEl)return;const action=actionEl.dataset.action;const id=actionEl.dataset.id;const parentId=actionEl.dataset.parentId;if(!dataLoadState.initialComplete&&['new-parent','edit-item','new-child','delete-item','delete-from-modal','confirm-delete','archive-restore-selected'].includes(action)){toast(tr('loadingData'),true);return;}switch(action){
- case 'select-parent':{ui.selectedParentId=id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();renderParentList({skipRemote:true});renderDetail();void ensureRootChildrenLoaded(id);void refreshActivityFor(id,'all');break;}
+ case 'account-tab':void openAccountTab(actionEl.dataset.tab);break;
+ case 'toggle-pin':void togglePinnedItem(id);break;
+ case 'save-user-privilege':void saveUserPrivilege(actionEl.dataset.userId);break;
+ case 'select-parent':{ui.page='workspace';ui.selectedParentId=id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();renderParentList({skipRemote:true});renderDetail();void ensureRootChildrenLoaded(id);void refreshActivityFor(id,'all');break;}
  case 'sidebar-mode':{const requestedMode=actionEl.dataset.mode==='assigned'?'assigned':'search';if(isMobileSidebarViewport()){if(ui.sidebarMode===requestedMode&&!ui.sidebarCollapsed){ui.sidebarCollapsed=true;}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}}else{ui.sidebarMode=requestedMode;ui.sidebarCollapsed=false;}if(ui.sidebarMode==='search'&&!['all','project','job'].includes(ui.parentType))ui.parentType='all';applyTranslations();renderParentList();break;}
  case 'select-assigned':{
+  ui.page='workspace';
   const item=allItem(id)||assignedItemCache.get(String(id));
   const rootId=String(item?.rootParentId||(item?rootParent(item)?.id:'')||'');
   const root=data.parents.find(parent=>String(parent.id)===rootId)||(item?rootParent(item):null);
@@ -2872,8 +2876,12 @@ $('#modalRoot').addEventListener('scroll',ev=>{
 },true);
 $('#modalRoot').addEventListener('toggle',ev=>{const details=ev.target.closest('.archive-disclosure[data-archive-node]');if(!details||ui.modal?.kind!=='archive')return;const key=details.dataset.archiveNode;const set=new Set(ui.modal.expandedArchiveNodes||[]);if(details.open)set.add(key);else set.delete(key);ui.modal.expandedArchiveNodes=[...set];},true);
 $('#modalRoot').addEventListener('change',ev=>{if(ev.target.id==='historyUserFilter'&&ui.modal?.kind==='global-history'){applicationHistorySearchRequest++;ui.modal.historyUserFilter=ev.target.value||'all';ui.modal.historyVisibleCount=100;renderModal();$('#historyUserFilter')?.focus({preventScroll:true});if(String(ui.modal.historyQuery||'').trim()||String(ui.modal.historyUserFilter||'all')!=='all')void loadRemainingApplicationHistoryForSearch();else{applicationHistorySearchFillActive=false;synchronizeApplicationHistoryWithWorkspace();renderModalPreservingInteraction();}return;}const checkbox=ev.target.closest('.archive-select');if(!checkbox||ui.modal?.kind!=='archive')return;const id=String(checkbox.dataset.archiveId);const scroller=$('.archive-groups');const top=scroller?.scrollTop||0;const left=scroller?.scrollLeft||0;const openKeys=[...$('#modalRoot').querySelectorAll('.archive-disclosure[data-archive-node][open]')].map(el=>el.dataset.archiveNode);ui.modal.expandedArchiveNodes=[...new Set(openKeys)];const selected=new Set(ui.modal.selectedIds||[]);if(checkbox.checked)selected.add(id);else selected.delete(id);ui.modal.selectedIds=[...selected];renderModal();const next=$('.archive-groups');if(next){next.scrollTop=top;next.scrollLeft=left;}const restored=$(`#modalRoot .archive-select[data-archive-id="${CSS.escape(id)}"]`);if(restored)restored.focus({preventScroll:true});});
-$('#langToggle').addEventListener('click',()=>{ui.lang=ui.lang==='en'?'ar':'en';render();});
-$('#themeToggle').addEventListener('click',()=>{ui.theme=ui.theme==='light'?'dark':'light';document.documentElement.dataset.theme=ui.theme;applyTranslations();});
+$('#langToggle').addEventListener('click',()=>{void changeUserPreference('lang',ui.lang==='en'?'ar':'en');});
+$('#themeToggle').addEventListener('click',()=>{void changeUserPreference('theme',ui.theme==='light'?'dark':'light');});
+$('#actingUserDisplay').addEventListener('click',()=>{void openAccountTab('profile');});
+$('#brandHome').addEventListener('click',()=>{ui.page='workspace';render();});
+$('#brandHome').addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();ui.page='workspace';render();}});
+$('#accountPage').addEventListener('submit',ev=>{if(ev.target?.id==='accountProfileForm'){ev.preventDefault();void saveCurrentProfile(ev.target);}});
 $('#newParentTop').addEventListener('click',openNewParent);
 $('#parentQuery').addEventListener('input',ev=>{ui.parentQuery=ev.target.value;renderParentList();});
 $('#parentTypeFilter').addEventListener('change',ev=>{ui.parentType=ev.target.value;renderParentList();});
@@ -2978,6 +2986,7 @@ async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
  return promise;
 }
 async function startWorkspaceHydration(){
+ ui.page='account';ui.accountTab='profile';ui.accountLoading=true;ui.accountAssignedRows=[];ui.accountPinnedRows=[];ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedLoading=false;ui.accountPinnedLoading=false;ui.accountAssignedError='';ui.accountPinnedError='';ui.accountError='';ui.accountMessage='';
  const hydrationRun=++workspaceHydrationGeneration;
  dataLoadState.initialComplete=false;dataLoadState.usersReady=false;dataLoadState.parentsReady=false;
  dataLoadState.childrenLoaded.clear();dataLoadState.activityLoaded.clear();dataLoadState.rootErrors.clear();dataLoadState.initialError='';
@@ -2993,25 +3002,28 @@ async function startWorkspaceHydration(){
    if(meta.stage==='parents-complete')dataLoadState.parentsReady=true;
    if(meta.stage==='complete'){dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;}
    if(data.parents.length&&!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0].id;
-   applyTranslations();renderParentList();renderDetail();
+   applyTranslations();renderParentList();renderDetail();if(ui.page==='account')renderAccountPage();
   });
   if(hydrationRun!==workspaceHydrationGeneration)return;
-  data=loaded;invalidateHierarchyIndex();lastApiSnapshot=copyWorkspace(data);
+  data=loaded;invalidateHierarchyIndex();
+  try{const meResponse=await window.TeamFollowUpDataApi.getMyProfile();if(hydrationRun!==workspaceHydrationGeneration)return;if(meResponse?.user){const profile=mergeProfileIntoData(meResponse.user);if(profile?.preferences){if(['en','ar'].includes(profile.preferences.lang))ui.lang=profile.preferences.lang;if(['light','dark'].includes(profile.preferences.theme))ui.theme=profile.preferences.theme;}}}catch(profileError){ui.accountError=String(profileError?.message||tr('accountError'));}
+  ui.accountLoading=false;lastApiSnapshot=copyWorkspace(data);
   dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;
   if(!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0]?.id||'';
   invalidateActivityIndexes();skipNextSidebarApiRefresh=true;render();
   if(ui.selectedParentId){void ensureRootChildrenLoaded(ui.selectedParentId);}
  }catch(error){
   if(hydrationRun!==workspaceHydrationGeneration)return;
+  ui.accountLoading=false;ui.accountError=String(error?.message||tr('loadFailed'));
   dataLoadState.initialComplete=true;dataLoadState.initialError=String(error?.message||tr('loadFailed'));
-  renderParentList();renderDetail();if(ui.modal)renderModal();
+  render();if(ui.modal)renderModal();
  }
 }
 // Start with an empty workspace and populate it exclusively from the AWS API.
 if(!data.parents.some(p=>p.id===ui.selectedParentId))ui.selectedParentId=data.parents[0]?.id||'';
 setSignInState(Boolean(sessionUserIdAtLoad));
 render();
-window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;ui.actingUserId=context.teamUserId;applyTranslations();renderParentList();renderDetail();if(ui.modal)renderModal();};
+window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;ui.actingUserId=context.teamUserId;ui.page='account';ui.accountTab='profile';ui.accountLoading=true;ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedRows=[];ui.accountPinnedRows=[];render();void startWorkspaceHydration();};
 document.documentElement.classList.remove('auth-pending','app-booting');
 void startWorkspaceHydration();
 } catch(startupError) {

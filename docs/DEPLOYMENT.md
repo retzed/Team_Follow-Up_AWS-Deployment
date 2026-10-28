@@ -328,6 +328,7 @@ Verify this on desktop and at narrow mobile widths in both English LTR and Arabi
 2. Expand Search, choose a Project/Job, then collapse it repeatedly. The workspace must remain usable, retain its selection, and not become blank or crash.
 3. Collapse while the parent list is refreshing, then reopen. A response started before close must not overwrite the state after collapse; the current parent list must remain usable.
 4. Resize across the 820 CSS-pixel breakpoint while collapsed and while expanded. Visibility should remain as chosen rather than being forcibly reset.
+5. Inspect the collapsed layout: the sidebar must be hidden and the grid must define one flexible main-content column. The workspace must not become blank from a zero-width grid track.
 
 ### Protected root account (additional Cognito mapping)
 

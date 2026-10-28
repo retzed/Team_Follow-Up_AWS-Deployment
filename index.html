@@ -1756,7 +1756,7 @@ function detectInitialPreferences(){
  }catch{return fallback;}
 }
 const initialPreferences=detectInitialPreferences();
-function isMobileSidebarViewport(){try{return typeof window.matchMedia==='function'&&isMobileSidebarViewport();}catch{return false;}}
+function isMobileSidebarViewport(){try{return typeof window.matchMedia==='function'&&window.matchMedia('(max-width: 820px)').matches;}catch{return false;}}
 let previousMobileSidebarViewport=isMobileSidebarViewport();
 const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:true,selectedParentId:'',tab:'overview',page:'account',accountTab:'assigned',accountLoading:true,accountSaving:false,accountMessage:'',accountProfileDraft:null,accountError:'',accountAssignedRows:[],accountAssignedLoaded:false,accountAssignedLoading:false,accountAssignedError:'',accountPinnedRows:[],accountPinnedLoaded:false,accountPinnedLoading:false,accountPinnedError:'',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||''),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all',accountSearchQuery:'',accountSearchType:'all',accountSearchStatus:'all',accountSearchDateMode:'updated',accountSearchDateFrom:'',accountSearchDateTo:'',accountSearchUser:'all'};
 const activityRefreshRequests=new Map();
@@ -4317,6 +4317,114 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
  .account-search-controls .account-search-query-field{grid-column:1}
  .account-item-actions .btn,.account-item-actions button{flex-basis:calc(50% - 4px)}
 }
+
+<style id="mobile-account-search-card-overflow-fix">
+@media(max-width:820px){
+  /* Profile > Search renders project/job results as parent cards. Keep every
+     child shrinkable and cap the card/action row to the panel's content width. */
+  #accountPage .account-search-results,
+  #accountPage .account-search-results > *,
+  #accountPage .account-search-results .parent-card {
+    box-sizing:border-box!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+  #accountPage .account-search-results .parent-card {
+    display:block!important;
+    overflow:hidden!important;
+    padding:10px!important;
+  }
+  #accountPage .account-search-results .card-topline {
+    display:flex!important;
+    align-items:flex-start!important;
+    gap:8px!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+  #accountPage .account-search-results .type-icon {
+    flex:0 0 30px!important;
+    width:30px!important;
+    min-width:30px!important;
+  }
+  #accountPage .account-search-results .parent-card-copy {
+    display:block!important;
+    flex:1 1 0!important;
+    width:0!important;
+    min-width:0!important;
+    max-width:100%!important;
+    overflow-wrap:anywhere!important;
+  }
+  #accountPage .account-search-results .parent-card-title,
+  #accountPage .account-search-results .parent-card-type {
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:normal!important;
+  }
+  #accountPage .account-search-results .parent-card-bottom {
+    display:flex!important;
+    flex-wrap:wrap!important;
+    align-items:center!important;
+    gap:7px!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    margin-top:9px!important;
+  }
+  #accountPage .account-search-results .account-item-actions {
+    display:flex!important;
+    flex:1 1 100%!important;
+    flex-wrap:wrap!important;
+    align-items:center!important;
+    justify-content:flex-start!important;
+    gap:6px!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+  #accountPage .account-search-results .account-item-actions .btn {
+    display:inline-flex!important;
+    flex:0 1 auto!important;
+    width:auto!important;
+    min-width:0!important;
+    max-width:100%!important;
+    min-height:36px!important;
+    height:auto!important;
+    padding:7px 9px!important;
+    box-sizing:border-box!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    text-align:center!important;
+    line-height:1.25!important;
+  }
+  #accountPage .account-search-results .account-item-actions .pin-item-btn {
+    display:inline-flex!important;
+    flex:0 0 36px!important;
+    align-self:center!important;
+    width:36px!important;
+    min-width:36px!important;
+    max-width:36px!important;
+    height:36px!important;
+    min-height:36px!important;
+    padding:0!important;
+    margin:0!important;
+    white-space:nowrap!important;
+  }
+}
+@media(max-width:380px){
+  #accountPage .account-search-results .account-item-actions .btn {
+    flex:1 1 105px!important;
+  }
+  #accountPage .account-search-results .account-item-actions .pin-item-btn {
+    flex:0 0 36px!important;
+  }
+}
+</style>
 </style>
 </body>
 </html>

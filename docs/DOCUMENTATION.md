@@ -1326,11 +1326,38 @@ The table resources in the template use both `DeletionPolicy: Retain` and `Updat
 - [GitHub Actions](https://github.com/retzed/Team_Follow-Up_AWS-Deployment/actions) — automated validation history.
 
 
-## 14. Account page and profile behavior (28 October 2026)
+## 14. Account page, Search, navigation and mobile reliability (28 October 2026)
 
-The signed-in application opens on **My Account → Assigned Items**. Account tabs are **Profile**, **Assigned Items**, **Pinned Items**, and **Search**. The Projects workspace retains its own Search sidebar, expanded by default and collapsible/expandable with a floating control; the old “Assigned to me” sidebar mode has been removed. Item assignment remains represented by the Account Assigned Items tab.
+The signed-in application opens on **My Account → Assigned Items**. Account tabs are **Profile**, **Assigned Items**, **Pinned Items**, and **Search**. The Projects & Jobs workspace retains its own Search sidebar, expanded by default and collapsible/expandable with a floating control. The old “Assigned to me” sidebar mode has been removed; current-user assignments live in the Account page.
 
-The profile's **Name** is a display name, not the Cognito username; Cognito username is not shown in the normal UI and is never changed by a profile save. Users can optionally enter Arabic display-name and Arabic label values. The UI selects the Arabic value when Arabic is active and the value is non-empty. A profile icon selector lists icon names, includes modern outline icons (including `cowboy-hat`), and previews the selected icon before save. **Save changes** saves profile fields only. Theme and language changes take effect immediately and are persisted by separate preference updates. Name, Arabic name, phone, e-mail, label, Arabic label, and privilege changes are logged to application-wide activity history by the profile API; language/theme settings are preferences and are not profile audit events. Password change uses Cognito's authenticated password-update flow.
+### Profile and privilege separation
+
+The profile **Name** is a display name, not the Cognito username; the username is not shown as the user's display field and profile save does not rename the Cognito identity. The personal-detail fields are **Display name**, optional **Display name (Arabic)**, **Phone number**, **E-mail**, **Label**, **Label (Arabic)**, and **Profile icon**, in that order. The Arabic label no longer uses the “optional” suffix in its displayed text. The icon selector previews the selection. The profile privilege textbox has been removed; the privilege indicator remains beside the display name at the top of the page, and authorized team privilege management is separate. The backend continues to own privilege authorization and protects the root profile.
+
+**Save changes** persists profile fields through the authenticated API. Theme and language preferences are separate updates. The frontend's password-update flow remains Amazon Cognito-backed. No Cognito pool, app-client, JWT authorizer, API route, Lambda handler contract, DynamoDB key/index, or permission changes were required for this frontend update.
+
+### Account Search and user/date filters
+
+The Account **Search** tab filters top-level Projects and Jobs. Its text query includes item and Arabic names, description, type/status, and related creator/updater/owner/assignee user identifiers and display information. User association checks support both the demo aliases and canonical fields returned by the AWS data model, including `createdByUserId`, `updatedByUserId`, `ownerId`, and `assignedTo` and their assignee aliases. The explicit user selector narrows results to items associated with the selected teammate; “All users” means no user restriction and does not make every teammate related to every row.
+
+Filters include type, status, date sort mode, inclusive **From / To** calendar-date bounds, and a **Clear** action. Date modes are **Last updated**, **Last created**, and **Created**; the latter sorts oldest first and Last created sorts newest first. Search works over the current top-level item set and does not turn descendant Tasks and Follow-ups into independent result rows. The workspace sidebar's filter state is separate from Account Search state.
+
+Every Search result offers separate **Open in workspace**, **Activity history**, and pin actions. Assigned Items and Pinned Items expose the same workspace navigation and an item-history action. A result's visual card is not itself a navigation control.
+
+### Workspace, lazy loading and history behavior
+
+Opening a Project/Job from account Search switches the UI out of the account page, selects that root, and starts its child-item query. Opening an assigned or pinned item resolves its root Project/Job, switches to the workspace, loads the root's descendants, recalculates its Task-ancestor expansion after hydration, and scrolls the selected item into view. This post-load expansion is necessary when the selected child's Task ancestor was not in the user's initial assignment cache.
+
+Expanding the workspace Search sidebar retains the selection and re-renders the selected root. The selected root is rehydrated as needed; a selected child is brought back into view once the load resolves. Errors are caught and logged while the app retains its normal retry behavior.
+
+History buttons reuse the existing lazy Activity request and persistent response-cache boundary. Item-history retrieval remains scoped to the requested item's history or its root hierarchy according to item type; the Account panels do not prefetch the full Activity table just to display result rows. The API and DynamoDB remain authoritative; the browser's versioned API-response cache is a performance layer, not a local work-data database.
+
+### Mobile and regression coverage
+
+The account Search controls collapse to two shrink-safe columns at widths up to 820 CSS pixels; the query spans the full row. Date inputs and select controls are constrained to their grid columns, and workspace/history action buttons can wrap on narrow screens. The layout is expected to remain usable in both English LTR and Arabic RTL. Inert result cards are not keyboard-focusable; explicit buttons provide keyboard-accessible actions.
+
+Regression coverage asserts the profile field ordering, user/date filter wiring, canonical AWS user-ID aliases, non-action result cards, mobile grid rules, workspace page switching, and Task-ancestor expansion after lazy child loading. These are frontend-only changes: they do not require a database migration or changes to the manually configured AWS resources. Release validation uses the repository's GitHub Actions workflow; a passing CI run validates source/build/test artifacts but does not prove the live AWS account or deployed Amplify branch was exercised end-to-end.
+
 
 ### Protected root identity
 

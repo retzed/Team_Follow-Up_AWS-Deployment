@@ -340,4 +340,22 @@ assert.equal(sidebarNodes.layout.collapsed,false,'Expanding Search restores the 
 assert.equal(sidebarNodes.content.hidden,false,'Expanding Search restores its content panel.');
 assert.equal(sidebarNodes.toggle.attributes['aria-expanded'],'true','The toggle reports the expanded state accessibly.');
 
-console.log('UI refinement tests passed: activity history, bilingual UI, profile/Search filters, workspace navigation, responsive layout and safe Search sidebar lifecycle.');
+// Mobile-only Search toggle and account/assigned card width regressions.
+check(html.includes('id="mobileSearchToggle" class="mobile-search-toggle"') &&
+      html.includes("mobileToggle.hidden=ui.page==='account'||!window.matchMedia('(max-width: 820px)').matches;") &&
+      html.includes("toggle.hidden=ui.page==='account'||window.matchMedia('(max-width: 820px)').matches;"),
+  'The labelled Search projects & Jobs control is mobile-only, while the floating icon is desktop-only.');
+check(html.includes('.mobile-search-toggle:not([hidden]){display:flex;') &&
+      html.includes('.account-search-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));') &&
+      html.includes('.account-search-controls input,.account-search-controls select,.account-search-controls button{width:100%;min-width:0;max-width:100%;box-sizing:border-box}'),
+  'Mobile Account Search controls stay inside shrink-safe grid columns and cannot exceed the available width.');
+check(html.includes('.account-item-row{display:grid;grid-template-columns:32px minmax(0,1fr);') &&
+      html.includes('.account-item-actions{grid-column:1/-1;grid-row:2;display:flex;flex-wrap:wrap;') &&
+      html.includes('.account-item-actions .btn,.account-item-actions button{display:inline-flex;'),
+  'Assigned and pinned Account rows use a shrink-safe two-column layout with wrapped actions instead of narrow vertical text.');
+check(html.includes('.assigned-card .parent-card-copy{display:block!important;flex:1 1 0!important;width:0!important;min-width:0!important;') &&
+      html.includes('.assigned-card .parent-card-title,.assigned-card .parent-card-type{display:block!important;width:100%;') &&
+      html.includes('.assigned-card .mini-updated{display:flex!important;width:100%;'),
+  'Workspace Assigned-mode cards keep readable titles and metadata within the mobile viewport.');
+
+console.log('UI refinement tests passed: activity history, bilingual UI, profile/Search filters, workspace navigation, desktop/mobile Search toggles, and responsive Account/Assigned layouts.');

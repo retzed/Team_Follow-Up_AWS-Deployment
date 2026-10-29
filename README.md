@@ -191,7 +191,7 @@ On a subsequent read the client sends a conditional request with the cache versi
 
 Modal clicks are stopped by the modal's own delegated handler before the action is processed; the workspace delegate ignores modal clicks as a second defensive guard. This avoids duplicate action dispatch when a dialog closes or its DOM is replaced. The shared `allDescendants()` helper used for subtree validation/deletion uses iterative, cycle-safe traversal; separate hierarchy renderers retain their own visited-ID guards. Dialogs use direct-child checks for type validation where that is sufficient, and child timestamp comparisons read that child's indexed Activity events instead of scanning the entire root timeline.
 
-These front-end safeguards do not change the AWS infrastructure. They add no API routes, request parameters required by the backend, environment variables, DynamoDB attributes/indexes, Lambda permissions, Cognito configuration, or migration steps. See the frontend-only update procedure in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#frontend-only-releases).
+These front-end safeguards (modal dispatch, hierarchy traversal and lazy Activity/index behavior) do not change the AWS infrastructure. The separate current-password check added on 29 October 2026 is not frontend-only: it adds an authenticated verifier endpoint, two Lambda Cognito environment variables and narrowly scoped Cognito IAM permissions, and requires enabling the server-side `ALLOW_ADMIN_USER_PASSWORD_AUTH` flow on the existing public app client. No DynamoDB schema migration or new Amplify environment variable is needed. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#account-password-verification).
 
 ## Account Search and responsive navigation
 
@@ -211,6 +211,7 @@ The AWS-backed application uses a JSON HTTP API. The frontend sends authenticate
 |---|---|---|
 | `GET` | `/bootstrap` | Returns only top-level Projects/Jobs and enabled team profiles for a lightweight startup snapshot; descendants and Activity history are loaded on demand. |
 | `GET` | `/users` | Lists enabled team profiles for assignee selectors. |
+| `POST` | `/users/me/verify-password` | Verifies the submitted current password only after confirming the requested Cognito username belongs to the already-authenticated JWT subject; returns `{ "valid": boolean }` only and never returns Cognito tokens. Requires the Lambda Cognito pool/client environment variables and two pool-scoped Cognito IAM actions. |
 | `GET` | `/items` | Lists work items. Query parameters include scope=top-level, parentId, rootParentId, assigneeUserId, type, status, priority, q, dateMode, from, to, direction, limit, and offset. |
 | `GET` | `/items/assigned-to-me` | Lists items assigned to the authenticated mapped team member. Accepts the normal item filters and paging options. |
 | `GET` | `/items/{itemId}/children` | Lists direct children of an item; accepts type/status/priority/search/date/order and paging filters. |

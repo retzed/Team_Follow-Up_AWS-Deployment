@@ -2609,6 +2609,8 @@ async function saveCurrentProfile(form){
 }
 let currentPasswordVerificationSequence=0;
 let verifiedCurrentPasswordOwner='';
+let verifiedCurrentPasswordValue='';
+let currentPasswordVerificationInFlight=null;
 function updatePasswordPairCheck(form){
  const newPassword=form?.querySelector('#passwordNew'),confirmation=form?.querySelector('#passwordConfirm'),check=form?.querySelector('#passwordConfirmCheck');
  const first=String(newPassword?.value||''),second=String(confirmation?.value||'');
@@ -2622,32 +2624,43 @@ async function verifyCurrentPasswordField(input){
  const value=String(input.value||''),check=form.querySelector('#passwordCurrentCheck'),status=form.querySelector('#passwordChangeStatus');
  const report=(message,isError=false)=>{if(status){status.textContent=message;status.classList.toggle('error',isError);}};
  const auth=window.__TEAM_FOLLOW_UP_AUTH_CONTEXT,owner=String(auth?.teamUserId||'');
- const sequence=++currentPasswordVerificationSequence;
- if(!value){verifiedCurrentPasswordOwner='';if(check)check.hidden=true;return false;}
- if(verifiedCurrentPasswordOwner===owner&&check&&!check.hidden)return true;
- if(!auth||typeof auth.verifyPassword!=='function'){verifiedCurrentPasswordOwner='';if(check)check.hidden=true;report(tr('passwordVerifyFailed'),true);return false;}
- if(check)check.hidden=true;
- report(tr('checkingPassword'));
- try{
-  const valid=await auth.verifyPassword(value);
-  if(sequence!==currentPasswordVerificationSequence||!input.isConnected||String(input.value||'')!==value)return false;
-  if(valid===true){
-   verifiedCurrentPasswordOwner=owner;
-   if(check){check.hidden=false;check.setAttribute('aria-label',tr('passwordVerified'));check.title=tr('passwordVerified');}
-   report(tr('passwordVerified'));
-   return true;
-  }
-  verifiedCurrentPasswordOwner='';
+ if(!value){
+  currentPasswordVerificationSequence++;
+  verifiedCurrentPasswordOwner='';verifiedCurrentPasswordValue='';currentPasswordVerificationInFlight=null;
   if(check)check.hidden=true;
-  report(tr('currentPasswordIncorrect'),true);
-  return false;
- }catch(error){
-  if(sequence!==currentPasswordVerificationSequence||!input.isConnected||String(input.value||'')!==value)return false;
-  verifiedCurrentPasswordOwner='';
-  if(check)check.hidden=true;
-  report(tr('passwordVerifyFailed'),true);
   return false;
  }
+ if(verifiedCurrentPasswordOwner===owner&&verifiedCurrentPasswordValue===value&&check&&!check.hidden)return true;
+ if(currentPasswordVerificationInFlight?.owner===owner&&currentPasswordVerificationInFlight?.value===value)return currentPasswordVerificationInFlight.promise;
+ if(!auth||typeof auth.verifyPassword!=='function'){
+  verifiedCurrentPasswordOwner='';verifiedCurrentPasswordValue='';if(check)check.hidden=true;
+  report(tr('passwordVerifyFailed'),true);return false;
+ }
+ const sequence=++currentPasswordVerificationSequence;
+ if(check)check.hidden=true;
+ report(tr('checkingPassword'));
+ // Defer the verifier to a microtask so the in-flight record is assigned before
+ // success/failure handlers run, even if the provider throws synchronously.
+ const requestPromise=Promise.resolve().then(()=>auth.verifyPassword(value)).then(valid=>{
+  if(sequence!==currentPasswordVerificationSequence||!input.isConnected||String(input.value||'')!==value)return false;
+  if(valid===true){
+   verifiedCurrentPasswordOwner=owner;verifiedCurrentPasswordValue=value;
+   if(check){check.hidden=false;check.setAttribute('aria-label',tr('passwordVerified'));check.title=tr('passwordVerified');}
+   report(tr('passwordVerified'));return true;
+  }
+  verifiedCurrentPasswordOwner='';verifiedCurrentPasswordValue='';
+  if(check)check.hidden=true;
+  report(tr('currentPasswordIncorrect'),true);return false;
+ },error=>{
+  if(sequence!==currentPasswordVerificationSequence||!input.isConnected||String(input.value||'')!==value)return false;
+  verifiedCurrentPasswordOwner='';verifiedCurrentPasswordValue='';
+  if(check)check.hidden=true;
+  report(tr('passwordVerifyFailed'),true);return false;
+ }).finally(()=>{
+  if(currentPasswordVerificationInFlight?.promise===requestPromise)currentPasswordVerificationInFlight=null;
+ });
+ currentPasswordVerificationInFlight={owner,value,promise:requestPromise};
+ return requestPromise;
 }
 async function changeCurrentPassword(form){
  const fields=Object.fromEntries(new FormData(form).entries()),oldPassword=String(fields.currentPassword||''),newPassword=String(fields.newPassword||''),confirmPassword=String(fields.confirmPassword||'');
@@ -2665,13 +2678,13 @@ async function changeCurrentPassword(form){
  try{
   await auth.changePassword(oldPassword,newPassword);
   currentPasswordVerificationSequence++;
-  verifiedCurrentPasswordOwner='';
+  verifiedCurrentPasswordOwner='';verifiedCurrentPasswordValue='';currentPasswordVerificationInFlight=null;
   form.reset();
   if(confirmCheck)confirmCheck.hidden=true;
   const currentCheck=form.querySelector('#passwordCurrentCheck');if(currentCheck)currentCheck.hidden=true;
   report(tr('passwordChanged'));
  }catch(error){
-  verifiedCurrentPasswordOwner='';
+  verifiedCurrentPasswordOwner='';verifiedCurrentPasswordValue='';currentPasswordVerificationInFlight=null;
   const currentCheck=form.querySelector('#passwordCurrentCheck');if(currentCheck)currentCheck.hidden=true;
   report(String(error?.message||tr('passwordChangeFailed')),true);
  }finally{
@@ -3069,7 +3082,7 @@ $('#themeToggle').addEventListener('click',()=>{void changeUserPreference('theme
 $('#actingUserDisplay').addEventListener('click',()=>{void openAccountTab('assigned');});
 $('#brandHome').addEventListener('click',()=>{ui.page='workspace';render();});
 $('#brandHome').addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();ui.page='workspace';render();}});
-$('#accountPage').addEventListener('submit',ev=>{if(ev.target?.id==='accountProfileForm'){ev.preventDefault();void saveCurrentProfile(ev.target);}else if(ev.target?.id==='accountPasswordForm'){ev.preventDefault();void changeCurrentPassword(ev.target);}});$('#accountPage').addEventListener('focusout',ev=>{if(ev.target?.id==='passwordCurrent'){const submit=ev.relatedTarget?.closest?.('#accountPasswordForm button[type="submit"]');if(!submit)void verifyCurrentPasswordField(ev.target);}});$('#accountPage').addEventListener('input',ev=>{if(ev.target.id==='passwordCurrent'){currentPasswordVerificationSequence++;verifiedCurrentPasswordOwner='';const check=$('#passwordCurrentCheck');if(check)check.hidden=true;const status=$('#passwordChangeStatus');if(status){status.textContent='';status.classList.remove('error');}}else if(ev.target.id==='passwordNew'||ev.target.id==='passwordConfirm'){const form=ev.target.closest?.('#accountPasswordForm');if(form){updatePasswordPairCheck(form);const status=$('#passwordChangeStatus');if(status&&status.classList.contains('error')&&status.textContent!==tr('currentPasswordIncorrect')){status.textContent='';status.classList.remove('error');}}}if(ev.target.id==='accountAssignedQuery'){ui.accountAssignedQuery=ev.target.value;refreshAccountAssignedResults();return;}if(ev.target.id==='accountSearchQuery'){ui.accountSearchQuery=ev.target.value;refreshAccountSearchResults();return;}const profileForm=ev.target.closest?.('#accountProfileForm');if(profileForm)ui.accountProfileDraft=Object.fromEntries(new FormData(profileForm).entries());});$('#accountPage').addEventListener('change',ev=>{const profileForm=$('#accountProfileForm');if(profileForm)ui.accountProfileDraft=Object.fromEntries(new FormData(profileForm).entries());if(ev.target.id==='accountTheme')void changeUserPreference('theme',ev.target.value);else if(ev.target.id==='accountLanguage')void changeUserPreference('lang',ev.target.value);else if(ev.target.id==='accountIcon'){const preview=$('#accountIconPreview');if(preview)preview.innerHTML=icon(ev.target.value,24);}else if(ev.target.id==='accountSearchType'){ui.accountSearchType=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchStatus'){ui.accountSearchStatus=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchDateMode'){ui.accountSearchDateMode=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchDateFrom'){ui.accountSearchDateFrom=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchDateTo'){ui.accountSearchDateTo=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchUser'){ui.accountSearchUser=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountAssignedType'){ui.accountAssignedType=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedStatus'){ui.accountAssignedStatus=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedDateMode'){ui.accountAssignedDateMode=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedDateFrom'){ui.accountAssignedDateFrom=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedDateTo'){ui.accountAssignedDateTo=ev.target.value;refreshAccountAssignedResults();}});
+$('#accountPage').addEventListener('submit',ev=>{if(ev.target?.id==='accountProfileForm'){ev.preventDefault();void saveCurrentProfile(ev.target);}else if(ev.target?.id==='accountPasswordForm'){ev.preventDefault();void changeCurrentPassword(ev.target);}});$('#accountPage').addEventListener('focusout',ev=>{if(ev.target?.id==='passwordCurrent'){const submit=ev.relatedTarget?.closest?.('#accountPasswordForm button[type="submit"]');if(!submit)void verifyCurrentPasswordField(ev.target);}});$('#accountPage').addEventListener('input',ev=>{if(ev.target.id==='passwordCurrent'){currentPasswordVerificationSequence++;verifiedCurrentPasswordOwner='';verifiedCurrentPasswordValue='';currentPasswordVerificationInFlight=null;const check=$('#passwordCurrentCheck');if(check)check.hidden=true;const status=$('#passwordChangeStatus');if(status){status.textContent='';status.classList.remove('error');}}else if(ev.target.id==='passwordNew'||ev.target.id==='passwordConfirm'){const form=ev.target.closest?.('#accountPasswordForm');if(form){updatePasswordPairCheck(form);const status=$('#passwordChangeStatus');if(status&&status.classList.contains('error')&&status.textContent!==tr('currentPasswordIncorrect')){status.textContent='';status.classList.remove('error');}}}if(ev.target.id==='accountAssignedQuery'){ui.accountAssignedQuery=ev.target.value;refreshAccountAssignedResults();return;}if(ev.target.id==='accountSearchQuery'){ui.accountSearchQuery=ev.target.value;refreshAccountSearchResults();return;}const profileForm=ev.target.closest?.('#accountProfileForm');if(profileForm)ui.accountProfileDraft=Object.fromEntries(new FormData(profileForm).entries());});$('#accountPage').addEventListener('change',ev=>{const profileForm=$('#accountProfileForm');if(profileForm)ui.accountProfileDraft=Object.fromEntries(new FormData(profileForm).entries());if(ev.target.id==='accountTheme')void changeUserPreference('theme',ev.target.value);else if(ev.target.id==='accountLanguage')void changeUserPreference('lang',ev.target.value);else if(ev.target.id==='accountIcon'){const preview=$('#accountIconPreview');if(preview)preview.innerHTML=icon(ev.target.value,24);}else if(ev.target.id==='accountSearchType'){ui.accountSearchType=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchStatus'){ui.accountSearchStatus=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchDateMode'){ui.accountSearchDateMode=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchDateFrom'){ui.accountSearchDateFrom=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchDateTo'){ui.accountSearchDateTo=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchUser'){ui.accountSearchUser=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountAssignedType'){ui.accountAssignedType=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedStatus'){ui.accountAssignedStatus=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedDateMode'){ui.accountAssignedDateMode=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedDateFrom'){ui.accountAssignedDateFrom=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedDateTo'){ui.accountAssignedDateTo=ev.target.value;refreshAccountAssignedResults();}});
 $('#newParentTop').addEventListener('click',openNewParent);
 $('#parentQuery').addEventListener('input',ev=>{ui.parentQuery=ev.target.value;renderParentList();});
 $('#parentTypeFilter').addEventListener('change',ev=>{ui.parentType=ev.target.value;renderParentList();});

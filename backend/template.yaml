@@ -47,6 +47,8 @@ Globals:
         ACTIVITY_TABLE: !Ref ActivityTable
         USERS_TABLE: !Ref UsersTable
         ARCHIVE_TABLE: !Ref ArchiveTable
+        COGNITO_USER_POOL_ID: !Ref TeamFollowUpUserPool
+        COGNITO_CLIENT_ID: !Ref TeamFollowUpAppClient
 
 Resources:
   # Identity resources are created by this template, not supplied as parameters.
@@ -80,6 +82,7 @@ Resources:
       ExplicitAuthFlows:
         - ALLOW_USER_SRP_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH
       PreventUserExistenceErrors: ENABLED
       ReadAttributes:
         - email
@@ -382,6 +385,12 @@ Resources:
                   - !GetAtt ItemsTable.Arn
                   - !GetAtt ActivityTable.Arn
                   - !GetAtt ArchiveTable.Arn
+              - Sid: VerifyCurrentCognitoPassword
+                Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminInitiateAuth
+                Resource: !GetAtt TeamFollowUpUserPool.Arn
 
   ApiFunction:
     Type: AWS::Serverless::Function

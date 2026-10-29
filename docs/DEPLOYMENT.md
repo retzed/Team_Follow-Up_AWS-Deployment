@@ -47,7 +47,7 @@ For a completely new manual environment, use `TeamFollowUp-Cognito` as the pool 
 Create an app client named **`Team_FollowUp`** in the pool:
 
 - Generate client secret: **off** (this is a browser/public client).
-- Authentication flows: enable **SRP** (`ALLOW_USER_SRP_AUTH`) and refresh tokens (`ALLOW_REFRESH_TOKEN_AUTH`).
+- Authentication flows: enable **SRP** (`ALLOW_USER_SRP_AUTH`) and refresh tokens (`ALLOW_REFRESH_TOKEN_AUTH`). Also enable `ALLOW_ADMIN_USER_PASSWORD_AUTH` for the Lambda-only current-password verification call; the browser must continue to sign in through SRP and must never receive IAM credentials.
 - Read attributes: include `email`, `email_verified`, and `custom:teamUserId`.
 - Write attributes: do **not** include `custom:teamUserId`. The target template explicitly limits browser writes to `email`.
 - Prevent user-existence errors: enabled.
@@ -159,7 +159,7 @@ Review the six standard IDs/names plus `root` and the mapping results. Only then
 
 ### 7.1 Create the execution role
 
-Create an IAM role named **`TeamFollowUp-Api-ExecutionRole`** for the **Lambda** service. This is the same default role name created by the optional full-stack template. Attach the AWS managed policy **`AWSLambdaBasicExecutionRole`** for CloudWatch logging. Add an inline policy based on [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json). Replace its account-ID placeholder and, if you deliberately use another table prefix, update all four table names consistently before saving. The custom policy is intentionally scoped to the four tables and indexes used by the handler; it does not grant Cognito administration or broad DynamoDB CRUD access. The template creates the same named role with an equivalent trust policy, managed logging policy and table-scoped DynamoDB permissions.
+Create an IAM role named **`TeamFollowUp-Api-ExecutionRole`** for the **Lambda** service. This is the same default role name created by the optional full-stack template. Attach the AWS managed policy **`AWSLambdaBasicExecutionRole`** for CloudWatch logging. Add an inline policy based on [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json). Replace the account-ID placeholder in every ARN and replace `REPLACE_WITH_USER_POOL_ID` with the actual Cognito User Pool ID. Keep the DynamoDB resources restricted to the four application tables/indexes, and keep `cognito-idp:AdminGetUser` plus `cognito-idp:AdminInitiateAuth` restricted to the one User Pool ARN. Do not grant broad `cognito-idp:*`, user creation/deletion, or attribute-update permissions. The automation template defines the same least-privilege actions against resource references.
 
 ### 7.2 Package the handler ZIP
 
@@ -198,6 +198,8 @@ Upload `backend/TeamFollowUp-Lambda.zip` as the function code. Set these environ
 | `ACTIVITY_TABLE` | `TeamFollowUp-Activity` |
 | `USERS_TABLE` | `TeamFollowUp-Users` |
 | `ARCHIVE_TABLE` | `TeamFollowUp-Archive` |
+| `COGNITO_USER_POOL_ID` | The actual User Pool ID, e.g. `us-east-1_...` (not the app-client ID) |
+| `COGNITO_CLIENT_ID` | The `Team_FollowUp` public app-client ID |
 | `LOG_LEVEL` | `INFO` (optional; this is the handler default) |
 
 Create the CloudWatch log group `/aws/lambda/TeamFollowUp-Api` and set retention to **30 days**. If the function created its log group automatically, open it and change the retention. The execution role needs its standard logging actions.
@@ -256,6 +258,19 @@ For a frontend-only change in this console-first deployment:
 
 For Lambda handler, data schema, environment, or infrastructure changes, use the relevant sections in this runbook and rerun the backend/infrastructure checks. A successful GitHub Actions validation proves repository artifacts and tests pass; it does not deploy AWS resources or prove the live environment is healthy.
 
+### Account password verification
+
+The 29 October 2026 password-check feature is **not frontend-only**. The UI verifies the current password when that field loses focus, shows a separate checkmark when the new password is at least eight characters and matches its confirmation, and still submits a password change through Cognito. The AWS current-password check uses the existing authenticated catch-all `ANY /{proxy+}` route with **`POST /users/me/verify-password`** and a JSON body containing the current Cognito username and password. The endpoint returns only `{ "valid": true|false }`; it never returns the tokens that Cognito may issue during verification. Lambda first verifies that the supplied username resolves to the same Cognito `sub` as the already-authorized request.
+
+For the existing console-created environment, do these steps before deploying the frontend:
+1. In the existing `Team_FollowUp` app client, preserve SRP and refresh-token flows and enable `ALLOW_ADMIN_USER_PASSWORD_AUTH`. Do not create a second pool or replace the client just for this setting. The user-facing sign-in flow remains SRP.
+2. Add Lambda environment variables `COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID` as described in Step 7.3.
+3. Update the Lambda execution role with the `VerifyCurrentCognitoPassword` statement from `backend/console-lambda-policy.json`, scoped to that pool's ARN. Keep both Cognito actions pool-scoped and do not add general Cognito user-management permissions.
+4. Package and publish the updated `backend/src/handler.py` ZIP, then test the verifier route with a valid session before publishing the frontend branch. No API Gateway route/CORS change, DynamoDB table/index change, migration, or new Amplify environment variable is required; the existing catch-all JWT-authorized route covers the endpoint.
+5. Rebuild/publish the frontend from the Amplify-connected branch. Verify a correct current password produces a checkmark, an incorrect password does not, matching valid new passwords produce the second checkmark, a mismatch hides it, and a successful change still requires Cognito's password-update operation.
+
+The optional full-stack template already declares the Cognito pool/client environment variables, the required app-client flow, and the pool-scoped IAM permissions. If using that template for a **new isolated environment**, these resources are created by the stack; do not run the template over the manually created current-account resources.
+
 ## 10. CloudWatch dashboard and alarms
 
 Create these alarms in **CloudWatch → Alarms → Create alarm**. Use statistic **Sum**, period **5 minutes (300 seconds)**, evaluation periods **1**, threshold **greater than or equal to 1**, and missing data **not breaching** for all three.
@@ -282,7 +297,8 @@ Use two independent team accounts in separate browsers or sessions:
 8. Open an assigned or pinned Task whose parent Task is assigned to a different user; confirm the workspace expands the ancestor chain after hydration and scrolls the selected item into view. Collapse/expand the workspace Search sidebar and confirm the selected Project/Job and child remain visible.
 9. Repeat Account Search and navigation at 320, 375, 560, 768, and 820 CSS pixel widths in both English LTR and Arabic RTL. Check date controls do not overflow, buttons wrap, text remains readable, and the workspace does not become blank after sidebar expansion.
 10. Send an unauthenticated API request and confirm the JWT authorizer denies it. Check CORS from the exact Amplify origin.
-11. Inspect Lambda/API logs, the dashboard and alarm state. Confirm the budget notifications are configured but do not treat the budget as a spending limit.
+11. In My Account → Profile, check valid/invalid current-password verification, matching/mismatched new-password checkmarks, and successful Cognito password change. Confirm a wrong password never produces a success checkmark.
+12. Inspect Lambda/API logs, the dashboard and alarm state. Confirm the budget notifications are configured but do not treat the budget as a spending limit.
 
 ## 12. Optional full-stack automation reference (not the primary method)
 

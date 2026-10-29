@@ -651,7 +651,7 @@ def restore_root_completion_positions(ordered, selected_roots, selected_under):
 
 
 PROFILE_PRIVILEGES = {"Administrator", "Editor", "User"}
-PROFILE_ICONS = {"user", "compass", "terminal", "shield", "briefcase", "wrench", "settings", "cpu", "clipboard", "search", "code", "database", "networking", "systems", "communications-engineering", "engineer", "wave", "monitor", "rocket", "hard-hat", "crown", "badge-check", "cowboy-hat", "layers", "sparkles", "target", "graduation-cap"}
+PROFILE_ICONS = {"user", "compass", "terminal", "shield", "briefcase", "wrench", "settings", "cpu", "clipboard", "search", "code", "database", "networking", "systems", "communications-engineering", "engineer", "wave", "monitor", "rocket", "crown", "badge-check", "cowboy-hat", "layers", "sparkles", "target", "graduation-cap"}
 PROFILE_PREFERENCE_LANGS = {"en", "ar"}
 PROFILE_PREFERENCE_THEMES = {"light", "dark"}
 

@@ -4890,5 +4890,138 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
 }
 </style>
 
+
+
+<style id="mobile-profile-date-row-width-fix">
+/* Keep From and To on one mobile row and clamp native date inputs to their
+   shrink-safe grid tracks in both Profile > Search and Assigned Items. */
+@media (max-width: 820px) {
+  #accountPage .account-search-controls,
+  #accountPage .account-assigned-controls {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-flow: row !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #accountPage .account-search-controls {
+    grid-template-areas:
+      "query query"
+      "type status"
+      "user user"
+      "dateMode dateMode"
+      "from to"
+      "clear clear" !important;
+  }
+
+  #accountPage .account-assigned-controls {
+    grid-template-areas:
+      "query query"
+      "type status"
+      "dateMode dateMode"
+      "from to"
+      "clear clear" !important;
+  }
+
+  #accountPage .account-search-controls > .account-search-query-field,
+  #accountPage .account-assigned-controls > .account-search-query-field {
+    grid-area: query !important;
+  }
+  #accountPage .account-search-controls > .account-search-type-field,
+  #accountPage .account-assigned-controls > .account-search-type-field {
+    grid-area: type !important;
+  }
+  #accountPage .account-search-controls > .account-search-status-field,
+  #accountPage .account-assigned-controls > .account-search-status-field {
+    grid-area: status !important;
+  }
+  #accountPage .account-search-controls > .account-search-date-mode-field,
+  #accountPage .account-assigned-controls > .account-search-date-mode-field {
+    grid-area: dateMode !important;
+  }
+  #accountPage .account-search-controls > .account-search-user-field {
+    grid-area: user !important;
+  }
+  #accountPage .account-search-controls > .account-search-date-from-field,
+  #accountPage .account-assigned-controls > .account-search-date-from-field {
+    grid-area: from !important;
+  }
+  #accountPage .account-search-controls > .account-search-date-to-field,
+  #accountPage .account-assigned-controls > .account-search-date-to-field {
+    grid-area: to !important;
+  }
+  #accountPage .account-search-controls > .account-search-clear-button,
+  #accountPage .account-assigned-controls > .account-search-clear-button {
+    grid-area: clear !important;
+    justify-self: end !important;
+  }
+
+  #accountPage .account-search-controls > .account-search-date-from-field,
+  #accountPage .account-search-controls > .account-search-date-to-field,
+  #accountPage .account-assigned-controls > .account-search-date-from-field,
+  #accountPage .account-assigned-controls > .account-search-date-to-field {
+    display: flex !important;
+    flex-direction: column !important;
+    align-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-inline-size: 0 !important;
+    max-width: 100% !important;
+    max-inline-size: 100% !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  #accountPage .account-search-controls > .account-search-date-from-field > input[type="date"],
+  #accountPage .account-search-controls > .account-search-date-to-field > input[type="date"],
+  #accountPage .account-assigned-controls > .account-search-date-from-field > input[type="date"],
+  #accountPage .account-assigned-controls > .account-search-date-to-field > input[type="date"] {
+    display: block !important;
+    flex: 0 1 auto !important;
+    width: 100% !important;
+    inline-size: 100% !important;
+    min-width: 0 !important;
+    min-inline-size: 0 !important;
+    max-width: 100% !important;
+    max-inline-size: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding-inline: 1px !important;
+    font-size: 10px !important;
+  }
+}
+
+/* Even on very narrow phones, retain a two-column date row instead of
+   allowing the Assigned Items override to stack From and To separately. */
+@media (max-width: 380px) {
+  #accountPage .account-search-controls,
+  #accountPage .account-assigned-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  #accountPage .account-search-controls {
+    grid-template-areas:
+      "query query"
+      "type status"
+      "user user"
+      "dateMode dateMode"
+      "from to"
+      "clear clear" !important;
+  }
+  #accountPage .account-assigned-controls {
+    grid-template-areas:
+      "query query"
+      "type status"
+      "dateMode dateMode"
+      "from to"
+      "clear clear" !important;
+  }
+}
+</style>
+
 </body>
 </html>

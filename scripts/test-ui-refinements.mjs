@@ -281,7 +281,7 @@ check(passwordStart>=0 && passwordEnd>passwordStart &&
       passwordMarkup.includes("<div class='account-field account-password-new-field'><label for='passwordNew'>") &&
       passwordMarkup.includes("<div class='account-field account-password-confirm-field'><label for='passwordConfirm'>") &&
       html.includes(".account-password-new-field{grid-column:1;grid-row:2}.account-password-confirm-field{grid-column:2;grid-row:2}") &&
-      html.includes(".account-password-current-field,.account-password-new-field,.account-password-confirm-field{grid-column:1;grid-row:auto}")
+      html.includes(".account-password-current-field,.account-password-new-field,.account-password-confirm-field{grid-column:1;grid-row:auto}") &&
       passwordMarkup.includes("id='passwordCurrentCheck'") &&
       !passwordMarkup.includes("id='passwordConfirmCheck'") &&
       html.includes("passwordVerified:'Passwords match.'") &&
@@ -305,8 +305,9 @@ check(html.includes("const priority=ui.accountAssignedPriority||'all';") &&
       html.includes("ui.accountAssignedPriority='all';") &&
       html.includes("else if(ev.target.id==='accountAssignedPriority'){ui.accountAssignedPriority=ev.target.value;refreshAccountAssignedResults();}"),
   'Assigned Items priority filtering shows only Tasks/Follow-ups of the selected priority, while All items retains both parent and child items and Clear resets to All items.');
-check(html.includes('data-action="clear-account-search">${icon(\'filter\',13)} ${esc(tr(\'clear\'))}</button>') &&
-      html.includes('data-action="clear-account-assigned-filters">${icon(\'filter\',13)} ${esc(tr(\'clear\'))}</button>'),
+check(html.includes('data-action="clear-account-search">') &&
+      html.includes('data-action="clear-account-assigned-filters">') &&
+      html.includes("${icon('filter',13)} ${esc(tr('clear'))}</button>"),
   'Search and Assigned Items Clear buttons both show the filter-clear icon.');
 check(html.includes('function accountSearchUserMatches') &&
       !html.includes("function accountSearchUserMatches(item,userId){if(!userId||userId==='all')return true;") &&

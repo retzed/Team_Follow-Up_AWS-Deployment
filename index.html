@@ -1681,7 +1681,7 @@ const ICONS = {
   'hard-hat':'<path d="M3 14a9 9 0 0 1 18 0"/><path d="M2 14h20v3H2zM12 5v5M7 7l2 3M17 7l-2 3"/>',
   crown:'<path d="m3 7 5 5 4-8 4 8 5-5-2 12H5L3 7Z"/><path d="M5 22h14"/>',
   'badge-check':'<path d="M12 3 15 5l4-.2.8 3.8 2.2 3.2-2.2 3.2-.8 3.8-4-.2-3 2-3-2-4 .2-.8-3.8L2 12l2.2-3.2L5 5l4 .2 3-2Z"/><path d="m8.5 12 2.2 2.2 4.8-4.8"/>',
-  'cowboy-hat':'<path d="M3 14c2-2 5-3 9-3s7 1 9 3l-1 3H4l-1-3Z"/><path d="M9 11V8a3 3 0 0 1 6 0v3M2 17h20"/>',
+  'cowboy-hat':'<path d="M2.2 15.3c2.5.9 4.9.8 7.1-.2h5.4c2.2 1 4.6 1.1 7.1.2.6-.2.8-.8.4-1.3-1.1-1.3-3-2-5.3-2.4l-.9-4.5c-.2-.8-.8-1.3-1.6-1.3h-4.8c-.8 0-1.4.5-1.6 1.3l-.9 4.5c-2.3.4-4.2 1.1-5.3 2.4-.4.5-.2 1.1.4 1.3Z"/><path d="M9.2 6.6c.7.6 1.5.9 2.8.9s2.1-.3 2.8-.9M9.2 11.4c.9-.5 1.8-.7 2.8-.7s1.9.2 2.8.7M2.5 14.2c1.2.6 2.5.7 3.8.5M17.7 14.7c1.3.2 2.6.1 3.8-.5"/>',
   'hard-hat':'<path d="M3 16a9 9 0 0 1 18 0"/><path d="M2 16h20v3H2zM12 7v9"/>',   layers:'<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/>',
   sparkles:'<path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15ZM5 2l.7 2.3L8 5l-2.3.7L5 8l-.7-2.3L2 5l2.3-.7L5 2Z"/>',
   target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
@@ -2902,7 +2902,7 @@ function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.mo
    const archivedRoot=group.items.find(x=>String(x.id)===String(group.rootId)&&(x.type==='project'||x.type==='job'))||null;
    const visibleItems=group.items.filter(x=>!archivedRoot||String(x.id)!==String(archivedRoot.id));
    const allSelected=group.items.length>0&&group.items.every(x=>selected.has(String(x.id)));
-   const showGroupAction=group.items.length>1||(!archivedRoot&&group.items.some(x=>x.type==='task'||x.type==='followup'));const groupAction=showGroupAction?`<button class="subtle-btn archive-group-select-all" data-action="archive-toggle-group" data-root-id="${esc(group.rootId)}" type="button">${icon(allSelected?'check-square':'layers',13)} ${esc(allSelected?tr('clearSelection'):tr('selectHierarchy'))}</button>`:'';
+   const showGroupAction=group.items.length>1||(!archivedRoot&&group.items.some(x=>x.type==='task'||x.type==='followup'));const groupAction=showGroupAction?`<button class="subtle-btn archive-group-select-all" data-action="archive-toggle-group" data-root-id="${esc(group.rootId)}" type="button">${icon(allSelected?'filter':'layers',13)} ${esc(allSelected?tr('clearSelection'):tr('selectHierarchy'))}</button>`:'';
    const visibleIds=new Set(visibleItems.map(x=>String(x.id)));
    const childrenByParent=new Map();
    for(const item of visibleItems){const pid=String(item.parentId||'');if(pid&&visibleIds.has(pid)){if(!childrenByParent.has(pid))childrenByParent.set(pid,[]);childrenByParent.get(pid).push(item);}}
@@ -3025,7 +3025,15 @@ function deleteItem(id){
  data.children=data.children.filter(c=>!doomed.has(c.id));data.parents=data.parents.filter(p=>!doomed.has(p.id));invalidateHierarchyIndex();
  if(isRoot){ui.selectedParentId=data.parents[0]?.id||'';ui.tab='overview';}
  ui.expanded.forEach(x=>{if(doomed.has(x))ui.expanded.delete(x);});persist();ui.modal=null;
- if(!data.parents.length){render();toast(tr('deleted'));return;}render();toast(tr('deleted'));
+ if(!data.parents.length){render();toast(tr('deleted'));return;}
+ render();toast(tr('deleted'));
+ // After deleting the selected Project/Job, hydrate the automatically selected replacement.
+ // Both requests wait for the queued delete write before reading authoritative API data.
+ if(isRoot&&ui.selectedParentId&&data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId))){
+  const nextParentId=String(ui.selectedParentId);
+  void ensureRootChildrenLoaded(nextParentId,{force:true});
+  void refreshActivityFor(nextParentId,'all');
+ }
 }
 function handleItemSubmit(form){const fd=new FormData(form);const kind=form.dataset.modalKind;const currentId=form.dataset.itemId;const name=String(fd.get('name')||'').trim();if(!name){$('#formName')?.focus();toast(tr('namePlaceholder'),true);return;}const type=String(fd.get('type')||'');const status=String(fd.get('status')||'not-started');let ownerId=String(fd.get('ownerId')??'');const dueDate=String(fd.get('dueDate')||'');const description=String(fd.get('description')||'').trim();
  if(kind==='new-parent'){
@@ -3194,6 +3202,8 @@ async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
    await apiPersistQueue.catch(()=>{});
    const result=await api.queryRootItems(rootId,{dateMode:'updated',direction:'desc'});
    if(hydrationRun!==workspaceHydrationGeneration)return;
+   // Ignore a delayed child-list response if its parent was deleted while the request was in flight.
+   if(!data.parents.some(parent=>String(parent.id)===rootId))return;
    const incoming=(result?.items||[]).map(item=>item?.id?item:toAppItem(item));
    data.children=mergeRootChildrenRows(data.children,rootId,incoming);
    if(lastApiSnapshot)lastApiSnapshot.children=mergeRootChildrenRows(lastApiSnapshot.children,rootId,incoming);
@@ -4720,7 +4730,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   grid-template-areas:
     "query query type status"
     "user dateMode from to"
-    "clear . . ." !important;
+    ". . . clear" !important;
   grid-auto-flow: row !important;
   align-items: stretch !important;
   width: 100% !important;
@@ -4971,7 +4981,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   grid-template-areas:
     "query query type status"
     "priority dateMode from to"
-    "clear . . ." !important;
+    ". . . clear" !important;
 }
 #accountPage .account-assigned-controls > .account-search-priority-field { grid-area: priority !important; }
 #accountPage .account-assigned-controls > .account-search-date-mode-field { grid-area: dateMode !important; }
@@ -5134,6 +5144,35 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
       "priority dateMode"
       "from to"
       "clear clear" !important;
+  }
+}
+</style>
+
+
+<style id="account-clear-buttons-right-alignment">
+/* Keep Clear at the physical right edge in both LTR and RTL layouts. */
+#accountPage .account-search-controls > .account-search-clear-button,
+#accountPage .account-assigned-controls > .account-search-clear-button {
+  justify-self: end !important;
+}
+@media (min-width: 821px) {
+  html[dir="rtl"] #accountPage .account-search-controls {
+    grid-template-areas:
+      "query query type status"
+      "user dateMode from to"
+      "clear . . ." !important;
+  }
+  html[dir="rtl"] #accountPage .account-assigned-controls {
+    grid-template-areas:
+      "query query type status"
+      "priority dateMode from to"
+      "clear . . ." !important;
+  }
+}
+@media (max-width: 820px) {
+  html[dir="rtl"] #accountPage .account-search-controls > .account-search-clear-button,
+  html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-button {
+    justify-self: start !important;
   }
 }
 </style>

@@ -3,6 +3,14 @@ import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 
 const sourceHtml = await readFile('index.html', 'utf8');
+const authGateStart = sourceHtml.indexOf('<script id="pre-auth-gate">');
+assert.ok(authGateStart >= 0, 'page includes the pre-authentication sign-in gate');
+const authGateEnd = sourceHtml.indexOf('</script>', authGateStart);
+assert.ok(authGateEnd > authGateStart, 'pre-authentication sign-in gate is a complete script');
+const authGate = sourceHtml.slice(authGateStart, authGateEnd);
+assert.ok(authGate.includes('src="./logo.svg?v=20261030-brandrefresh2"'), 'sign-in logo is rendered without relying on the later app script');
+assert.ok(!authGate.includes('applicationLogoMarkup()'), 'pre-auth sign-in cannot call helpers from the later app bootstrap script');
+
 assert.ok(sourceHtml.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v2:'"), 'AWS frontend may persist only the versioned API response cache.');
 assert.ok(sourceHtml.includes('function requestCachedGet(path,key){'), 'AWS response cache must validate server versions before reusing stored data.');
 for (const forbidden of [

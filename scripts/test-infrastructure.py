@@ -224,8 +224,8 @@ def main():
     client = resources["TeamFollowUpAppClient"]["Properties"]
     if client.get("UserPoolId") != {"Ref": "TeamFollowUpUserPool"} or client.get("GenerateSecret") is not False:
         fail("Cognito app client must belong to the template pool and must not have a client secret.")
-    if not {"ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"}.issubset(set(client.get("ExplicitAuthFlows", []))):
-        fail("Cognito app client must support the frontend SRP sign-in and token refresh flows.")
+    if not {"ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_ADMIN_USER_PASSWORD_AUTH"}.issubset(set(client.get("ExplicitAuthFlows", []))):
+        fail("Cognito app client must support SRP sign-in, token refresh, and the server-side current-password verification flow.")
     if "custom:teamUserId" not in client.get("ReadAttributes", []):
         fail("The browser app client must be allowed to read custom:teamUserId.")
     if "custom:teamUserId" in client.get("WriteAttributes", []):
@@ -326,6 +326,8 @@ def main():
         "ACTIVITY_TABLE": "ActivityTable",
         "USERS_TABLE": "UsersTable",
         "ARCHIVE_TABLE": "ArchiveTable",
+        "COGNITO_USER_POOL_ID": "TeamFollowUpUserPool",
+        "COGNITO_CLIENT_ID": "TeamFollowUpAppClient",
     }
     for variable, logical_id in expected_variables.items():
         if variables.get(variable) != {"Ref": logical_id}:
@@ -447,6 +449,7 @@ def main():
         "AllowPartialRestoreActivitySummaries",
         "AllowTransactionalItemOperationsOnly",
         "AllowAtomicWorkItemArchiveAndAuditTransactions",
+        "VerifyCurrentCognitoPassword",
     }
     if set(template_by_sid) != expected_sids or set(console_by_sid) != expected_sids:
         fail("Console and template IAM policies must contain the same four narrowly scoped statement IDs.")
@@ -461,6 +464,21 @@ def main():
             fail(f"Console and template IAM action sets diverge for {sid}.")
         if template_statement.get("Condition") != console_statement.get("Condition"):
             fail(f"Console and template IAM conditions diverge for {sid}.")
+
+
+    password_verify_statement = template_by_sid["VerifyCurrentCognitoPassword"]
+    password_verify_actions = password_verify_statement.get("Action", [])
+    if sorted(password_verify_actions) != ["cognito-idp:AdminGetUser", "cognito-idp:AdminInitiateAuth"]:
+        fail("Current-password verification must use only AdminGetUser and AdminInitiateAuth.")
+    if "TeamFollowUpUserPool" not in str(password_verify_statement.get("Resource", "")):
+        fail("Password-verification IAM permissions must be scoped to the Cognito pool.")
+    console_password_statement = console_by_sid["VerifyCurrentCognitoPassword"]
+    if sorted(console_password_statement.get("Action", [])) != sorted(password_verify_actions):
+        fail("Console and template Cognito password-verification actions must match.")
+    if "userpool/REPLACE_WITH_USER_POOL_ID" not in str(console_password_statement.get("Resource", "")):
+        fail("Console Cognito permissions must use an explicit User Pool ARN placeholder.")
+    if "dynamodb:" in str(console_password_statement.get("Action", [])):
+        fail("Cognito verification permissions must not grant additional DynamoDB access.")
 
     # The generated web origin and frontend settings are wired together without a dependency cycle.
     app_properties = resources["FrontendApp"]["Properties"]

@@ -274,9 +274,13 @@ const passwordStart=html.indexOf("<form id='accountPasswordForm'>");
 const passwordEnd=html.indexOf('</form>',passwordStart);
 const passwordMarkup=html.slice(passwordStart,passwordEnd);
 check(passwordStart>=0 && passwordEnd>passwordStart &&
-      passwordMarkup.includes("class='account-field full'><label for='passwordCurrent'") &&
-      passwordMarkup.indexOf("for='passwordNew'")<passwordMarkup.indexOf("for='passwordConfirm'"),
-  'Current password spans a row, with New and Confirm following as the desktop two-column pair.');
+      passwordMarkup.includes("<div class='account-field'><label for='passwordCurrent'>") &&
+      !passwordMarkup.includes("class='account-field full'") &&
+      passwordMarkup.indexOf("for='passwordCurrent'")<passwordMarkup.indexOf("for='passwordNew'") &&
+      passwordMarkup.indexOf("for='passwordNew'")<passwordMarkup.indexOf("for='passwordConfirm'") &&
+      passwordMarkup.includes("id='passwordCurrentCheck'") &&
+      passwordMarkup.includes("id='passwordConfirmCheck'"),
+  'Current, New and Confirm password fields use the ordinary two-column grid and have independent success-check controls.');
 check(html.includes('id="mobile-profile-search-date-width-fix"') &&
       html.includes('#accountPage .account-search-controls > .account-search-date-from-field,') &&
       html.includes('overflow: hidden !important;') &&

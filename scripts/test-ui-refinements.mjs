@@ -415,4 +415,16 @@ check(mobileDateRowFix.includes('grid-template-columns: repeat(2, minmax(0, 1fr)
       mobileDateRowFix.includes('#accountPage .account-assigned-controls'),
   'Profile Search and Assigned Items keep From/To side by side and constrain date inputs to half-width grid columns on mobile, including narrow phones.');
 
-console.log('UI refinement tests passed: activity history, bilingual UI, profile/Search filters, workspace navigation, desktop/mobile Search toggles, and responsive Account/Assigned layouts.');
+check(html.includes("id='passwordCurrentCheck'") && html.includes("id='passwordConfirmCheck'") &&
+      !html.includes("class='account-field full'><label for='passwordCurrent'") &&
+      html.includes(".account-password-check[hidden]{display:none!important}"),
+  'Current password shares the two-column profile grid; verified-current and matching-new-password checkmarks are independently available.');
+check(html.includes('function verifyCurrentPasswordField(input)') &&
+      html.includes('currentPasswordVerificationSequence++') &&
+      html.includes('updatePasswordPairCheck(form)') &&
+      html.includes("first.length>=8&&second.length>0&&first===second"),
+  'Password checkmarks are based on current-password verification and matching new passwords of at least eight characters, with stale verification responses invalidated.');
+check(html.includes("focusout',ev=>{if(ev.target?.id==='passwordCurrent'") &&
+      html.includes("ev.target.id==='passwordNew'||ev.target.id==='passwordConfirm'"),
+  'Password validation is interactive on current-password focus loss and new-password input changes.');
+console.log('UI refinement tests passed: activity history, bilingual UI, profile/Search filters, workspace navigation, desktop/mobile Search toggles, responsive Account/Assigned layouts, and password-check behavior.');

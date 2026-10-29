@@ -550,13 +550,13 @@ class PinTransactionTests(unittest.TestCase):
         }
         with patch.object(handler, "current_profile", return_value=profile), \
              patch.object(handler.WORK, "get_item", return_value={"Item": {"itemId": "project-1"}}), \
-             patch.object(handler.USERS, "get_item", return_value={"Item": profile}), \
+             patch.object(handler.USERS, "get_item", return_value={"Item": {**profile, "pinnedItemIds": ["project-1"]}}), \
              patch.object(handler.ddb.meta.client, "transact_write_items") as transact:
             result = handler.lambda_handler(event, SimpleNamespace(aws_request_id="pin-test"))
 
         self.assertEqual(result["statusCode"], 200)
         payload = json.loads(result["body"])
-        self.assertEqual(payload["user"]["pinnedItemIds"], ["project-1"] if "pinnedItemIds" in payload["user"] else [])
+        self.assertEqual(payload["user"]["pinnedItemIds"], ["project-1"])
         transact.assert_called_once()
         writes = transact.call_args.kwargs["TransactItems"]
         self.assertEqual(len(writes), 1)

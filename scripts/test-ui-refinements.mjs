@@ -300,7 +300,7 @@ check(assignedPriorityMarkupIndex>=0 && assignedPriorityMarkupIndex<assignedDate
       html.includes("allAssignedItems:'All items'") &&
       html.includes("allAssignedItems:'جميع العناصر'"),
   'Assigned Items places Priority before Date, defaults to All items, and provides English/Arabic labels.');
-check(html.includes("const priority=ui.accountAssignedPriority||'all';") &&
+check(html.includes("const type=ui.accountAssignedType||'all',status=ui.accountAssignedStatus||'all',priority=ui.accountAssignedPriority||'all';") &&
       html.includes("if(priority!=='all'&&(!['task','followup'].includes(String(item.type||''))||String(item.priority||'').toLowerCase()!==priority))return false;") &&
       html.includes("ui.accountAssignedPriority='all';") &&
       html.includes("else if(ev.target.id==='accountAssignedPriority'){ui.accountAssignedPriority=ev.target.value;refreshAccountAssignedResults();}"),

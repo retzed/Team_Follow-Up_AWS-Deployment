@@ -417,5 +417,125 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(event["action"], "Updated profile name")
 
 
+
+class CurrentPasswordVerificationTests(unittest.TestCase):
+    claims = {"sub": "cognito-sub-u2"}
+    profile = {"userId": "u2", "cognitoSub": "cognito-sub-u2", "enabled": True}
+    username = "zyad@example.com"
+
+    def call_verifier(self, body, cognito):
+        with patch.object(handler, "COGNITO_USER_POOL_ID", "us-east-1_testpool"), \
+             patch.object(handler, "COGNITO_CLIENT_ID", "public-test-client"), \
+             patch.object(handler, "COGNITO_IDP", cognito):
+            return handler.verify_current_password(body, self.claims, self.profile)
+
+    @staticmethod
+    def make_client_error(code):
+        return handler.ClientError(
+            {"Error": {"Code": code, "Message": "test response"}},
+            "AdminInitiateAuth",
+        )
+
+    def test_valid_password_returns_boolean_only_and_binds_to_current_cognito_subject(self):
+        cognito = SimpleNamespace()
+        cognito.admin_get_user = unittest.mock.Mock(return_value={
+            "Enabled": True,
+            "UserAttributes": [{"Name": "sub", "Value": "cognito-sub-u2"}],
+        })
+        cognito.admin_initiate_auth = unittest.mock.Mock(return_value={
+            "AuthenticationResult": {
+                "AccessToken": "must-not-be-returned",
+                "IdToken": "must-not-be-returned",
+                "RefreshToken": "must-not-be-returned",
+            },
+        })
+
+        result = self.call_verifier(
+            {"username": self.username, "password": "correct-test-password"},
+            cognito,
+        )
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(json.loads(result["body"]), {"valid": True})
+        self.assertNotIn("must-not-be-returned", result["body"])
+        cognito.admin_get_user.assert_called_once_with(
+            UserPoolId="us-east-1_testpool", Username=self.username,
+        )
+        cognito.admin_initiate_auth.assert_called_once_with(
+            UserPoolId="us-east-1_testpool",
+            ClientId="public-test-client",
+            AuthFlow="ADMIN_USER_PASSWORD_AUTH",
+            AuthParameters={"USERNAME": self.username, "PASSWORD": "correct-test-password"},
+        )
+
+    def test_incorrect_password_returns_false_without_exposing_cognito_error(self):
+        cognito = SimpleNamespace()
+        cognito.admin_get_user = unittest.mock.Mock(return_value={
+            "Enabled": True,
+            "UserAttributes": [{"Name": "sub", "Value": "cognito-sub-u2"}],
+        })
+        cognito.admin_initiate_auth = unittest.mock.Mock(
+            side_effect=self.make_client_error("NotAuthorizedException"),
+        )
+
+        result = self.call_verifier(
+            {"username": self.username, "password": "wrong-test-password"},
+            cognito,
+        )
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(json.loads(result["body"]), {"valid": False})
+        self.assertNotIn("wrong-test-password", result["body"])
+        self.assertNotIn("test response", result["body"])
+
+    def test_username_mapped_to_another_subject_is_rejected_before_auth_attempt(self):
+        cognito = SimpleNamespace()
+        cognito.admin_get_user = unittest.mock.Mock(return_value={
+            "Enabled": True,
+            "UserAttributes": [{"Name": "sub", "Value": "somebody-else"}],
+        })
+        cognito.admin_initiate_auth = unittest.mock.Mock()
+
+        result = self.call_verifier(
+            {"username": self.username, "password": "any-test-password"},
+            cognito,
+        )
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(json.loads(result["body"]), {"valid": False})
+        cognito.admin_initiate_auth.assert_not_called()
+
+    def test_malformed_request_is_rejected_without_cognito_calls(self):
+        cognito = SimpleNamespace()
+        cognito.admin_get_user = unittest.mock.Mock()
+        cognito.admin_initiate_auth = unittest.mock.Mock()
+
+        result = self.call_verifier(
+            {"username": self.username, "password": "candidate", "extra": "not allowed"},
+            cognito,
+        )
+
+        self.assertEqual(result["statusCode"], 400)
+        cognito.admin_get_user.assert_not_called()
+        cognito.admin_initiate_auth.assert_not_called()
+
+    def test_disabled_or_unmapped_user_is_rejected_without_auth_attempt(self):
+        cognito = SimpleNamespace()
+        cognito.admin_get_user = unittest.mock.Mock(return_value={
+            "Enabled": False,
+            "UserAttributes": [{"Name": "sub", "Value": "cognito-sub-u2"}],
+        })
+        cognito.admin_initiate_auth = unittest.mock.Mock()
+
+        result = self.call_verifier(
+            {"username": self.username, "password": "candidate"},
+            cognito,
+        )
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(json.loads(result["body"]), {"valid": False})
+        cognito.admin_initiate_auth.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

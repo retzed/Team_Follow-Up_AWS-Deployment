@@ -284,9 +284,23 @@ check(passwordStart>=0 && passwordEnd>passwordStart &&
       html.includes(".account-password-current-field,.account-password-new-field,.account-password-confirm-field{grid-column:1;grid-row:auto}") &&
       passwordMarkup.includes("id='passwordCurrentCheck'") &&
       !passwordMarkup.includes("id='passwordConfirmCheck'") &&
-      html.includes("passwordVerified:'Passwords match.'") &&
-      html.includes("passwordVerified:'كلمتا المرور متطابقتان.'"),
-  'Current password occupies its own half-width desktop row; New and Confirm share the next row and stack on mobile, and only Current has a success check labeled Passwords match.');
+      html.includes("passwordVerified:'Current password verified.'") &&
+      html.includes("passwordVerified:'تم التحقق من كلمة المرور الحالية.'") &&
+      html.includes("passwordsMatch:'Passwords match.'") &&
+      html.includes("passwordsMatch:'كلمتا المرور متطابقتان.'"),
+  'Current password occupies its own half-width desktop row; New and Confirm share the next row and stack on mobile, and only Current has its own verification indicator.');
+check(html.includes("function setCurrentPasswordCheck(check,state)") &&
+      html.includes("check.textContent=state==='invalid'?'×':'✓';") &&
+      html.includes("setCurrentPasswordCheck(check,'valid')") &&
+      html.includes("setCurrentPasswordCheck(check,'invalid')") &&
+      html.includes(".account-password-check.is-invalid{color:#dc2626!important}"),
+  'Current password shows a green check only on verification success and a red cross when the verifier rejects it.');
+check(html.includes("function updatePasswordMatchStatus(form)") &&
+      html.includes("const matches=first.length>0&&second.length>0&&first===second;") &&
+      html.includes("status.textContent=tr('passwordsMatch')") &&
+      html.includes("updatePasswordMatchStatus(form);"),
+  'Passwords match is displayed only for two non-empty, equal new-password values, with no check mark on Confirm new password.');
+
 check(html.includes('id="mobile-profile-search-date-width-fix"') &&
       html.includes('#accountPage .account-search-controls > .account-search-date-from-field,') &&
       html.includes('overflow: hidden !important;') &&
@@ -305,6 +319,16 @@ check(html.includes("const type=ui.accountAssignedType||'all',status=ui.accountA
       html.includes("ui.accountAssignedPriority='all';") &&
       html.includes("else if(ev.target.id==='accountAssignedPriority'){ui.accountAssignedPriority=ev.target.value;refreshAccountAssignedResults();}"),
   'Assigned Items priority filtering shows only Tasks/Follow-ups of the selected priority, while All items retains both parent and child items and Clear resets to All items.');
+check(html.includes('"priority dateMode from to"') &&
+      html.includes('"priority dateMode"') &&
+      html.includes('#accountPage .account-assigned-controls > .account-search-priority-field { grid-area: priority !important; }'),
+  'Assigned Items Priority and Date filters align with the Search tab grid at desktop and responsive widths.');
+check(html.includes('id="accountSearchCount"') &&
+      html.includes('ui.accountSearchResultCount=rows.length') &&
+      html.includes("const count=$('#accountSearchCount')") &&
+      html.includes('accountSearchMarkup=accountSearchResultsMarkup()'),
+  'Search displays a live count of currently listed results, updated when filters change.');
+
 check(html.includes('data-action="clear-account-search">') &&
       html.includes('data-action="clear-account-assigned-filters">') &&
       html.includes("${icon('filter',13)} ${esc(tr('clear'))}</button>"),

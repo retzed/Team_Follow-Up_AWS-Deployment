@@ -452,7 +452,7 @@ def main():
         "VerifyCurrentCognitoPassword",
     }
     if set(template_by_sid) != expected_sids or set(console_by_sid) != expected_sids:
-        fail("Console and template IAM policies must contain the same four narrowly scoped statement IDs.")
+        fail("Console and template IAM policies must contain the same five narrowly scoped statement IDs.")
     for sid in sorted(expected_sids):
         template_statement = template_by_sid[sid]
         console_statement = console_by_sid[sid]

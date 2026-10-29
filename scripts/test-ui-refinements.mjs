@@ -238,6 +238,19 @@ const profileRoleArabicPos=html.indexOf('for="accountRoleArabic"');
 const profileIconPos=html.indexOf('for="accountIcon"');
 check(profileRolePos>=0 && profileRoleArabicPos>profileRolePos && profileIconPos>profileRoleArabicPos,
   'Profile Label fields remain adjacent with Profile icon as the final personal-detail field.');
+const personStart=html.indexOf('function person(id)');
+const personEnd=html.indexOf('function currentUser()',personStart);
+const personSource=html.slice(personStart,personEnd);
+check(personStart>=0 && personEnd>personStart && personSource.includes('nameArabic') &&
+      personSource.includes('raw.name||') && personSource.includes('roleArabic') && personSource.includes('raw.role||') &&
+      !personSource.includes('localizedUserNames') && !personSource.includes('localizedUserRoles'),
+  'Missing Arabic user names and labels fall back to their exact English values in Arabic view.');
+check(html.includes("placeholder=\"${esc(user.name||") &&
+      html.includes("placeholder=\"${esc(user.role||") &&
+      html.includes('function refreshAccountProfileForForm()') &&
+      html.includes("if(next==='profile')void refreshAccountProfileForForm()") &&
+      html.includes('preserveExistingTranslations:true'),
+  'Profile Arabic inputs show English fallback placeholders and refresh the logged-in profile while preserving available translations.');
 for(const control of ['accountSearchDateMode','accountSearchDateFrom','accountSearchDateTo','accountSearchUser','clear-account-search']) {
   check(html.includes(control), `Account Search exposes its date and user filter control: ${control}.`);
 }

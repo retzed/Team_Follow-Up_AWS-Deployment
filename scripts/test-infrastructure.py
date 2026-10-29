@@ -441,7 +441,7 @@ def main():
     if "USERS.update_item(" in handler_source_for_profile_access:
         fail("Users-table writes must use TransactWriteItems; do not grant standalone UpdateItem on Users.")
 
-    user_transactional_items = console_by_sid.get("AllowTransactionalItemOperationsOnly", {})
+    user_transactional_items = next((s for s in console_statements if s.get("Sid") == "AllowTransactionalItemOperationsOnly"), {})
     if "TeamFollowUp-Users" not in str(user_transactional_items.get("Resource", [])):
         fail("Users profile field updates must be allowed only within the constrained transactional item-action statement.")
     if "dynamodb:EnclosingOperation" not in str(user_transactional_items.get("Condition", {})):

@@ -99,6 +99,9 @@ assert.equal(config.apiBaseUrl, 'https://app-api.execute-api.us-east-1.amazonaws
 assert.ok(!('localAuth' in config), 'runtime config must not contain a local-auth switch');
 assert.ok(!('dataMode' in config), 'runtime config must not contain a database-mode switch');
 assert.ok(!('identityMap' in config.cognito), 'team identity must not be overridable by a browser-side map');
+for (const asset of ['favicon.svg', 'favicon.png', 'favicon.ico']) {
+  assert.deepEqual(await readFile('dist/' + asset), await readFile(asset), `AWS artifact includes the deployed ${asset} asset`);
+}
 
 const template = await readFile('backend/template.yaml', 'utf8');
 // SAM is optional, but its template must be a complete from-scratch automation reference.

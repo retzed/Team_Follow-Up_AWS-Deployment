@@ -380,7 +380,8 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(updates["roleArabic"], "مهندس سحابة")
         self.assertEqual(updates["icon"], "briefcase")
         self.assertEqual(handler.normalize_profile_updates({"icon": "cowboy-hat"}, actor, target)["icon"], "cowboy-hat")
-        self.assertEqual(handler.normalize_profile_updates({"icon": "hard-hat"}, actor, target)["icon"], "hard-hat")
+        with self.assertRaises(ValueError):
+            handler.normalize_profile_updates({"icon": "hard-hat"}, actor, target)
         for icon_value in ("networking", "systems", "communications-engineering", "engineer", "wave"):
             self.assertEqual(handler.normalize_profile_updates({"icon": icon_value}, actor, target)["icon"], icon_value)
         self.assertEqual(updates["preferences"], {"lang": "ar", "theme": "light"})

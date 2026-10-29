@@ -394,8 +394,8 @@ def main():
         if required_action not in policy_text:
             fail(f"Missing transactional item permission: {required_action}.")
     transact = next((s for s in statements if "dynamodb:TransactWriteItems" in str(s.get("Action", []))), None)
-    if not transact or not all(name in str(transact.get("Resource")) for name in ("ItemsTable", "ActivityTable", "ArchiveTable")):
-        fail("Transaction writes must be scoped to Items, Activity, and Archive tables.")
+    if not transact or not all(name in str(transact.get("Resource")) for name in ("ItemsTable", "ActivityTable", "ArchiveTable", "UsersTable")):
+        fail("Transaction writes must be scoped to Items, Activity, Archive, and profile-update Users tables.")
     batch_write = next((s for s in statements if "dynamodb:BatchWriteItem" in str(s.get("Action", []))), None)
     if not batch_write or "ActivityTable" not in str(batch_write.get("Resource")) or "ItemsTable" in str(batch_write.get("Resource")):
         fail("BatchWriteItem is only allowed on Activity for partial-restore summaries.")
@@ -432,13 +432,20 @@ def main():
         fail("Console Lambda policy BatchWriteItem must be scoped to the Activity table only.")
     console_transact = next((s for s in console_statements if "dynamodb:TransactWriteItems" in str(s.get("Action", []))), None)
     if not console_transact or not all(name in str(console_transact.get("Resource")) for name in (
-        "TeamFollowUp-Items", "TeamFollowUp-Activity", "TeamFollowUp-Archive"
+        "TeamFollowUp-Items", "TeamFollowUp-Activity", "TeamFollowUp-Archive", "TeamFollowUp-Users"
     )):
-        fail("Console Lambda policy transactions must be scoped to Items, Activity, and Archive.")
+        fail("Console Lambda policy transactions must be scoped to Items, Activity, Archive, and Users profile writes.")
     if "dynamodb:EnclosingOperation" not in serialized_console_policy:
         fail("Console Lambda policy transactional item-level writes must be restricted to TransactWriteItems.")
-    if "TeamFollowUp-Users" in str(console_transact.get("Resource", [])):
-        fail("Console Lambda policy must not grant transaction-write access to Users.")
+    handler_source_for_profile_access = (ROOT / "backend" / "src" / "handler.py").read_text(encoding="utf-8")
+    if "USERS.update_item(" in handler_source_for_profile_access:
+        fail("Users-table writes must use TransactWriteItems; do not grant standalone UpdateItem on Users.")
+
+    user_transactional_items = console_by_sid.get("AllowTransactionalItemOperationsOnly", {})
+    if "TeamFollowUp-Users" not in str(user_transactional_items.get("Resource", [])):
+        fail("Users profile field updates must be allowed only within the constrained transactional item-action statement.")
+    if "dynamodb:EnclosingOperation" not in str(user_transactional_items.get("Condition", {})):
+        fail("Users profile item writes must stay restricted to TransactWriteItems.")
 
     # The console policy and template policy must grant the same actions and conditions;
     # only resource references differ (literal ARNs versus CloudFormation resource ARNs).

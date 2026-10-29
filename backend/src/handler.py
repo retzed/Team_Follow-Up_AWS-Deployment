@@ -657,10 +657,10 @@ def public_team_user(row, include_private=False):
     """Shape a team profile for the browser without exposing private fields to the team list."""
     result = {
         "id": str(row.get("userId") or ""),
-        "name": str(row.get("displayName") or ""),
-        "nameArabic": str(row.get("displayNameArabic") or ""),
-        "role": str(row.get("role") or "Team member"),
-        "roleArabic": str(row.get("roleArabic") or ""),
+        "name": str(row.get("displayName") or row.get("name") or ""),
+        "nameArabic": str(row.get("displayNameArabic") or row.get("nameArabic") or ""),
+        "role": str(row.get("role") or row.get("label") or "Team member"),
+        "roleArabic": str(row.get("roleArabic") or row.get("labelArabic") or ""),
         "icon": str(row.get("icon") or "user"),
         "privilege": str(row.get("privilege") or ("Administrator" if str(row.get("userId") or "") in {"u1", "root"} else "User")),
         "enabled": row.get("enabled", True) is not False,

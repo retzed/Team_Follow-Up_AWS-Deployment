@@ -282,7 +282,7 @@ check(passwordStart>=0 && passwordEnd>passwordStart &&
       !passwordMarkup.includes("id='passwordConfirmCheck'") &&
       html.includes("passwordVerified:'Passwords match.'") &&
       html.includes("passwordVerified:'كلمتا المرور متطابقتان.'"),
-  'Current, New and Confirm password fields use the ordinary two-column grid; only the current-password field has a success check and its status label is translated to 'Passwords match.'.');
+  'Current, New and Confirm password fields use the ordinary two-column grid; only the current-password field has a success check and its status label is translated to Passwords match..');
 check(html.includes('id="mobile-profile-search-date-width-fix"') &&
       html.includes('#accountPage .account-search-controls > .account-search-date-from-field,') &&
       html.includes('overflow: hidden !important;') &&
@@ -425,7 +425,7 @@ check(html.includes("id='passwordCurrentCheck'") && !html.includes("id='password
       html.includes("passwordVerified:'Passwords match.'") &&
       !html.includes("class='account-field full'><label for='passwordCurrent'") &&
       html.includes(".account-password-check[hidden]{display:none!important}"),
-  'Current password shares the two-column profile grid and is the only password field with a check mark; its success label reads 'Passwords match.'.');
+  'Current password shares the two-column profile grid and is the only password field with a check mark; its success label reads Passwords match..');
 check(html.includes('function verifyCurrentPasswordField(input)') &&
       html.includes('currentPasswordVerificationSequence++') &&
       html.includes("if(newPassword!==confirmPassword){report(tr('passwordMismatch'),true);return;}") &&

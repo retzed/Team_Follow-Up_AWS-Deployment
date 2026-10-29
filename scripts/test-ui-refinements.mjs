@@ -254,6 +254,21 @@ check(html.includes("placeholder=\"${esc(user.name||") &&
 for(const control of ['accountSearchDateMode','accountSearchDateFrom','accountSearchDateTo','accountSearchUser','clear-account-search']) {
   check(html.includes(control), `Account Search exposes its date and user filter control: ${control}.`);
 }
+check(html.includes("user.privilege==='User'?'':"),
+  'The duplicate standard User badge is suppressed at the Profile heading.');
+const passwordStart=html.indexOf("<form id='accountPasswordForm'>");
+const passwordEnd=html.indexOf('</form>',passwordStart);
+const passwordMarkup=html.slice(passwordStart,passwordEnd);
+check(passwordStart>=0 && passwordEnd>passwordStart &&
+      passwordMarkup.includes("class='account-field full'><label for='passwordCurrent'") &&
+      passwordMarkup.indexOf("for='passwordNew'")<passwordMarkup.indexOf("for='passwordConfirm'"),
+  'Current password spans a row, with New and Confirm following as the desktop two-column pair.');
+check(html.includes('id="mobile-profile-search-date-width-fix"') &&
+      html.includes('#accountPage .account-search-controls > .account-search-date-from-field,') &&
+      html.includes('overflow: hidden !important;') &&
+      html.includes('max-inline-size: 100% !important;'),
+  'Mobile From/To inputs are shrink-constrained to their equal-width grid columns.');
+
 check(html.includes('function accountSearchUserMatches') &&
       !html.includes("function accountSearchUserMatches(item,userId){if(!userId||userId==='all')return true;") &&
       html.includes("if(userId!=='all'&&!accountSearchUserMatches(item,userId))return false;") &&

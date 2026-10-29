@@ -101,7 +101,7 @@ assert.equal(valid.status, 0, `AWS-configured build should succeed: ${valid.stde
 const output = await readFile('dist/index.html', 'utf8');
 assert.ok(output.includes("$('#workspaceEyebrow').hidden=ui.page==='account';"), 'account page hides the duplicate MY ACCOUNT eyebrow while keeping the bold title');
 assert.ok(output.includes("cpu:'CPU'"), 'CPU profile-icon label uses the standard uppercase spelling');
-assert.ok(output.includes("networking:'<path d=\"M12 3.1"), 'Network profile icon uses the detailed connected-node vector');
+assert.ok(output.includes("networking:'<g stroke-width=\"1.4\"><path d=\"M12 1.2L4.5 4.3"), 'Network profile icon preserves the reference mesh silhouette and inner connections');
 assert.ok(!output.includes("networking:'<circle cx=\"12\" cy=\"5\" r=\"2.5\""), 'old three-node network icon has been replaced');
 const config = getRuntimeConfig(output);
 assert.equal(config.cognito.userPoolId, 'us-east-1_Example123');

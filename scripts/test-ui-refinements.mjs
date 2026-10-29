@@ -402,7 +402,11 @@ check(html.includes('.assigned-card .parent-card-copy{display:block!important;fl
   'Workspace Assigned-mode cards keep readable titles and metadata within the mobile viewport.');
 
 
-const mobileDateRowFix = html.match(/<style id="mobile-profile-date-row-width-fix">([\\s\\S]*?)<\\/style>/)?.[1] || '';
+const mobileDateRowFixStart = html.indexOf('<style id="mobile-profile-date-row-width-fix">');
+const mobileDateRowFixEnd = html.indexOf('</style>', mobileDateRowFixStart);
+const mobileDateRowFix = mobileDateRowFixStart >= 0 && mobileDateRowFixEnd > mobileDateRowFixStart
+  ? html.slice(mobileDateRowFixStart, mobileDateRowFixEnd)
+  : '';
 check(mobileDateRowFix.includes('grid-template-columns: repeat(2, minmax(0, 1fr)) !important;') &&
       mobileDateRowFix.includes('"from to"') &&
       mobileDateRowFix.includes('min-inline-size: 0 !important;') &&

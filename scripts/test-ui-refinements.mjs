@@ -274,21 +274,40 @@ const passwordStart=html.indexOf("<form id='accountPasswordForm'>");
 const passwordEnd=html.indexOf('</form>',passwordStart);
 const passwordMarkup=html.slice(passwordStart,passwordEnd);
 check(passwordStart>=0 && passwordEnd>passwordStart &&
-      passwordMarkup.includes("<div class='account-field'><label for='passwordCurrent'>") &&
+      passwordMarkup.includes("<div class='account-field account-password-current-field'><label for='passwordCurrent'>") &&
       !passwordMarkup.includes("class='account-field full'") &&
       passwordMarkup.indexOf("for='passwordCurrent'")<passwordMarkup.indexOf("for='passwordNew'") &&
       passwordMarkup.indexOf("for='passwordNew'")<passwordMarkup.indexOf("for='passwordConfirm'") &&
+      passwordMarkup.includes("<div class='account-field account-password-new-field'><label for='passwordNew'>") &&
+      passwordMarkup.includes("<div class='account-field account-password-confirm-field'><label for='passwordConfirm'>") &&
+      html.includes(".account-password-new-field{grid-column:1;grid-row:2}.account-password-confirm-field{grid-column:2;grid-row:2}") &&
+      html.includes(".account-password-current-field,.account-password-new-field,.account-password-confirm-field{grid-column:1;grid-row:auto}")
       passwordMarkup.includes("id='passwordCurrentCheck'") &&
       !passwordMarkup.includes("id='passwordConfirmCheck'") &&
       html.includes("passwordVerified:'Passwords match.'") &&
       html.includes("passwordVerified:'كلمتا المرور متطابقتان.'"),
-  'Current, New and Confirm password fields use the ordinary two-column grid; only the current-password field has a success check and its status label is translated to Passwords match..');
+  'Current password occupies its own half-width desktop row; New and Confirm share the next row and stack on mobile, and only Current has a success check labeled Passwords match.');
 check(html.includes('id="mobile-profile-search-date-width-fix"') &&
       html.includes('#accountPage .account-search-controls > .account-search-date-from-field,') &&
       html.includes('overflow: hidden !important;') &&
       html.includes('max-inline-size: 100% !important;'),
   'Mobile From/To inputs are shrink-constrained to their equal-width grid columns.');
 
+const assignedPriorityMarkupIndex=html.indexOf('id="accountAssignedPriority"');
+const assignedDateMarkupIndex=html.indexOf('id="accountAssignedDateMode"');
+check(assignedPriorityMarkupIndex>=0 && assignedPriorityMarkupIndex<assignedDateMarkupIndex &&
+      html.includes("accountAssignedPriority:'all'") &&
+      html.includes("allAssignedItems:'All items'") &&
+      html.includes("allAssignedItems:'جميع العناصر'"),
+  'Assigned Items places Priority before Date, defaults to All items, and provides English/Arabic labels.');
+check(html.includes("const priority=ui.accountAssignedPriority||'all';") &&
+      html.includes("if(priority!=='all'&&(!['task','followup'].includes(String(item.type||''))||String(item.priority||'').toLowerCase()!==priority))return false;") &&
+      html.includes("ui.accountAssignedPriority='all';") &&
+      html.includes("else if(ev.target.id==='accountAssignedPriority'){ui.accountAssignedPriority=ev.target.value;refreshAccountAssignedResults();}"),
+  'Assigned Items priority filtering shows only Tasks/Follow-ups of the selected priority, while All items retains both parent and child items and Clear resets to All items.');
+check(html.includes('data-action="clear-account-search">${icon(\'filter\',13)} ${esc(tr(\'clear\'))}</button>') &&
+      html.includes('data-action="clear-account-assigned-filters">${icon(\'filter\',13)} ${esc(tr(\'clear\'))}</button>'),
+  'Search and Assigned Items Clear buttons both show the filter-clear icon.');
 check(html.includes('function accountSearchUserMatches') &&
       !html.includes("function accountSearchUserMatches(item,userId){if(!userId||userId==='all')return true;") &&
       html.includes("if(userId!=='all'&&!accountSearchUserMatches(item,userId))return false;") &&
@@ -425,7 +444,7 @@ check(html.includes("id='passwordCurrentCheck'") && !html.includes("id='password
       html.includes("passwordVerified:'Passwords match.'") &&
       !html.includes("class='account-field full'><label for='passwordCurrent'") &&
       html.includes(".account-password-check[hidden]{display:none!important}"),
-  'Current password shares the two-column profile grid and is the only password field with a check mark; its success label reads Passwords match..');
+  'Current password occupies its own half-width desktop row while New and Confirm share the next row; only Current has a success check labeled Passwords match.');
 check(html.includes('function verifyCurrentPasswordField(input)') &&
       html.includes('currentPasswordVerificationSequence++') &&
       html.includes("if(newPassword!==confirmPassword){report(tr('passwordMismatch'),true);return;}") &&

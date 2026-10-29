@@ -4538,7 +4538,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   grid-template-areas:
     "query query type status"
-    "dateMode from to user"
+    "user dateMode from to"
     "clear . . ." !important;
   grid-auto-flow: row !important;
   align-items: stretch !important;
@@ -4653,9 +4653,9 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     grid-template-areas:
       "query query"
       "type status"
+      "user user"
       "dateMode dateMode"
       "from to"
-      "user user"
       "clear clear" !important;
     gap: 8px !important;
   }

@@ -466,10 +466,13 @@ check(mobileDateRowFix.includes('grid-template-columns: repeat(2, minmax(0, 1fr)
   'Profile Search and Assigned Items keep From/To side by side and constrain date inputs to half-width grid columns on mobile, including narrow phones.');
 
 check(html.includes("id='passwordCurrentCheck'") && !html.includes("id='passwordConfirmCheck'") &&
-      html.includes("passwordVerified:'Passwords match.'") &&
+      html.includes("passwordVerified:'Current password verified.'") &&
+      html.includes("passwordsMatch:'Passwords match.'") &&
+      html.includes("function setCurrentPasswordCheck(check,state)") &&
+      html.includes("function updatePasswordMatchStatus(form)") &&
       !html.includes("class='account-field full'><label for='passwordCurrent'") &&
       html.includes(".account-password-check[hidden]{display:none!important}"),
-  'Current password occupies its own half-width desktop row while New and Confirm share the next row; only Current has a success check labeled Passwords match.');
+  'Current password occupies its own half-width desktop row and shows a success check or red cross; Passwords match is reserved for the New/Confirm pair.');
 check(html.includes('function verifyCurrentPasswordField(input)') &&
       html.includes('currentPasswordVerificationSequence++') &&
       html.includes("if(newPassword!==confirmPassword){report(tr('passwordMismatch'),true);return;}") &&

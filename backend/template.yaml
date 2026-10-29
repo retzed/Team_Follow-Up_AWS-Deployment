@@ -373,6 +373,7 @@ Resources:
                   - !GetAtt ItemsTable.Arn
                   - !GetAtt ActivityTable.Arn
                   - !GetAtt ArchiveTable.Arn
+                  - !GetAtt UsersTable.Arn
                 Condition:
                   ForAnyValue:StringEquals:
                     dynamodb:EnclosingOperation:
@@ -385,6 +386,7 @@ Resources:
                   - !GetAtt ItemsTable.Arn
                   - !GetAtt ActivityTable.Arn
                   - !GetAtt ArchiveTable.Arn
+                  - !GetAtt UsersTable.Arn
               - Sid: VerifyCurrentCognitoPassword
                 Effect: Allow
                 Action:

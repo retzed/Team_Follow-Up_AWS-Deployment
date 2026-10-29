@@ -360,7 +360,7 @@ First identify which layer changed. The optional template provisions the full st
 
 ### Frontend-only change
 
-Changes limited to `index.html`, frontend JavaScript/styles, UI tests, or other frontend-only files do not change the Cognito/API/DynamoDB contract. The Amplify branch created by the template has automatic builds enabled and points at the configured GitHub branch.
+Changes limited to `index.html`, frontend JavaScript/styles, UI tests, or other genuinely frontend-only files do not change the Cognito/API/DynamoDB contract. The current-password verification feature added on 29 October 2026 is an exception: it changes `backend/src/handler.py`, the Cognito app-client auth-flow setting and Lambda IAM/environment configuration, so follow **Lambda, API, or infrastructure change** below instead of this frontend-only procedure. The template already includes the required pool-scoped IAM actions and Cognito settings for a new, isolated stack. The Amplify branch created by the template has automatic builds enabled and points at the configured GitHub branch.
 
 1. Run the repository checks locally where practical:
    ```powershell

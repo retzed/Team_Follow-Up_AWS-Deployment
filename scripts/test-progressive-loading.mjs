@@ -22,6 +22,8 @@ check(html.includes('async function queryRootItems(') && html.includes('async fu
   'Descendants must be fetched through the dedicated root query, not during bootstrap.');
 check(html.includes('void ensureRootChildrenLoaded(ui.selectedParentId)'),
   'After the top-level list appears, only the currently selected Project/Job should be hydrated.');
+check(html.includes("void refreshActivityFor(ui.selectedParentId,'all')"),
+  'Startup loads the selected parent activity timeline without widening bootstrap.');
 check(html.includes("case 'select-parent':") && html.includes('void ensureRootChildrenLoaded(id)'),
   'Selecting another Project/Job must trigger its own lazy child-item query.');
 

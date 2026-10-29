@@ -1574,7 +1574,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   const token=await this.getAccessToken();if(!token)throw new Error('No valid Cognito access token.');const headers=new Headers(init.headers||{});headers.set('Authorization','Bearer '+token);if(init.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');return fetch(url.toString(),{...init,headers});
  }};
  function initializeSignInCopy(){
-  $('signInLogoMark').innerHTML=applicationLogoMarkup();
+  $('signInLogoMark').innerHTML='<img class="application-logo" src="./logo.svg?v=20261030-brandrefresh2" alt="" aria-hidden="true">';
   $('signInBrandSubtitle').textContent=copy.brand;$('signInTitle').textContent=copy.title;$('signInSubtitle').textContent=copy.subtitle;$('signInUsernameLabel').textContent=copy.username;$('signInPasswordLabel').textContent=copy.password;$('signInUsername').placeholder=copy.usernamePlaceholder;$('signInPassword').placeholder=copy.passwordPlaceholder;$('signInSubmit').textContent=copy.submit;$('signInForgotPassword').textContent=copy.forgot;
  }
  async function initialize(){

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const SOURCE_PATH = 'index.html';
 const OUTPUT_PATH = 'dist/index.html';
@@ -76,4 +76,8 @@ const output = source.replace(configRegex, replacement);
 
 await mkdir('dist', { recursive: true });
 await writeFile(OUTPUT_PATH, output, 'utf8');
+
+for (const asset of ['favicon.svg', 'favicon.png', 'favicon.ico']) {
+  await copyFile(asset, 'dist/' + asset);
+}
 console.log(`Built AWS-only frontend to ${OUTPUT_PATH} (Cognito + HTTPS API configured).`);

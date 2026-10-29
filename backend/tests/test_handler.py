@@ -341,6 +341,17 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(private["roleArabic"], "قائد الفريق")
         self.assertEqual(private["pinnedItemIds"], ["p1"])
 
+    def test_public_team_user_reads_legacy_arabic_profile_field_aliases(self):
+        row = {
+            "userId": "u2", "name": "Zyad", "nameArabic": "زياد",
+            "label": "Cloud Engineer", "labelArabic": "مهندس سحابة", "enabled": True,
+        }
+        profile = handler.public_team_user(row, include_private=True)
+        self.assertEqual(profile["name"], "Zyad")
+        self.assertEqual(profile["nameArabic"], "زياد")
+        self.assertEqual(profile["role"], "Cloud Engineer")
+        self.assertEqual(profile["roleArabic"], "مهندس سحابة")
+
     def test_privilege_manager_bootstrap_and_explicit_demotion(self):
         self.assertTrue(handler.is_privilege_manager({"userId": "root"}))
         self.assertTrue(handler.is_privilege_manager({"userId": "u1"}))

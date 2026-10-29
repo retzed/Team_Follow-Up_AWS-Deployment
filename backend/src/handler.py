@@ -49,6 +49,9 @@ WORK = ddb.Table(os.environ['ITEMS_TABLE'])
 ACTIVITY = ddb.Table(os.environ['ACTIVITY_TABLE'])
 USERS = ddb.Table(os.environ['USERS_TABLE'])
 ARCHIVE = ddb.Table(os.environ['ARCHIVE_TABLE'])
+COGNITO_USER_POOL_ID = os.environ.get('COGNITO_USER_POOL_ID', '').strip()
+COGNITO_CLIENT_ID = os.environ.get('COGNITO_CLIENT_ID', '').strip()
+COGNITO_IDP = boto3.client('cognito-idp')
 
 
 # ---------------------------------------------------------------------------
@@ -823,6 +826,72 @@ def commit_profile_update(actor, target, normalized):
     return public_team_user(updated, include_private=True), [public_event(event) for event in events]
 
 
+def verify_current_password(body, claims, profile):
+    """Verify the current signed-in Cognito user's password without returning tokens.
+
+    The submitted username is never trusted on its own: AdminGetUser resolves it
+    first, and its Cognito sub must exactly match the already-authorized JWT sub.
+    Password values and Cognito responses are never logged or persisted.
+    """
+    if not COGNITO_USER_POOL_ID or not COGNITO_CLIENT_ID:
+        return response(503, {"message": "Current-password verification is not configured."})
+    if not isinstance(body, dict) or set(body) != {"username", "password"}:
+        return response(400, {"message": "Provide only username and password for verification."})
+    username = body.get("username")
+    password = body.get("password")
+    if not isinstance(username, str) or not username.strip() or len(username.strip()) > 256:
+        return response(400, {"message": "A valid username is required."})
+    if not isinstance(password, str) or not password or len(password) > 256:
+        return response(400, {"message": "A non-empty password of at most 256 characters is required."})
+    token_sub = str(claims.get("sub") or "").strip()
+    if not token_sub or str(profile.get("cognitoSub") or "").strip() != token_sub:
+        return response(403, {"message": "Current-password verification is not available for this session."})
+    username = username.strip()
+
+    def map_cognito_error(exc, *, auth_attempt=False):
+        code = str(exc.response.get("Error", {}).get("Code", "Unknown"))
+        if code in ("TooManyRequestsException", "LimitExceededException", "ThrottlingException"):
+            return response(429, {"message": "Password verification is temporarily rate-limited. Try again shortly."})
+        if auth_attempt and code in ("NotAuthorizedException", "UserNotFoundException"):
+            return response(200, {"valid": False})
+        if not auth_attempt and code == "UserNotFoundException":
+            return response(200, {"valid": False})
+        logger.warning("current_password_verification_failed", extra={"errorCode": code})
+        return response(503, {"message": "Current-password verification is unavailable. Try again later."})
+
+    try:
+        identity = COGNITO_IDP.admin_get_user(
+            UserPoolId=COGNITO_USER_POOL_ID,
+            Username=username,
+        )
+    except ClientError as exc:
+        return map_cognito_error(exc)
+
+    attributes = {
+        str(attr.get("Name") or ""): str(attr.get("Value") or "")
+        for attr in identity.get("UserAttributes", [])
+        if isinstance(attr, dict)
+    }
+    if identity.get("Enabled") is False or attributes.get("sub", "").strip() != token_sub:
+        return response(200, {"valid": False})
+
+    try:
+        result = COGNITO_IDP.admin_initiate_auth(
+            UserPoolId=COGNITO_USER_POOL_ID,
+            ClientId=COGNITO_CLIENT_ID,
+            AuthFlow="ADMIN_USER_PASSWORD_AUTH",
+            AuthParameters={"USERNAME": username, "PASSWORD": password},
+        )
+    except ClientError as exc:
+        return map_cognito_error(exc, auth_attempt=True)
+
+    # Challenges such as MFA or NEW_PASSWORD_REQUIRED still mean Cognito accepted
+    # the primary password. Do not continue the challenge or expose issued tokens.
+    return response(200, {
+        "valid": bool(result.get("AuthenticationResult") or result.get("ChallengeName"))
+    })
+
+
 def lambda_handler(event, context):
     """Handle API Gateway HTTP API requests."""
     request_id = getattr(context, "aws_request_id", None) or event.get("requestContext", {}).get("requestId", "unknown")
@@ -854,6 +923,8 @@ def lambda_handler(event, context):
             user_rows=scan_pages(USERS)
             users=[public_team_user(u) for u in user_rows if u.get('enabled',True)]
             return response(200,{'items':parents,'users':users})
+        if method=='POST' and path=='/users/me/verify-password':
+            return verify_current_password(body, claims, profile)
         if method=='GET' and path=='/users/me':
             return response(200, {'user': public_team_user(profile, include_private=True)})
         if method=='PATCH' and path=='/users/me':

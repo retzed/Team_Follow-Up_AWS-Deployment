@@ -110,6 +110,12 @@ assert.ok(!('identityMap' in config.cognito), 'team identity must not be overrid
 for (const asset of ['logo.svg', 'favicon.svg', 'favicon.png', 'favicon.ico']) {
   assert.deepEqual(await readFile('dist/' + asset), await readFile(asset), `AWS artifact includes the deployed ${asset} asset`);
 }
+const deployedLogo = await readFile('dist/logo.svg', 'utf8');
+assert.ok(deployedLogo.includes('fill="#5b62e8"'), 'logo uses the application purple accent');
+assert.ok(!deployedLogo.includes('#102e50'), 'logo no longer uses the low-contrast navy');
+const deployedFavicon = await readFile('dist/favicon.svg', 'utf8');
+assert.ok(deployedFavicon.includes('fill="#5b62e8"'), 'favicon uses the same application purple accent');
+assert.ok(!deployedFavicon.includes('#102e50'), 'favicon no longer uses the low-contrast navy');
 
 const template = await readFile('backend/template.yaml', 'utf8');
 // SAM is optional, but its template must be a complete from-scratch automation reference.

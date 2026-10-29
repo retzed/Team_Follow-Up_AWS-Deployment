@@ -41,7 +41,8 @@
       "Resource": [
         "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Items",
         "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Activity",
-        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Archive"
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Archive",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Users"
       ],
       "Condition": {
         "ForAnyValue:StringEquals": {
@@ -60,7 +61,8 @@
       "Resource": [
         "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Items",
         "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Activity",
-        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Archive"
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Archive",
+        "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Users"
       ]
     },
     {

@@ -2979,10 +2979,11 @@ function renderArchivePreservingScroll(){const content=$('.archive-modal-content
 function openArchive(){ui.modal={kind:'archive',loading:true,archiveItems:[],selectedIds:[],error:'',expandedArchiveNodes:[]};renderModal();(async()=>{try{await apiPersistQueue.catch(()=>{});const result=await window.TeamFollowUpDataApi.listArchive({},(page,meta)=>{if(ui.modal?.kind!=='archive')return;const current=ui.modal.archiveItems||[];const byId=new Map(current.map(x=>[String(x.id||x.archiveId||x.itemId),x]));for(const row of page||[]){const id=String(row.id||row.archiveId||row.itemId||'');if(id)byId.set(id,row);}ui.modal.archiveItems=[...byId.values()];ui.modal.loading=meta.nextOffset!==null&&meta.nextOffset!==undefined;ui.modal.error='';renderArchivePreservingScroll();});if(ui.modal?.kind!=='archive')return;ui.modal.archiveItems=result.items||ui.modal.archiveItems||[];ui.modal.loading=false;renderArchivePreservingScroll();}catch(error){if(ui.modal?.kind!=='archive')return;ui.modal.loading=false;ui.modal.error=error?.message||tr('archiveRestoreFailed');renderArchivePreservingScroll();}})();}
 function toggleArchiveParent(id){if(ui.modal?.kind!=='archive')return;const selected=new Set(ui.modal.selectedIds||[]);if(selected.has(id))selected.delete(id);else selected.add(id);ui.modal.selectedIds=[...selected];renderModal();}
 function toggleArchiveGroup(rootId){if(ui.modal?.kind!=='archive')return;const items=(ui.modal.archiveItems||[]).filter(x=>String(x.archiveRootId||x.rootParentId||x.id)===String(rootId));const selected=new Set(ui.modal.selectedIds||[]);const allSelected=items.length&&items.every(x=>selected.has(x.id));for(const item of items){if(allSelected)selected.delete(item.id);else selected.add(item.id);}ui.modal.selectedIds=[...selected];renderModal();}
-async function reconcileWorkspaceAfterRestoreFailure(){
+async function reconcileWorkspaceAfterRestore(extraRootIds=[]){
  const previouslyLoadedChildren=new Set([...dataLoadState.childrenLoaded,...rootChildrenRequests.keys()].map(String));
  const previouslyLoadedActivity=new Set([...dataLoadState.activityLoaded].filter(key=>String(key).endsWith(':all')).map(key=>String(key).slice(0,-4)));
  if(ui.selectedParentId){previouslyLoadedChildren.add(String(ui.selectedParentId));previouslyLoadedActivity.add(String(ui.selectedParentId));}
+ for(const rootId of extraRootIds.map(String).filter(Boolean)){previouslyLoadedChildren.add(rootId);previouslyLoadedActivity.add(rootId);}
  // Bootstrap fetches parents/users, not every child table. Reset matching loaded flags
  // and explicitly reload every root that had been loaded before the failed restore.
  const refreshedWorkspace=await window.TeamFollowUpDataApi.bootstrap(data);
@@ -3011,7 +3012,11 @@ async function restoreSelectedArchive(){
   const restoredRows=Array.isArray(result?.restoredItems)?result.restoredItems:[];
   const restoreAt=(result?.activityEvents||[]).map(e=>Date.parse(e.at)).filter(Number.isFinite).reduce((max,value)=>Math.max(max,value),Date.now());
   const restoreStamp=new Date(restoreAt).toISOString();
-  if(!restoredRows.length){data=await window.TeamFollowUpDataApi.bootstrap(data);}else{
+  if(!restoredRows.length){
+   const archivedById=new Map((modal.archiveItems||[]).map(row=>[String(row.id||row.archiveId||row.itemId),row]));
+   const rootsToRehydrate=selected.map(id=>archivedById.get(String(id))).filter(Boolean).map(row=>String(row.archiveRootId||row.rootParentId||((row.type==='project'||row.type==='job')?(row.id||row.itemId):''))).filter(Boolean);
+   await reconcileWorkspaceAfterRestore(rootsToRehydrate);
+  }else{
    for(const raw of restoredRows){const item={...raw,id:String(raw.id||raw.itemId||'')};if(!item.id)continue;const oldUpdated=Date.parse(item.updatedAt||'');if(!Number.isFinite(oldUpdated)||oldUpdated<restoreAt)item.updatedAt=restoreStamp;const isParent=item.type==='project'||item.type==='job';const list=isParent?data.parents:data.children;const index=list.findIndex(existing=>String(existing.id)===item.id);if(index>=0)list[index]=item;else list.push(item);}
   }
   invalidateHierarchyIndex();
@@ -3033,7 +3038,7 @@ async function restoreSelectedArchive(){
    items=current.items||[];
    // A missing-parent restore is a validated rejection, not a partial success. Avoid replacing
    // the active workspace with bootstrap-only data and losing cached child rows/counts.
-   if(!parentRequiredError)await reconcileWorkspaceAfterRestoreFailure();
+   if(!parentRequiredError)await reconcileWorkspaceAfterRestore();
   }catch(recoveryError){console.warn('Could not fully reconcile workspace after a failed archive restore.',recoveryError);}
   const displayMessage=parentRequiredError?tr('archiveParentRequired'):(rawMessage||tr('archiveRestoreFailed'));
   ui.modal={kind:'archive',loading:false,archiveItems:items,selectedIds:selected.filter(id=>items.some(x=>String(x.id||x.archiveId||x.itemId)===String(id))),error:displayMessage};render();toast(ui.modal.error,true);

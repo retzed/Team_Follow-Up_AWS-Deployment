@@ -217,7 +217,11 @@ The AWS-backed application uses a JSON HTTP API. The frontend sends authenticate
 |---|---|---|
 | `GET` | `/bootstrap` | Returns only top-level Projects/Jobs and enabled team profiles for a lightweight startup snapshot; descendants and Activity history are loaded on demand. |
 | `GET` | `/users` | Lists enabled team profiles for assignee selectors. |
-| `POST` | `/users/me/verify-password` | Verifies the submitted current password only after confirming the requested Cognito username belongs to the already-authenticated JWT subject; returns `{ "valid": boolean }` only and never returns Cognito tokens. Requires the Lambda Cognito pool/client environment variables and two pool-scoped Cognito IAM actions. |
+| `GET` | `/users/me` | Returns the signed-in user's profile fields, preferences and pinned IDs. |
+| `PATCH` | `/users/me` | Updates allowed Profile fields and emits supported profile Activity events. |
+| `PATCH` | `/users/me/pins` | Updates pinned IDs; Users-table writes stay inside `TransactWriteItems`. |
+| `PATCH` | `/users/{userId}` | Manager-only privilege update for another non-root user. |
+| `POST` | `/users/me/verify-password` | Verifies the current password only after confirming the submitted Cognito username belongs to the authenticated JWT subject; returns `{ "valid": boolean }` only and never returns Cognito tokens. Requires Lambda Cognito pool/client variables and two pool-scoped Cognito IAM actions. |
 | `GET` | `/items` | Lists work items. Query parameters include scope=top-level, parentId, rootParentId, assigneeUserId, type, status, priority, q, dateMode, from, to, direction, limit, and offset. |
 | `GET` | `/items/assigned-to-me` | Lists items assigned to the authenticated mapped team member. Accepts the normal item filters and paging options. |
 | `GET` | `/items/{itemId}/children` | Lists direct children of an item; accepts type/status/priority/search/date/order and paging filters. |

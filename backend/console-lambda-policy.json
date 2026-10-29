@@ -62,6 +62,15 @@
         "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Activity",
         "arn:aws:dynamodb:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:table/TeamFollowUp-Archive"
       ]
+    },
+    {
+      "Sid": "VerifyCurrentCognitoPassword",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminInitiateAuth"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-east-1:REPLACE_WITH_12_DIGIT_ACCOUNT_ID:userpool/REPLACE_WITH_USER_POOL_ID"
     }
   ]
 }

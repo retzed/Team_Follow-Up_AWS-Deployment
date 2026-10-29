@@ -942,13 +942,20 @@ def lambda_handler(event, context):
                 row = WORK.get_item(Key={'itemId': item_id}).get('Item')
                 if not row or row.get('deletedAt'):
                     raise ValueError('A pinned item no longer exists. Refresh the pinned list and try again.')
-            USERS.update_item(
-                Key={'userId': str(profile['userId'])},
-                UpdateExpression='SET #pins = :pins, #profileVersion = if_not_exists(#profileVersion, :zero) + :one',
-                ExpressionAttributeNames={'#pins':'pinnedItemIds','#profileVersion':'profileVersion'},
-                ExpressionAttributeValues={':pins':pinned,':zero':0,':one':1},
-                ConditionExpression='attribute_exists(userId)',
-            )
+            ddb.meta.client.transact_write_items(TransactItems=[{
+                'Update': {
+                    'TableName': USERS.name,
+                    'Key': av_map({'userId': str(profile['userId'])}),
+                    'UpdateExpression': 'SET #pins = :pins, #profileVersion = if_not_exists(#profileVersion, :zero) + :one',
+                    'ExpressionAttributeNames': {'#pins':'pinnedItemIds','#profileVersion':'profileVersion','#userId':'userId'},
+                    'ExpressionAttributeValues': {
+                        ':pins': SERIALIZER.serialize(pinned),
+                        ':zero': SERIALIZER.serialize(0),
+                        ':one': SERIALIZER.serialize(1),
+                    },
+                    'ConditionExpression': 'attribute_exists(#userId)',
+                }
+            }])
             latest = USERS.get_item(Key={'userId': str(profile['userId'])}, ConsistentRead=True).get('Item') or profile
             return response(200, {'user': public_team_user(latest, include_private=True)})
         if method=='PATCH' and path.startswith('/users/'):

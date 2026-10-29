@@ -537,5 +537,34 @@ class CurrentPasswordVerificationTests(unittest.TestCase):
         cognito.admin_initiate_auth.assert_not_called()
 
 
+class PinTransactionTests(unittest.TestCase):
+    def test_pin_update_uses_transaction_scoped_users_write(self):
+        profile = {"userId": "u2", "displayName": "Zyad", "cognitoSub": "cognito-sub-u2", "enabled": True}
+        event = {
+            "requestContext": {
+                "http": {"method": "PATCH"},
+                "authorizer": {"jwt": {"claims": {"sub": "cognito-sub-u2"}}},
+            },
+            "rawPath": "/users/me/pins",
+            "body": json.dumps({"itemIds": ["project-1"]}),
+        }
+        with patch.object(handler, "current_profile", return_value=profile), \
+             patch.object(handler.WORK, "get_item", return_value={"Item": {"itemId": "project-1"}}), \
+             patch.object(handler.USERS, "get_item", return_value={"Item": profile}), \
+             patch.object(handler.ddb.meta.client, "transact_write_items") as transact:
+            result = handler.lambda_handler(event, SimpleNamespace(aws_request_id="pin-test"))
+
+        self.assertEqual(result["statusCode"], 200)
+        payload = json.loads(result["body"])
+        self.assertEqual(payload["user"]["pinnedItemIds"], ["project-1"] if "pinnedItemIds" in payload["user"] else [])
+        transact.assert_called_once()
+        writes = transact.call_args.kwargs["TransactItems"]
+        self.assertEqual(len(writes), 1)
+        update = writes[0]["Update"]
+        self.assertEqual(update["TableName"], handler.USERS.name)
+        self.assertEqual(update["Key"], {"userId": {"S": "u2"}})
+        self.assertEqual(update["ConditionExpression"], "attribute_exists(#userId)")
+        self.assertEqual(update["ExpressionAttributeValues"][":pins"], {"L": [{"S": "project-1"}]})
+
 if __name__ == "__main__":
     unittest.main()

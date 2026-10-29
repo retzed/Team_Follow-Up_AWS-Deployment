@@ -951,6 +951,7 @@ The Lambda receives the proxy path and dispatches based on HTTP method and route
 |---|---|---|---|
 | **GET /bootstrap** | Lightweight startup snapshot for compatible clients. | None. | Top-level Projects/Jobs and enabled team users only; descendants and Activity history are loaded on demand. |
 | **GET /users** | List enabled team profiles. | None. | users array with id, name, role. |
+| **POST /users/me/verify-password** | Verify the current password of the authenticated Cognito account for the Profile checkmark. | JSON `username` and `password`; no additional fields are accepted. | `{ "valid": true|false }` only; Cognito tokens and credentials are never returned. Requires pool-scoped Cognito IAM permissions and Lambda pool/client environment variables. |
 | **GET /items** | Query top-level items, children under a parent, root hierarchy, or items assigned to a user. | Supply one supported selector and optional filters/pagination. | items, count, nextOffset. |
 | **GET /items/assigned-to-me** | Query items assigned to the authenticated profile. | Optional filters/pagination. | items, count, nextOffset. |
 | **GET /items/{itemId}/children** | Query direct children of an item. | Optional filters/pagination. | items, count, nextOffset. |
@@ -1196,13 +1197,15 @@ Follow the full service-by-service procedure in [`DEPLOYMENT.md`](DEPLOYMENT.md)
 
 **Amplify Hosting:** connect the GitHub repository and intended branch. Use the repository `amplify.yml`, Node.js 24, the `node scripts/build.mjs` build command, and `dist/` output. Record the final branch HTTPS origin (scheme + host only; no path/trailing slash). The first build may fail until the API base URL is configured.
 
-**Lambda:** create a Python 3.12 function named `TeamFollowUp-Api`, 256 MB memory, 20-second timeout, handler `handler.lambda_handler`. Package `backend/src/handler.py` with the dependencies from `backend/src/requirements.txt` at the ZIP root. Create an IAM role named `TeamFollowUp-Api-ExecutionRole` trusted by Lambda, attach `AWSLambdaBasicExecutionRole`, and add the least-privilege policy in [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json) after replacing the account-ID placeholder. This matches the explicit `ApiExecutionRole` in the optional template. Set environment variables:
+**Lambda:** create a Python 3.12 function named `TeamFollowUp-Api`, 256 MB memory, 20-second timeout, handler `handler.lambda_handler`. Package `backend/src/handler.py` with the dependencies from `backend/src/requirements.txt` at the ZIP root. Create an IAM role named `TeamFollowUp-Api-ExecutionRole` trusted by Lambda, attach `AWSLambdaBasicExecutionRole`, and add the least-privilege policy in [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json). Replace the account-ID and User Pool ID placeholders; the Cognito actions must reference only the existing pool ARN. This matches the explicit `ApiExecutionRole` in the optional template. Set environment variables:
 - `ITEMS_TABLE=TeamFollowUp-Items`
 - `ACTIVITY_TABLE=TeamFollowUp-Activity`
 - `USERS_TABLE=TeamFollowUp-Users`
 - `ARCHIVE_TABLE=TeamFollowUp-Archive`
+- `COGNITO_USER_POOL_ID=<POOL_ID>`
+- `COGNITO_CLIENT_ID=<PUBLIC_APP_CLIENT_ID>`
 
-Create or verify `/aws/lambda/TeamFollowUp-Api` with 30-day retention. Never grant the function Cognito user-management permissions.
+Create or verify `/aws/lambda/TeamFollowUp-Api` with 30-day retention. The Lambda may use only `cognito-idp:AdminGetUser` and `cognito-idp:AdminInitiateAuth` against that pool for session-bound password verification; do not grant general user creation/deletion or attribute-update permissions.
 
 **API Gateway:** create an HTTP API with Lambda integration and an `ANY /{proxy+}` route at the auto-deployed `$default` stage. Configure a JWT authorizer with identity source `$request.header.Authorization`, issuer `https://cognito-idp.us-east-1.amazonaws.com/<POOL_ID>`, and audience equal to the public app-client ID. Attach the authorizer to every application route. The CORS allow-origin must be exactly the Amplify branch HTTPS origin; do not use `*`. Allow only `authorization` and `content-type` headers, the used HTTP methods (GET, POST, PATCH, DELETE, OPTIONS), and a 600-second max age. Enable 30-day API access logging without logging bearer tokens or Authorization headers.
 
@@ -1334,7 +1337,7 @@ The signed-in application opens on **My Account → Assigned Items**. Account ta
 
 The profile **Name** is a display name, not the Cognito username; the username is not shown as the user's display field and profile save does not rename the Cognito identity. The personal-detail fields are **Display name**, optional **Display name (Arabic)**, **Phone number**, **E-mail**, **Label**, **Label (Arabic)**, and **Profile icon**, in that order. The Arabic label no longer uses the “optional” suffix in its displayed text. The icon selector previews the selection. The profile privilege textbox has been removed; the privilege indicator remains beside the display name at the top of the page, and authorized team privilege management is separate. The backend continues to own privilege authorization and protects the root profile.
 
-**Save changes** persists profile fields through the authenticated API. Theme and language preferences are separate updates. The frontend's password-update flow remains Amazon Cognito-backed. No Cognito pool, app-client, JWT authorizer, API route, Lambda handler contract, DynamoDB key/index, or permission changes were required for this frontend update.
+**Save changes** persists profile fields through the authenticated API. Theme and language preferences are separate updates. The actual password update remains Amazon Cognito-backed. The current-password check added on 29 October 2026 is a separate authenticated API operation (`POST /users/me/verify-password`) and requires the documented Lambda/Cognito app-client/IAM updates. Earlier Profile/Search and mobile-layout changes were frontend-only, but this check is not.
 
 ### Account Search and user/date filters
 
@@ -1368,3 +1371,9 @@ Closing Search clears a queued sidebar query timer and increments `sidebarQueryS
 ### Protected root identity
 
 The AWS implementation retains Cognito as its only application authentication provider. Create the administrator-managed Cognito identity mapped to application user ID `root` with `custom:teamUserId=root`; use `root@1234` as its initial password only if it complies with the current pool password policy (the documented pool uses email sign-in), and create a Users-table mapping with `userId=root`, `displayName=root`, `role=Root`, `icon=crown`, `privilege=Administrator`, `cognitoSub` set to the real Cognito `sub`, and `enabled=true`. The updated Cognito seeding scripts expect six standard users plus root. Do not persist plaintext passwords or a second password hash in DynamoDB: Cognito owns password storage, password hashing, reset, and change operations. The app and backend make the root profile database-managed and reject profile edits and privilege changes through the app. Account creation and the initial password must be completed by a trusted Cognito administrator; this repository cannot create identities in the live AWS account by itself.
+
+### Current-password check (29 October 2026)
+
+The current-password checkmark is displayed only after verifying the entered password against Cognito. The current-password field shares the normal two-column Profile password grid; its status is reset immediately when the input changes, and asynchronous verification responses are ignored if the value changes before they return. A second checkmark is shown when the new password is at least eight characters and exactly matches its confirmation. The actual password change is still performed by Cognito.
+
+For the AWS deployment, this feature introduces `POST /users/me/verify-password` in Lambda. Before deploying the updated frontend, configure `COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID` on Lambda, enable `ALLOW_ADMIN_USER_PASSWORD_AUTH` on the existing public app client while retaining SRP and refresh-token flows, and grant only `cognito-idp:AdminGetUser` and `cognito-idp:AdminInitiateAuth` against the configured User Pool ARN. The handler verifies that the supplied username's Cognito `sub` matches the already-authenticated JWT subject and returns only a boolean. Passwords are neither logged by the handler nor stored in DynamoDB. No new DynamoDB table/index, migration, Amplify variable, or API Gateway route is required, but the Lambda ZIP and Cognito/IAM settings must be updated before the frontend is published.

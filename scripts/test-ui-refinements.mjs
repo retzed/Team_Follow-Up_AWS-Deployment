@@ -48,6 +48,20 @@ assert.ok(html.includes(':root[lang="en"] { --mixed-content-align: left; }') && 
 assert.ok(html.includes('function assignmentContextMarkup(item)') && html.includes('<bdi dir="auto">${esc(root.name)}</bdi>'), 'Names embedded in Assigned to me card context are isolated from UI-direction changes.');
 assert.ok(html.includes('id="formName" name="name" dir="auto"') && html.includes('id="formDescription" name="description" dir="auto"') && html.includes('<option dir="auto" value="${esc(p.id)}"'), 'Editing fields and parent selector use content-driven direction for mixed Arabic/Latin text.');
 
+
+const assignedFilterFunctionStart = html.indexOf('function filteredAccountAssignedItems(){');
+const assignedFilterFunctionEnd = html.indexOf('\nfunction accountAssignedResultsMarkup()', assignedFilterFunctionStart);
+assert.ok(assignedFilterFunctionStart >= 0 && assignedFilterFunctionEnd > assignedFilterFunctionStart, 'Assigned Items must have an isolated filter function.');
+const assignedFilterFunction = html.slice(assignedFilterFunctionStart, assignedFilterFunctionEnd);
+assert.ok(assignedFilterFunction.includes('ui.accountAssignedQuery') && assignedFilterFunction.includes("type!=='all'") && assignedFilterFunction.includes('matchesStatusFilter(item.status,status)') && assignedFilterFunction.includes("matchesDate(item,dateMode,dateFrom,dateTo,'application')"), 'Assigned Items filters must cover query, type, status, and date range.');
+assert.ok(assignedFilterFunction.includes('compareByDateMode(a,b,dateMode)'), 'Assigned Items sort order must follow the selected Date list mode.');
+for (const filterId of ['accountAssignedQuery','accountAssignedType','accountAssignedStatus','accountAssignedDateMode','accountAssignedDateFrom','accountAssignedDateTo']) {
+  assert.ok(html.includes(`id="${filterId}"`), `Assigned Items must render the ${filterId} control.`);
+  assert.ok(html.includes(`ev.target.id==='${filterId}'`), `Assigned Items must respond to changes in ${filterId}.`);
+}
+assert.ok(html.includes('data-action="clear-account-assigned-filters"') && html.includes("case 'clear-account-assigned-filters':"), 'Assigned Items Clear must reset its independent filters.');
+assert.ok(html.includes('id="account-assigned-filters-layout"') && html.includes('.account-assigned-controls') && html.includes('"from to"'), 'Assigned Items filters must use the responsive desktop/mobile layout.');
+
 const modalStart = html.indexOf('function renderModal(preserveExisting=true){');
 const modalEnd = html.indexOf('\nlet toastTimer;', modalStart);
 assert.ok(modalStart >= 0 && modalEnd > modalStart, 'Modal renderer must exist.');

@@ -147,6 +147,8 @@ The handler and `backend/table-schema.json` use the physical table keys and inde
 - **Users:** the primary key remains `userId`. Cognito `sub` values are stored in `cognitoSub`; because this table has no Cognito-subject GSI, Lambda scans this deliberately small seven-profile table and denies missing, duplicate, or disabled mappings.
 - **Archive:** the existing `archiveId` key, `GSI_ArchiveIndex`, and `GSI_ArchiveRoot` remain unchanged. Archiving/restore uses the existing table and transaction logic.
 
+The Lambda IAM policy permits Users-table profile edits only through transactions: profile updates atomically update Users and Activity, while pin updates use `TransactWriteItems` without granting standalone `UpdateItem` on Users.
+
 ### Optional full-stack automation template
 
 The console-first deployment does not use SAM to create AWS resources. The optional `backend/template.yaml` is a full-stack CloudFormation/SAM template for a separate fresh environment. It creates the Cognito pool/client, Items/Activity/Users/Archive tables and their five GSIs, API Gateway HTTP API, Lambda/IAM, CloudWatch logs/dashboard/alarms, Amplify app/branch and monthly cost budget. Its default `ResourceNamePrefix=TeamFollowUp` reproduces the physical table names used in this account, so **do not deploy it with that default prefix into this same account/Region** while the console-created tables and budget with those names remain. CloudFormation will not automatically adopt them. Use a clean environment or a deliberately unique prefix for automation experiments.

@@ -101,7 +101,7 @@ assert.equal(valid.status, 0, `AWS-configured build should succeed: ${valid.stde
 const output = await readFile('dist/index.html', 'utf8');
 assert.ok(output.includes("$('#workspaceEyebrow').hidden=ui.page==='account';"), 'account page hides the duplicate MY ACCOUNT eyebrow while keeping the bold title');
 assert.ok(output.includes("cpu:'CPU'"), 'CPU profile-icon label uses the standard uppercase spelling');
-assert.ok(output.includes("networking:'<g stroke-width=\"1.4\"><path d=\"M12 1.2L4.5 4.3"), 'Network profile icon preserves the reference mesh silhouette and inner connections');
+assert.ok(output.includes('networking:\'<image href="./network-icon.svg"'), 'Network profile icon renders the high-quality vector asset');
 assert.ok(!output.includes("networking:'<circle cx=\"12\" cy=\"5\" r=\"2.5\""), 'old three-node network icon has been replaced');
 const config = getRuntimeConfig(output);
 assert.equal(config.cognito.userPoolId, 'us-east-1_Example123');
@@ -111,7 +111,7 @@ assert.equal(config.apiBaseUrl, 'https://app-api.execute-api.us-east-1.amazonaws
 assert.ok(!('localAuth' in config), 'runtime config must not contain a local-auth switch');
 assert.ok(!('dataMode' in config), 'runtime config must not contain a database-mode switch');
 assert.ok(!('identityMap' in config.cognito), 'team identity must not be overridable by a browser-side map');
-for (const asset of ['logo.svg', 'favicon.svg', 'favicon.png', 'favicon.ico']) {
+for (const asset of ['logo.svg', 'favicon.svg', 'favicon.png', 'favicon.ico', 'network-icon.svg']) {
   assert.deepEqual(await readFile('dist/' + asset), await readFile(asset), `AWS artifact includes the deployed ${asset} asset`);
 }
 const deployedLogo = await readFile('dist/logo.svg', 'utf8');

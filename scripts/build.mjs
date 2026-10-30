@@ -77,7 +77,7 @@ const output = source.replace(configRegex, replacement);
 await mkdir('dist', { recursive: true });
 await writeFile(OUTPUT_PATH, output, 'utf8');
 
-for (const asset of ['logo.svg', 'favicon.svg', 'favicon.png', 'favicon.ico']) {
+for (const asset of ['logo.svg', 'favicon.svg', 'favicon.png', 'favicon.ico', 'network-icon.svg']) {
   await copyFile(asset, 'dist/' + asset);
 }
 console.log(`Built AWS-only frontend to ${OUTPUT_PATH} (Cognito + HTTPS API configured).`);

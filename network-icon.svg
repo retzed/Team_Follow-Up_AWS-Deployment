@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" fill="none">
+  <defs>
+    <linearGradient id="link" x1="18" y1="166" x2="173" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0875f5"/><stop offset=".36" stop-color="#05a8f4"/><stop offset=".66" stop-color="#13c6b2"/><stop offset="1" stop-color="#27d94b"/>
+    </linearGradient>
+    <radialGradient id="blue" cx="0" cy="0" r="1" gradientTransform="translate(39 83) rotate(62) scale(19)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#82e4ff"/><stop offset=".48" stop-color="#169cff"/><stop offset="1" stop-color="#0756d2"/>
+    </radialGradient>
+    <radialGradient id="cyan" cx="0" cy="0" r="1" gradientTransform="translate(91 109) rotate(60) scale(18)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b4fff3"/><stop offset=".5" stop-color="#1dd2df"/><stop offset="1" stop-color="#0799c1"/>
+    </radialGradient>
+    <radialGradient id="teal" cx="0" cy="0" r="1" gradientTransform="translate(117 69) rotate(60) scale(18)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#c3ffe4"/><stop offset=".52" stop-color="#25dcb2"/><stop offset="1" stop-color="#08a77d"/>
+    </radialGradient>
+    <radialGradient id="green" cx="0" cy="0" r="1" gradientTransform="translate(147 35) rotate(60) scale(19)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e1ff9c"/><stop offset=".48" stop-color="#45ed72"/><stop offset="1" stop-color="#0ab64d"/>
+    </radialGradient>
+    <filter id="soft" x="-25%" y="-25%" width="150%" height="160%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="1.3" stdDeviation="1.1" flood-color="#0050a8" flood-opacity=".28"/></filter>
+    <filter id="nodeShadow" x="-70%" y="-70%" width="240%" height="240%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="1.4" stdDeviation="1.4" flood-color="#003f91" flood-opacity=".38"/></filter>
+  </defs>
+  <g stroke="url(#link)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" filter="url(#soft)">
+    <path d="M96 18 43 43 20 96 47 91 70 66 119 77 151 37 169 96 147 138 91 117 75 162 108 173"/>
+    <path d="M96 18 151 37M96 18 70 66M96 18 119 77M43 43 70 66M43 43 20 96M43 43 119 77"/>
+    <path d="M151 37 119 77M151 37 169 96M20 96 47 91M20 96 75 162M47 91 70 66M47 91 91 117M47 91 75 162"/>
+    <path d="M70 66 119 77M70 66 91 117M70 66 108 173M119 77 169 96M119 77 91 117M119 77 147 138"/>
+    <path d="M169 96 147 138M91 117 75 162M91 117 108 173M91 117 147 138M75 162 108 173M108 173 147 138"/>
+  </g>
+  <g filter="url(#nodeShadow)">
+    <g stroke-width="1.4">
+      <circle cx="96" cy="18" r="7.6" fill="url(#green)" stroke="#18c85d"/>
+      <circle cx="43" cy="43" r="7.4" fill="url(#blue)" stroke="#0874e5"/>
+      <circle cx="47" cy="91" r="7.4" fill="url(#blue)" stroke="#086be1"/>
+      <circle cx="119" cy="77" r="7.7" fill="url(#teal)" stroke="#0aa98f"/>
+      <circle cx="91" cy="117" r="7.6" fill="url(#cyan)" stroke="#079fc3"/>
+      <circle cx="75" cy="162" r="7.3" fill="url(#blue)" stroke="#086be1"/>
+      <circle cx="108" cy="173" r="7.4" fill="url(#blue)" stroke="#075bd3"/>
+    </g>
+    <g stroke-width="3.2">
+      <circle cx="151" cy="37" r="7.3" stroke="url(#green)"/>
+      <circle cx="20" cy="96" r="7.4" stroke="url(#blue)"/>
+      <circle cx="70" cy="66" r="7.3" stroke="url(#cyan)"/>
+      <circle cx="169" cy="96" r="7.3" stroke="url(#green)"/>
+      <circle cx="147" cy="138" r="7.7" stroke="url(#cyan)"/>
+    </g>
+    <g stroke="#eaffff" stroke-opacity=".78" stroke-width=".9">
+      <circle cx="151" cy="37" r="4.7"/><circle cx="20" cy="96" r="4.7"/><circle cx="70" cy="66" r="4.7"/><circle cx="169" cy="96" r="4.7"/><circle cx="147" cy="138" r="5"/>
+    </g>
+    <g fill="#ffffff" fill-opacity=".42">
+      <circle cx="93.5" cy="15.3" r="1.45"/><circle cx="40.4" cy="40.5" r="1.3"/><circle cx="44.4" cy="88.5" r="1.3"/><circle cx="116.3" cy="74.1" r="1.35"/><circle cx="88.5" cy="114.2" r="1.3"/><circle cx="72.7" cy="159.1" r="1.25"/><circle cx="105.5" cy="170.2" r="1.3"/>
+    </g>
+  </g>
+</svg>

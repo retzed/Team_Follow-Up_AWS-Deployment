@@ -1727,12 +1727,11 @@ const ICONS = {
   spinner:'<path d="M21 12a9 9 0 1 1-6.2-8.56"/>',
 };
 const ICON_PALETTES = {
-  compass:{stroke:['#153B9B','#168FE8','#57D8EE'],fill:['#EAF7FF','#6AC8F8','#1D66CE'],accent:['#C8F6FF','#38BDF8','#1555C7']},
+  compass:{stroke:['#35465B','#AEBCCB','#405873'],fill:['#F7FAFF','#DCE9F7','#A9C3DF'],accent:['#E11D48','#F97316','#FBBF24']},
   wrench:{stroke:['#536477','#DCE5EF','#77879B'],fill:['#F8FAFC','#C7D2DF','#718096'],accent:['#FFFFFF','#E8EEF5','#8D9BAE']},
-  cpu:{stroke:['#163C9C','#0E9FE5','#50E5D0'],fill:['#DDF4FF','#69C9F2','#2878C7'],accent:['#14366F','#227FB8','#38C6D0']},
-  engineer:{stroke:['#254C78','#398DC5','#75D0C7'],fill:['#F9FCFF','#D7E1EB','#8798AD'],accent:['#163E70','#2379AE','#32B9B5']},
-  database:{stroke:['#173D9A','#149DDA','#49D8C8'],fill:['#102D78','#167CC2','#16B7A5'],accent:['#B7F3FF','#36CFE6','#0E8FC5']},
-  crown:{stroke:['#874606','#D99518','#FFE18A'],fill:['#9A5208','#E9A928','#FFE58C'],accent:['#FFF2B8','#FFC43D','#B66B09']},
+  cpu:{stroke:['#102A56','#1479C9','#35D4CF'],fill:['#162B4D','#174D83','#0F698E'],accent:['#B7F7FF','#43DCEB','#28B7D4']},
+  engineer:{stroke:['#594015','#C78A22','#31557A'],fill:['#FFF0A6','#FFC83D','#D99112'],accent:['#142E59','#256DB5','#3FADD0'],skin:['#FFD7B5','#F1AC82','#C97954']},
+  database:{stroke:['#123B5A','#0EA5B7','#65E0C2'],fill:['#102C4E','#116C91','#087E78'],accent:['#D0FFF1','#65E6CF','#18B6A5']},
   helmet:{stroke:['#657386','#DCE5EE','#8D9BAD'],fill:['#FFFFFF','#E5EBF2','#AAB6C5'],accent:['#F9FCFF','#CFD8E3','#8492A5']},
   layers:{stroke:['#F0444C','#3295D9','#6658DA','#F28A19'],fill:['#F0444C','#3295D9','#6658DA','#F28A19'],accent:['#FF9A42','#5B62E8','#F0444C']}
 };
@@ -1742,9 +1741,10 @@ function icon(name,size=16){
  if(!palette)return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
  const id='app-icon-'+(++iconRenderSequence);
  const stops=colors=>colors.map((color,index)=>'<stop offset="'+(index/(colors.length-1)*100)+'%" stop-color="'+color+'"/>').join('');
- const defs='<defs><linearGradient id="'+id+'-stroke" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.stroke)+'</linearGradient><linearGradient id="'+id+'-fill" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.fill)+'</linearGradient><linearGradient id="'+id+'-accent" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.accent)+'</linearGradient><linearGradient id="'+id+'-metal" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#64748B"/><stop offset="24%" stop-color="#FFFFFF"/><stop offset="48%" stop-color="#A8B4C3"/><stop offset="72%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#64748B"/></linearGradient></defs>';
+ const defs='<defs><linearGradient id="'+id+'-stroke" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.stroke)+'</linearGradient><linearGradient id="'+id+'-fill" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.fill)+'</linearGradient><linearGradient id="'+id+'-accent" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.accent)+'</linearGradient><linearGradient id="'+id+'-metal" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#64748B"/><stop offset="24%" stop-color="#FFFFFF"/><stop offset="48%" stop-color="#A8B4C3"/><stop offset="72%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#64748B"/></linearGradient>'+(palette.skin?'<linearGradient id="'+id+'-skin" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.skin)+'</linearGradient>':'')+'</defs>';
  let body=paths;
  if(name==='compass'){
+  body=body.replace('<circle cx="12" cy="12" r="10"/>','<circle cx="12" cy="12" r="10" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
   body=body.replace('<path d="m16.2 7.8-2.7 5.7-5.7 2.7 2.7-5.7z"/>','<path d="m16.2 7.8-2.7 5.7-5.7 2.7 2.7-5.7z" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/>');
  }else if(name==='wrench'){
   body=body.replace('<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z"/>','<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z" fill="url(#'+id+'-metal)" stroke="url(#'+id+'-stroke)" stroke-width="1.35"/>');
@@ -1753,13 +1753,12 @@ function icon(name,size=16){
   body=body.replace('<path d="M9 9h6v6H9zM9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/>','<path d="M9 9h6v6H9z" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/>');
  }else if(name==='engineer'){
   body=body.replace('<path d="M5.6 8.1C6 5 8.1 3.2 10 2.8V4.2h.7V2.7h2.6v1.5h.7V2.8c1.9.4 4 2.2 4.4 5.3l.6.9-2.8 1.2H7.8L5 9Z"/>','<path d="M5.6 8.1C6 5 8.1 3.2 10 2.8V4.2h.7V2.7h2.6v1.5h.7V2.8c1.9.4 4 2.2 4.4 5.3l.6.9-2.8 1.2H7.8L5 9Z" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
-  body=body.replace('<path d="M5.6 8.1 4.8 9.2l3 1.5h8.4l3-1.5-.8-1.1"/>','<path d="M5.6 8.1 4.8 9.2l3 1.5h8.4l3-1.5-.8-1.1" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/>');
+  body=body.replace('<path d="M5.6 8.1 4.8 9.2l3 1.5h8.4l3-1.5-.8-1.1"/>','<path d="M5.6 8.1 4.8 9.2l3 1.5h8.4l3-1.5-.8-1.1" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
+  body=body.replace('<path d="M4.8 9.1 7 10.9v1.2c0 3.1 2 5.3 5 5.3s5-2.2 5-5.3v-1.2l2.2-1.8"/>','<path d="M4.8 9.1 7 10.9v1.2c0 3.1 2 5.3 5 5.3s5-2.2 5-5.3v-1.2l2.2-1.8" fill="url(#'+id+'-skin)" stroke="url(#'+id+'-stroke)"/>');
   body=body.replace('<path d="M8.1 17.2 12 20.3l3.9-3.1c4.1.8 6.1 3.2 6.6 5.8h-21c.5-2.6 2.5-5 6.6-5.8Z"/>','<path d="M8.1 17.2 12 20.3l3.9-3.1c4.1.8 6.1 3.2 6.6 5.8h-21c.5-2.6 2.5-5 6.6-5.8Z" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/>');
  }else if(name==='database'){
   body='<path d="M4 5c0-1.7 3.6-3 8-3s8 1.3 8 3v14c0 1.7-3.6 3-8 3s-8-1.3-8-3V5Z" fill="url(#'+id+'-fill)" stroke="none"/>'+body;
   body=body.replace('<ellipse cx="12" cy="5" rx="8" ry="3"/>','<ellipse cx="12" cy="5" rx="8" ry="3" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/>');
- }else if(name==='crown'){
-  body=body.replace('<path d="m3 7 5 5 4-8 4 8 5-5-2 12H5L3 7Z"/>','<path d="m3 7 5 5 4-8 4 8 5-5-2 12H5L3 7Z" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
  }else if(name==='helmet'){
   body=body.replace('<path d="M3.8 13.2v-1.5a8.2 8.2 0 0 1 16.4 0v1.5"/>','<path d="M3.8 13.2v-1.5a8.2 8.2 0 0 1 16.4 0v1.5Z" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
   body=body.replace('<path d="M2 13.2h20c.6 0 1 .4 1 1v.6c0 1.2-1 2.2-2.2 2.2H3.2C2 17 1 16 1 14.8v-.6c0-.6.4-1 1-1Z"/>','<path d="M2 13.2h20c.6 0 1 .4 1 1v.6c0 1.2-1 2.2-2.2 2.2H3.2C2 17 1 16 1 14.8v-.6c0-.6.4-1 1-1Z" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/>');

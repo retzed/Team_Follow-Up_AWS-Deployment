@@ -120,7 +120,7 @@ assert.ok(iconRenderer.includes("if(name==='compass')") &&
 assert.ok(iconRenderer.includes("if(name==='cpu')") &&
           iconRenderer.includes('width="14.7"') &&
           iconRenderer.includes('width="7.1"') &&
-          iconRenderer.includes('BAF7FF'),
+          iconRenderer.includes("url(#'+id+'-accent)"),
   'CPU uses a layered package, inset die, circuit details, and metallic pins');
 assert.ok(iconRenderer.includes("if(name==='engineer')") &&
           iconRenderer.includes('M2.2 22c.38-3.18') &&

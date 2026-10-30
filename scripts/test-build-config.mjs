@@ -106,18 +106,27 @@ for (const name of ['compass','wrench','cpu','engineer','database','helmet','lay
   assert.ok(output.includes(name+':{stroke:['), `color palette is defined for ${name}`);
 }
 assert.ok(output.includes("wrench:{stroke:['#536477','#DCE5EF','#77879B']"), 'Wrench uses a silver/chrome palette');
-assert.ok(output.includes("compass:{stroke:['#2563EB','#0F766E']") && output.includes("accent:['#FB923C','#E11D48']"), 'Compass uses a nautical blue dial with a warm directional needle');
-assert.ok(output.includes("cpu:{stroke:['#60A5FA','#22D3EE']") && output.includes("fill:['#334155','#0F172A']") && output.includes("accent:['#CFFAFE','#38BDF8','#06B6D4']"), 'CPU uses a graphite-indigo package with an electric cyan die');
-assert.ok(output.includes("engineer:{stroke:['#17324D','#0F6476']") && output.includes("helmet:['#FFF1B8','#FACC15','#D97706']") && output.includes("clothes:['#1D4ED8','#0F766E']"), 'Engineer uses separate safety-yellow, skin-tone, and blue/teal workwear ramps');
+assert.ok(output.includes("compass:{stroke:['#60A5FA','#0E7490']") && output.includes("fill:['#0B1B35','#143C63','#0C5D73']") && output.includes("accent:['#FDBA74','#F97316','#DC2626']"), 'Compass uses a layered midnight-blue instrument face and a warm directional needle');
+assert.ok(output.includes("cpu:{stroke:['#64748B','#60A5FA','#22D3EE']") && output.includes("fill:['#111827','#1E293B','#334155']") && output.includes("accent:['#BAF7FF','#22D3EE','#0284C7']"), 'CPU uses a graphite package with a distinct luminous cyan die');
+assert.ok(output.includes("engineer:{stroke:['#8A4B08','#D97706','#164E63']") && output.includes("helmet:['#FFF4C2','#FACC15','#D97706']") && output.includes("clothes:['#2563EB','#0F766E']"), 'Engineer uses coordinated safety-yellow helmet, warm face, and blue/teal workwear');
 assert.ok(output.includes("database:{stroke:['#3B82F6','#0F766E']") && output.includes("accent:['#A5F3FC','#22D3EE']"), 'Database uses a modern blue-indigo cylinder with aqua data rings');
 const iconRendererStart=output.indexOf('function icon(name,size=16){');
-const iconRendererEnd=output.indexOf('\nfunction ',iconRendererStart);
+const iconRendererEnd=output.indexOf('\\nfunction ',iconRendererStart);
 const iconRenderer=output.slice(iconRendererStart,iconRendererEnd);
-assert.ok(iconRenderer.includes("shapePaths.length===4") &&
-          iconRenderer.includes("styledPath(shapePaths[3],'clothes','clothesLine'") &&
-          iconRenderer.includes("styledPath(shapePaths[2],'face','faceLine'") &&
-          iconRenderer.includes("styledPath(shapePaths[0],'helmet','helmetLine'"),
-  'Engineer keeps all four original paths separate and renders the body, face, helmet, and brim in correct layer order');
+assert.ok(iconRenderer.includes("if(name==='compass')") &&
+          iconRenderer.includes('r="9.45"') &&
+          iconRenderer.includes("M12 5.25 14.95 12 12 10.72Z"),
+  'Compass uses the complete layered dial and split directional needle');
+assert.ok(iconRenderer.includes("if(name==='cpu')") &&
+          iconRenderer.includes('width="14.7"') &&
+          iconRenderer.includes('width="7.1"') &&
+          iconRenderer.includes('BAF7FF'),
+  'CPU uses a layered package, inset die, circuit details, and metallic pins');
+assert.ok(iconRenderer.includes("if(name==='engineer')") &&
+          iconRenderer.includes('M2.2 22c.38-3.18') &&
+          iconRenderer.includes('M7.05 9.15v3.05') &&
+          iconRenderer.includes('M4.8 9.2V7.7'),
+  'Engineer is rendered as independent jacket, face, helmet dome, and brim layers');
 assert.ok(iconRenderer.includes('fill="none" stroke="#67E8F9"') &&
           iconRenderer.includes('middleRingPath=pathMatch[1].slice(middleStart)'),
   'Database cylinder and internal separator are styled as independent vector paths');

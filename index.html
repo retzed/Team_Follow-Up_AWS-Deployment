@@ -1727,11 +1727,11 @@ const ICONS = {
   spinner:'<path d="M21 12a9 9 0 1 1-6.2-8.56"/>',
 };
 const ICON_PALETTES = {
-  compass:{stroke:['#35465B','#AEBCCB','#405873'],fill:['#F7FAFF','#DCE9F7','#A9C3DF'],accent:['#E11D48','#F97316','#FBBF24']},
+  compass:{stroke:['#173B56','#0F6B7B'],fill:['#EAF6FF','#B9E5F2'],accent:['#F97316','#E11D48']},
   wrench:{stroke:['#536477','#DCE5EF','#77879B'],fill:['#F8FAFC','#C7D2DF','#718096'],accent:['#FFFFFF','#E8EEF5','#8D9BAE']},
-  cpu:{stroke:['#102A56','#1479C9','#35D4CF'],fill:['#162B4D','#174D83','#0F698E'],accent:['#B7F7FF','#43DCEB','#28B7D4']},
-  engineer:{stroke:['#594015','#C78A22','#31557A'],fill:['#FFF0A6','#FFC83D','#D99112'],accent:['#142E59','#256DB5','#3FADD0'],skin:['#FFD7B5','#F1AC82','#C97954']},
-  database:{stroke:['#123B5A','#0EA5B7','#65E0C2'],fill:['#102C4E','#116C91','#087E78'],accent:['#D0FFF1','#65E6CF','#18B6A5']},
+  cpu:{stroke:['#14213D','#1D4ED8'],fill:['#0F172A','#1E3A8A'],accent:['#CFFAFE','#38BDF8','#06B6D4']},
+  engineer:{stroke:['#17324D','#0F6476'],fill:['#FDE68A','#D97706'],accent:['#1D4ED8','#0F766E'],helmet:['#FFF1B8','#FACC15','#D97706'],helmetBand:['#FDE68A','#F59E0B'],face:['#FFE0C2','#F4AD82'],clothes:['#1D4ED8','#0F766E'],faceLine:['#A65B3D','#70412F'],helmetLine:['#92500A','#713F12'],clothesLine:['#143B62','#0B5363']},
+  database:{stroke:['#123B5A','#155E91'],fill:['#2563EB','#312E81'],accent:['#A5F3FC','#22D3EE']},
   helmet:{stroke:['#657386','#DCE5EE','#8D9BAD'],fill:['#FFFFFF','#E5EBF2','#AAB6C5'],accent:['#F9FCFF','#CFD8E3','#8492A5']},
   layers:{stroke:['#F0444C','#3295D9','#6658DA','#F28A19'],fill:['#F0444C','#3295D9','#6658DA','#F28A19'],accent:['#FF9A42','#5B62E8','#F0444C']}
 };
@@ -1741,24 +1741,47 @@ function icon(name,size=16){
  if(!palette)return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
  const id='app-icon-'+(++iconRenderSequence);
  const stops=colors=>colors.map((color,index)=>'<stop offset="'+(index/(colors.length-1)*100)+'%" stop-color="'+color+'"/>').join('');
- const defs='<defs><linearGradient id="'+id+'-stroke" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.stroke)+'</linearGradient><linearGradient id="'+id+'-fill" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.fill)+'</linearGradient><linearGradient id="'+id+'-accent" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.accent)+'</linearGradient><linearGradient id="'+id+'-metal" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#64748B"/><stop offset="24%" stop-color="#FFFFFF"/><stop offset="48%" stop-color="#A8B4C3"/><stop offset="72%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#64748B"/></linearGradient>'+(palette.skin?'<linearGradient id="'+id+'-skin" x1="0%" y1="0%" x2="100%" y2="100%">'+stops(palette.skin)+'</linearGradient>':'')+'</defs>';
+ const gradient=(key,colors,x2='100%',y2='100%')=>'<linearGradient id="'+id+'-'+key+'" x1="0%" y1="0%" x2="'+x2+'" y2="'+y2+'">'+stops(colors)+'</linearGradient>';
+ const defs='<defs>'+gradient('stroke',palette.stroke)+gradient('fill',palette.fill)+gradient('accent',palette.accent)+
+  gradient('metal',['#64748B','#F8FAFC','#94A3B8'],'100%','0%')+
+  (palette.helmet?gradient('helmet',palette.helmet):'')+
+  (palette.helmetBand?gradient('helmetBand',palette.helmetBand):'')+
+  (palette.face?gradient('face',palette.face):'')+
+  (palette.clothes?gradient('clothes',palette.clothes):'')+
+  (palette.faceLine?gradient('faceLine',palette.faceLine):'')+
+  (palette.helmetLine?gradient('helmetLine',palette.helmetLine):'')+
+  (palette.clothesLine?gradient('clothesLine',palette.clothesLine):'')+
+  '</defs>';
  let body=paths;
  if(name==='compass'){
   body=body.replace('<circle cx="12" cy="12" r="10"/>','<circle cx="12" cy="12" r="10" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
-  body=body.replace('<path d="m16.2 7.8-2.7 5.7-5.7 2.7 2.7-5.7z"/>','<path d="m16.2 7.8-2.7 5.7-5.7 2.7 2.7-5.7z" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/>');
+  body=body.replace('<path d="m16.2 7.8-2.7 5.7-5.7 2.7 2.7-5.7z"/>','<path d="m16.2 7.8-2.7 5.7-5.7 2.7 2.7-5.7z" fill="url(#'+id+'-accent)" stroke="#9F1239" stroke-width="1"/>');
  }else if(name==='wrench'){
   body=body.replace('<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z"/>','<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z" fill="url(#'+id+'-metal)" stroke="url(#'+id+'-stroke)" stroke-width="1.35"/>');
  }else if(name==='cpu'){
   body=body.replace('<rect x="5" y="5" width="14" height="14" rx="2"/>','<rect x="5" y="5" width="14" height="14" rx="2" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
-  body=body.replace('<path d="M9 9h6v6H9zM9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/>','<path d="M9 9h6v6H9z" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/>');
+  body=body.replace('<path d="M9 9h6v6H9zM9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/>','<path d="M9 9h6v6H9z" fill="url(#'+id+'-accent)" stroke="#A5F3FC" stroke-width=".8"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4" fill="none" stroke="url(#'+id+'-metal)" stroke-width="1.3"/>');
  }else if(name==='engineer'){
-  body=body.replace('<path d="M5.6 8.1C6 5 8.1 3.2 10 2.8V4.2h.7V2.7h2.6v1.5h.7V2.8c1.9.4 4 2.2 4.4 5.3l.6.9-2.8 1.2H7.8L5 9Z"/>','<path d="M5.6 8.1C6 5 8.1 3.2 10 2.8V4.2h.7V2.7h2.6v1.5h.7V2.8c1.9.4 4 2.2 4.4 5.3l.6.9-2.8 1.2H7.8L5 9Z" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
-  body=body.replace('<path d="M5.6 8.1 4.8 9.2l3 1.5h8.4l3-1.5-.8-1.1"/>','<path d="M5.6 8.1 4.8 9.2l3 1.5h8.4l3-1.5-.8-1.1" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
-  body=body.replace('<path d="M4.8 9.1 7 10.9v1.2c0 3.1 2 5.3 5 5.3s5-2.2 5-5.3v-1.2l2.2-1.8"/>','<path d="M4.8 9.1 7 10.9v1.2c0 3.1 2 5.3 5 5.3s5-2.2 5-5.3v-1.2l2.2-1.8" fill="url(#'+id+'-skin)" stroke="url(#'+id+'-stroke)"/>');
-  body=body.replace('<path d="M8.1 17.2 12 20.3l3.9-3.1c4.1.8 6.1 3.2 6.6 5.8h-21c.5-2.6 2.5-5 6.6-5.8Z"/>','<path d="M8.1 17.2 12 20.3l3.9-3.1c4.1.8 6.1 3.2 6.6 5.8h-21c.5-2.6 2.5-5 6.6-5.8Z" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/>');
+  const shapePaths=paths.match(/<path d="[^"]+"\/>/g)||[];
+  if(shapePaths.length===4){
+   const styledPath=(path,fillKey,lineKey,width)=>path.replace(/\/>$/,' fill="url(#'+id+'-'+fillKey+')" stroke="url(#'+id+'-'+lineKey+')" stroke-width="'+width+'"/>');
+   body=[
+    styledPath(shapePaths[3],'clothes','clothesLine','1.15'),
+    styledPath(shapePaths[2],'face','faceLine','.9'),
+    styledPath(shapePaths[0],'helmet','helmetLine','1.05'),
+    styledPath(shapePaths[1],'helmetBand','helmetLine','.85')
+   ].join('');
+  }
  }else if(name==='database'){
-  body='<path d="M4 5c0-1.7 3.6-3 8-3s8 1.3 8 3v14c0 1.7-3.6 3-8 3s-8-1.3-8-3V5Z" fill="url(#'+id+'-fill)" stroke="none"/>'+body;
-  body=body.replace('<ellipse cx="12" cy="5" rx="8" ry="3"/>','<ellipse cx="12" cy="5" rx="8" ry="3" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/>');
+  const pathMatch=paths.match(/<path d="([^"]+)"\/>/);
+  const middleStart=pathMatch?pathMatch[1].indexOf('M4 12'):-1;
+  if(pathMatch&&middleStart>0){
+   const cylinderPath=pathMatch[1].slice(0,middleStart);
+   const middleRingPath=pathMatch[1].slice(middleStart);
+   body='<path d="'+cylinderPath+'" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)" stroke-width="1.35"/>'+
+    '<ellipse cx="12" cy="5" rx="8" ry="3" fill="url(#'+id+'-accent)" stroke="#0E7490" stroke-width="1.1"/>'+
+    '<path d="'+middleRingPath+'" fill="none" stroke="#67E8F9" stroke-width="1.2"/>';
+  }
  }else if(name==='helmet'){
   body=body.replace('<path d="M3.8 13.2v-1.5a8.2 8.2 0 0 1 16.4 0v1.5"/>','<path d="M3.8 13.2v-1.5a8.2 8.2 0 0 1 16.4 0v1.5Z" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)"/>');
   body=body.replace('<path d="M2 13.2h20c.6 0 1 .4 1 1v.6c0 1.2-1 2.2-2.2 2.2H3.2C2 17 1 16 1 14.8v-.6c0-.6.4-1 1-1Z"/>','<path d="M2 13.2h20c.6 0 1 .4 1 1v.6c0 1.2-1 2.2-2.2 2.2H3.2C2 17 1 16 1 14.8v-.6c0-.6.4-1 1-1Z" fill="url(#'+id+'-accent)" stroke="url(#'+id+'-stroke)"/>');

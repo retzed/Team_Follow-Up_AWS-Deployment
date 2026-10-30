@@ -106,10 +106,21 @@ for (const name of ['compass','wrench','cpu','engineer','database','helmet','lay
   assert.ok(output.includes(name+':{stroke:['), `color palette is defined for ${name}`);
 }
 assert.ok(output.includes("wrench:{stroke:['#536477','#DCE5EF','#77879B']"), 'Wrench uses a silver/chrome palette');
-assert.ok(output.includes("compass:{stroke:['#35465B','#AEBCCB','#405873']") && output.includes("accent:['#E11D48','#F97316','#FBBF24']"), 'Compass uses a metallic dial and a red/orange directional needle');
-assert.ok(output.includes("cpu:{stroke:['#102A56','#1479C9','#35D4CF']") && output.includes("accent:['#B7F7FF','#43DCEB','#28B7D4']"), 'CPU uses a dark silicon body with bright electronic circuitry');
-assert.ok(output.includes("engineer:{stroke:['#594015','#C78A22','#31557A']") && output.includes("skin:['#FFD7B5','#F1AC82','#C97954']"), 'Engineer uses a safety-yellow hard hat, blue clothing, and a warm face tone');
-assert.ok(output.includes("database:{stroke:['#123B5A','#0EA5B7','#65E0C2']") && output.includes("accent:['#D0FFF1','#65E6CF','#18B6A5']"), 'Database uses deep teal-blue with bright aqua data highlights');
+assert.ok(output.includes("compass:{stroke:['#173B56','#0F6B7B']") && output.includes("accent:['#F97316','#E11D48']"), 'Compass uses a nautical blue dial with a warm directional needle');
+assert.ok(output.includes("cpu:{stroke:['#14213D','#1D4ED8']") && output.includes("accent:['#CFFAFE','#38BDF8','#06B6D4']"), 'CPU uses a graphite-indigo package with an electric cyan die');
+assert.ok(output.includes("engineer:{stroke:['#17324D','#0F6476']") && output.includes("helmet:['#FFF1B8','#FACC15','#D97706']") && output.includes("clothes:['#1D4ED8','#0F766E']"), 'Engineer uses separate safety-yellow, skin-tone, and blue/teal workwear ramps');
+assert.ok(output.includes("database:{stroke:['#123B5A','#155E91']") && output.includes("accent:['#A5F3FC','#22D3EE']"), 'Database uses a modern blue-indigo cylinder with aqua data rings');
+const iconRendererStart=output.indexOf('function icon(name,size=16){');
+const iconRendererEnd=output.indexOf('\\nfunction ',iconRendererStart);
+const engineerRenderer=output.slice(iconRendererStart,iconRendererEnd);
+assert.ok(engineerRenderer.includes("const shapePaths=paths.match") && engineerRenderer.includes("shapePaths.length===4") &&
+          engineerRenderer.includes("styledPath(shapePaths[3],'clothes','clothesLine'") &&
+          engineerRenderer.includes("styledPath(shapePaths[2],'face','faceLine'") &&
+          engineerRenderer.includes("styledPath(shapePaths[0],'helmet','helmetLine'"),
+  'Engineer keeps its four original paths separate and paints body, face, helmet, and brim in correct layer order');
+assert.ok(engineerRenderer.includes("const cylinderPath=pathMatch[1].slice(0,middleStart)") &&
+          engineerRenderer.includes("fill=\\"none\\" stroke=\\"#67E8F9\\""),
+  'Database body fill and internal separator render as separate vector paths');
 assert.ok(!output.slice(output.indexOf('const ICON_PALETTES = {'), output.indexOf('let iconRenderSequence')).includes('crown:{'), 'Crown is removed from the color palette and returns to its original currentColor outline');
 assert.ok(!output.slice(output.indexOf('function icon(name,size=16)'), output.indexOf('\nfunction ', output.indexOf('function icon(name,size=16)'))).includes("name==='crown'") && output.includes("crown:'<path d=\"m3 7 5 5 4-8 4 8 5-5-2 12H5L3 7Z\"/><path d=\"M5 22h14\"/>"), 'Crown uses its untouched original shape without a special fill override');
 assert.ok(output.includes("layers:{stroke:['#F0444C','#3295D9','#6658DA','#F28A19']"), 'Layers uses the former logo color palette');

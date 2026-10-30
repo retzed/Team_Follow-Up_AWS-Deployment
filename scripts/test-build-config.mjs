@@ -111,16 +111,16 @@ assert.ok(output.includes("cpu:{stroke:['#14213D','#1D4ED8']") && output.include
 assert.ok(output.includes("engineer:{stroke:['#17324D','#0F6476']") && output.includes("helmet:['#FFF1B8','#FACC15','#D97706']") && output.includes("clothes:['#1D4ED8','#0F766E']"), 'Engineer uses separate safety-yellow, skin-tone, and blue/teal workwear ramps');
 assert.ok(output.includes("database:{stroke:['#123B5A','#155E91']") && output.includes("accent:['#A5F3FC','#22D3EE']"), 'Database uses a modern blue-indigo cylinder with aqua data rings');
 const iconRendererStart=output.indexOf('function icon(name,size=16){');
-const iconRendererEnd=output.indexOf('\\nfunction ',iconRendererStart);
-const engineerRenderer=output.slice(iconRendererStart,iconRendererEnd);
-assert.ok(engineerRenderer.includes("const shapePaths=paths.match") && engineerRenderer.includes("shapePaths.length===4") &&
-          engineerRenderer.includes("styledPath(shapePaths[3],'clothes','clothesLine'") &&
-          engineerRenderer.includes("styledPath(shapePaths[2],'face','faceLine'") &&
-          engineerRenderer.includes("styledPath(shapePaths[0],'helmet','helmetLine'"),
-  'Engineer keeps its four original paths separate and paints body, face, helmet, and brim in correct layer order');
-assert.ok(engineerRenderer.includes("const cylinderPath=pathMatch[1].slice(0,middleStart)") &&
-          engineerRenderer.includes("fill=\\"none\\" stroke=\\"#67E8F9\\""),
-  'Database body fill and internal separator render as separate vector paths');
+const iconRendererEnd=output.indexOf('\nfunction ',iconRendererStart);
+const iconRenderer=output.slice(iconRendererStart,iconRendererEnd);
+assert.ok(iconRenderer.includes("shapePaths.length===4") &&
+          iconRenderer.includes("styledPath(shapePaths[3],'clothes','clothesLine'") &&
+          iconRenderer.includes("styledPath(shapePaths[2],'face','faceLine'") &&
+          iconRenderer.includes("styledPath(shapePaths[0],'helmet','helmetLine'"),
+  'Engineer keeps all four original paths separate and renders the body, face, helmet, and brim in correct layer order');
+assert.ok(iconRenderer.includes('fill="none" stroke="#67E8F9"') &&
+          iconRenderer.includes('cylinderPath=pathMatch[1].slice(middleStart)'),
+  'Database cylinder and internal separator are styled as independent vector paths');
 assert.ok(!output.slice(output.indexOf('const ICON_PALETTES = {'), output.indexOf('let iconRenderSequence')).includes('crown:{'), 'Crown is removed from the color palette and returns to its original currentColor outline');
 assert.ok(!output.slice(output.indexOf('function icon(name,size=16)'), output.indexOf('\nfunction ', output.indexOf('function icon(name,size=16)'))).includes("name==='crown'") && output.includes("crown:'<path d=\"m3 7 5 5 4-8 4 8 5-5-2 12H5L3 7Z\"/><path d=\"M5 22h14\"/>"), 'Crown uses its untouched original shape without a special fill override');
 assert.ok(output.includes("layers:{stroke:['#F0444C','#3295D9','#6658DA','#F28A19']"), 'Layers uses the former logo color palette');

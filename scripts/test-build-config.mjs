@@ -106,10 +106,10 @@ for (const name of ['compass','wrench','cpu','engineer','database','helmet','lay
   assert.ok(output.includes(name+':{stroke:['), `color palette is defined for ${name}`);
 }
 assert.ok(output.includes("wrench:{stroke:['#536477','#DCE5EF','#77879B']"), 'Wrench uses a silver/chrome palette');
-assert.ok(output.includes("compass:{stroke:['#173B56','#0F6B7B']") && output.includes("accent:['#F97316','#E11D48']"), 'Compass uses a nautical blue dial with a warm directional needle');
-assert.ok(output.includes("cpu:{stroke:['#14213D','#1D4ED8']") && output.includes("accent:['#CFFAFE','#38BDF8','#06B6D4']"), 'CPU uses a graphite-indigo package with an electric cyan die');
+assert.ok(output.includes("compass:{stroke:['#2563EB','#0F766E']") && output.includes("accent:['#FB923C','#E11D48']"), 'Compass uses a nautical blue dial with a warm directional needle');
+assert.ok(output.includes("cpu:{stroke:['#60A5FA','#22D3EE']") && output.includes("fill:['#334155','#0F172A']") && output.includes("accent:['#CFFAFE','#38BDF8','#06B6D4']"), 'CPU uses a graphite-indigo package with an electric cyan die');
 assert.ok(output.includes("engineer:{stroke:['#17324D','#0F6476']") && output.includes("helmet:['#FFF1B8','#FACC15','#D97706']") && output.includes("clothes:['#1D4ED8','#0F766E']"), 'Engineer uses separate safety-yellow, skin-tone, and blue/teal workwear ramps');
-assert.ok(output.includes("database:{stroke:['#123B5A','#155E91']") && output.includes("accent:['#A5F3FC','#22D3EE']"), 'Database uses a modern blue-indigo cylinder with aqua data rings');
+assert.ok(output.includes("database:{stroke:['#3B82F6','#0F766E']") && output.includes("accent:['#A5F3FC','#22D3EE']"), 'Database uses a modern blue-indigo cylinder with aqua data rings');
 const iconRendererStart=output.indexOf('function icon(name,size=16){');
 const iconRendererEnd=output.indexOf('\nfunction ',iconRendererStart);
 const iconRenderer=output.slice(iconRendererStart,iconRendererEnd);
@@ -119,7 +119,7 @@ assert.ok(iconRenderer.includes("shapePaths.length===4") &&
           iconRenderer.includes("styledPath(shapePaths[0],'helmet','helmetLine'"),
   'Engineer keeps all four original paths separate and renders the body, face, helmet, and brim in correct layer order');
 assert.ok(iconRenderer.includes('fill="none" stroke="#67E8F9"') &&
-          iconRenderer.includes('cylinderPath=pathMatch[1].slice(middleStart)'),
+          iconRenderer.includes('middleRingPath=pathMatch[1].slice(middleStart)'),
   'Database cylinder and internal separator are styled as independent vector paths');
 assert.ok(!output.slice(output.indexOf('const ICON_PALETTES = {'), output.indexOf('let iconRenderSequence')).includes('crown:{'), 'Crown is removed from the color palette and returns to its original currentColor outline');
 assert.ok(!output.slice(output.indexOf('function icon(name,size=16)'), output.indexOf('\nfunction ', output.indexOf('function icon(name,size=16)'))).includes("name==='crown'") && output.includes("crown:'<path d=\"m3 7 5 5 4-8 4 8 5-5-2 12H5L3 7Z\"/><path d=\"M5 22h14\"/>"), 'Crown uses its untouched original shape without a special fill override');

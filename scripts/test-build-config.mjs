@@ -101,7 +101,7 @@ assert.equal(valid.status, 0, `AWS-configured build should succeed: ${valid.stde
 const output = await readFile('dist/index.html', 'utf8');
 assert.ok(output.includes("$('#workspaceEyebrow').hidden=ui.page==='account';"), 'account page hides the duplicate MY ACCOUNT eyebrow while keeping the bold title');
 assert.ok(output.includes("cpu:'CPU'"), 'CPU profile-icon label uses the standard uppercase spelling');
-assert.ok(output.includes('M12 11.65c-2.5 0-4.25-2.02-4.25-4.62') && !output.includes('M8.15 5.95') && output.includes('M9.05 11.25v1.12') && output.includes('C4.25 15.9 3 17.55 3 19.72V21h18v-1.28') && !output.includes('m9.25 14.18 2.75 2.27') && !output.includes('M4 21v-2a8 8 0 0 1 16 0v2'), 'User icon keeps its clean original head contour with the refined neck and shoulder silhouette, without hairline or collar details');
+assert.ok(output.includes("user:'<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21v-2a8 8 0 0 1 16 0v2\"/>',") && output.includes("'profile-user':'<path d=\"M12 11.65c-2.5 0-4.25-2.02") && output.includes("{value:'profile-user'}") && !output.includes("{value:'user'}") && output.includes("const profileName=name==='user'?'profile-user':name") && output.includes("raw.icon||roleIcons[raw.role]||'profile-user'") && output.includes("${icon('user',14)}"), 'The original User glyph is reserved for UI controls; the refined bust is a profile-only option with legacy user values mapped to it');
 assert.ok(output.includes('const ICON_PALETTES = {'), 'profile icons use dedicated color palettes while retaining their source SVG paths');
 for (const name of ['wrench','database','helmet','layers']) {
   assert.ok(output.includes(name+':{stroke:['), `color palette is defined for ${name}`);

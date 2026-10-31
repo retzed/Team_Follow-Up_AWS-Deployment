@@ -1727,10 +1727,9 @@ const ICONS = {
   spinner:'<path d="M21 12a9 9 0 1 1-6.2-8.56"/>',
 };
 const ICON_PALETTES = {
-  compass:{stroke:['#60A5FA','#0E7490'],fill:['#0B1B35','#143C63','#0C5D73'],accent:['#FDBA74','#F97316','#DC2626']},
   wrench:{stroke:['#536477','#DCE5EF','#77879B'],fill:['#F8FAFC','#C7D2DF','#718096'],accent:['#FFFFFF','#E8EEF5','#8D9BAE']},
-  cpu:{stroke:['#64748B','#60A5FA','#22D3EE'],fill:['#111827','#1E293B','#334155'],accent:['#BAF7FF','#22D3EE','#0284C7']},
-  engineer:{stroke:['#8A4B08','#D97706','#164E63'],fill:['#FFF7D6','#FDE68A','#D97706'],accent:['#2563EB','#0F766E'],helmet:['#FFF4C2','#FACC15','#D97706'],helmetLine:['#A16207','#854D0E'],face:['#FFE0C2','#F2B18B'],faceLine:['#A65B3D','#7C3F27'],clothes:['#2563EB','#0F766E'],clothesLine:['#173B63','#0B4F5A']},
+  cpu:{stroke:['#64748B','#3B82F6','#22D3EE'],fill:['#111827','#1E293B','#334155'],accent:['#CFFAFE','#38BDF8','#0EA5E9'],pins:['#64748B','#E2E8F0','#94A3B8']},
+  engineer:{stroke:['#1E3A8A','#0F766E'],fill:['#FFF7D6','#FDE68A','#D97706'],accent:['#2563EB','#0F766E'],helmet:['#FFF4C2','#FACC15','#D97706'],helmetBand:['#FDE68A','#F59E0B'],helmetLine:['#A16207','#854D0E'],face:['#FFE0C2','#F2B18B'],faceLine:['#A65B3D','#7C3F27'],clothes:['#1E40AF','#0F766E'],clothesLine:['#1E3A8A','#115E59'],clothesHighlight:['#93C5FD','#2DD4BF']},
   database:{stroke:['#3B82F6','#0F766E'],fill:['#2563EB','#312E81'],accent:['#A5F3FC','#22D3EE']},
   helmet:{stroke:['#657386','#DCE5EE','#8D9BAD'],fill:['#FFFFFF','#E5EBF2','#AAB6C5'],accent:['#F9FCFF','#CFD8E3','#8492A5']},
   layers:{stroke:['#F0444C','#3295D9','#6658DA','#F28A19'],fill:['#F0444C','#3295D9','#6658DA','#F28A19'],accent:['#FF9A42','#5B62E8','#F0444C']}
@@ -1745,45 +1744,40 @@ function icon(name,size=16){
  const defs='<defs>'+gradient('stroke',palette.stroke)+gradient('fill',palette.fill)+gradient('accent',palette.accent)+
   gradient('metal',['#64748B','#F8FAFC','#94A3B8'],'100%','0%')+
   (palette.helmet?gradient('helmet',palette.helmet):'')+
+  (palette.helmetBand?gradient('helmetBand',palette.helmetBand):'')+
   (palette.helmetLine?gradient('helmetLine',palette.helmetLine):'')+
   (palette.face?gradient('face',palette.face):'')+
   (palette.faceLine?gradient('faceLine',palette.faceLine):'')+
   (palette.clothes?gradient('clothes',palette.clothes):'')+
   (palette.clothesLine?gradient('clothesLine',palette.clothesLine):'')+
+  (palette.clothesHighlight?gradient('clothesHighlight',palette.clothesHighlight):'')+
   '</defs>';
  let body=paths;
- if(name==='compass'){
-  body=
-   '<circle cx="12" cy="12" r="9.45" fill="#08182F" stroke="url(#'+id+'-stroke)" stroke-width="1.15"/>'+
-   '<circle cx="12" cy="12" r="7.85" fill="url(#'+id+'-fill)" stroke="#7DD3FC" stroke-opacity=".82" stroke-width=".65"/>'+
-   '<circle cx="12" cy="12" r="6.75" fill="none" stroke="#BAE6FD" stroke-opacity=".28" stroke-width=".38"/>'+
-   '<path d="M12 4.8v1.15M19.2 12h-1.15M12 19.2v-1.15M4.8 12h1.15" fill="none" stroke="#D8F1FF" stroke-opacity=".9" stroke-width=".8" stroke-linecap="round"/>'+
-   '<path d="M12 5.25 14.95 12 12 10.72Z" fill="url(#'+id+'-accent)" stroke="#FDBA74" stroke-width=".55" stroke-linejoin="round"/>'+
-   '<path d="M12 18.75 9.05 12 12 13.28Z" fill="#D8F3FF" stroke="#60A5FA" stroke-width=".55" stroke-linejoin="round"/>'+
-   '<circle cx="12" cy="12" r="1.38" fill="#F8FAFC" stroke="#38BDF8" stroke-width=".65"/>'+
-   '<path d="M7.05 7.5A6.35 6.35 0 0 1 11 5.72" fill="none" stroke="#FFFFFF" stroke-opacity=".28" stroke-width=".65" stroke-linecap="round"/>';
- }else if(name==='wrench'){
+ if(name==='wrench'){
   body=body.replace('<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z"/>','<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z" fill="url(#'+id+'-metal)" stroke="url(#'+id+'-stroke)" stroke-width="1.35"/>');
  }else if(name==='cpu'){
   body=
-   '<path d="M8 2.15v2.25M12 2.15v2.25M16 2.15v2.25M8 19.6v2.25M12 19.6v2.25M16 19.6v2.25M2.15 8h2.25M2.15 12h2.25M2.15 16h2.25M19.6 8h2.25M19.6 12h2.25M19.6 16h2.25" fill="none" stroke="url(#'+id+'-metal)" stroke-width="1.35" stroke-linecap="round"/>'+
-   '<rect x="4.65" y="4.65" width="14.7" height="14.7" rx="2.35" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)" stroke-width="1.25"/>'+
-   '<rect x="6.35" y="6.35" width="11.3" height="11.3" rx="1.55" fill="#0B172A" stroke="#64748B" stroke-opacity=".72" stroke-width=".55"/>'+
-   '<rect x="8.45" y="8.45" width="7.1" height="7.1" rx="1.05" fill="url(#'+id+'-accent)" stroke="#A5F3FC" stroke-width=".7"/>'+
-   '<rect x="10.3" y="10.3" width="3.4" height="3.4" rx=".45" fill="#0E7490" stroke="#CFFAFE" stroke-width=".48"/>'+
-   '<path d="M11 11.2h2M11 12.8h2M12 11v2" fill="none" stroke="#ECFEFF" stroke-opacity=".9" stroke-width=".45" stroke-linecap="round"/>'+
-   '<path d="M7.2 7.2h2M7.2 7.2v2M16.8 7.2h-2M16.8 7.2v2M7.2 16.8h2M7.2 16.8v-2M16.8 16.8h-2M16.8 16.8v-2" fill="none" stroke="#93C5FD" stroke-opacity=".72" stroke-width=".55" stroke-linecap="round"/>'+
-   '<path d="M6.2 5.8h4" stroke="#FFFFFF" stroke-opacity=".35" stroke-width=".55" stroke-linecap="round"/>';
+   '<path d="M7.2 1.65v2.5M10.4 1.65v2.5M13.6 1.65v2.5M16.8 1.65v2.5M7.2 19.85v2.5M10.4 19.85v2.5M13.6 19.85v2.5M16.8 19.85v2.5M1.65 7.2h2.5M1.65 10.4h2.5M1.65 13.6h2.5M1.65 16.8h2.5M19.85 7.2h2.5M19.85 10.4h2.5M19.85 13.6h2.5M19.85 16.8h2.5" fill="none" stroke="url(#'+id+'-metal)" stroke-width="1.25" stroke-linecap="round"/>'+
+   '<rect x="4.25" y="4.25" width="15.5" height="15.5" rx="2.55" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)" stroke-width="1.25"/>'+
+   '<rect x="5.95" y="5.95" width="12.1" height="12.1" rx="1.7" fill="#0B1424" stroke="#64748B" stroke-opacity=".8" stroke-width=".6"/>'+
+   '<path d="M7.15 7.55h2.25M7.15 7.55v2.15M16.85 7.55H14.6M16.85 7.55v2.15M7.15 16.45h2.25M7.15 16.45V14.3M16.85 16.45H14.6M16.85 16.45V14.3" fill="none" stroke="#60A5FA" stroke-opacity=".85" stroke-width=".65" stroke-linecap="round"/>'+
+   '<rect x="8.05" y="8.05" width="7.9" height="7.9" rx="1.2" fill="url(#'+id+'-accent)" stroke="#A5F3FC" stroke-width=".72"/>'+
+   '<rect x="9.75" y="9.75" width="4.5" height="4.5" rx=".72" fill="#0E334F" stroke="#CFFAFE" stroke-width=".62"/>'+
+   '<path d="M10.75 11.2h2.5M10.75 12.8h2.5M12 10.75v2.5" fill="none" stroke="#ECFEFF" stroke-width=".55" stroke-linecap="round"/>'+
+   '<circle cx="9.05" cy="9.05" r=".42" fill="#FFFFFF" fill-opacity=".85"/><circle cx="14.95" cy="9.05" r=".42" fill="#FFFFFF" fill-opacity=".85"/><circle cx="9.05" cy="14.95" r=".42" fill="#FFFFFF" fill-opacity=".55"/><circle cx="14.95" cy="14.95" r=".42" fill="#FFFFFF" fill-opacity=".55"/>'+
+   '<path d="M5.2 5.2h4.1" fill="none" stroke="#FFFFFF" stroke-opacity=".38" stroke-width=".62" stroke-linecap="round"/>;
  }else if(name==='engineer'){
   body=
-   '<path d="M2.2 22c.38-3.18 2.25-5.05 5.72-5.78 1.08 1.05 2.45 1.62 4.08 1.62s3-.57 4.08-1.62c3.47.73 5.34 2.6 5.72 5.78Z" fill="url(#'+id+'-clothes)" stroke="url(#'+id+'-clothesLine)" stroke-width="1.05" stroke-linejoin="round"/>'+
-   '<path d="m8.45 16.85 3.55 3.05 3.55-3.05M12 19.9v2" fill="none" stroke="#DCEAFE" stroke-opacity=".9" stroke-width=".78" stroke-linecap="round" stroke-linejoin="round"/>'+
-   '<path d="M7.05 9.15v3.05c0 2.85 2.08 5.02 4.95 5.02s4.95-2.17 4.95-5.02V9.15c0-2.35-2.08-3.92-4.95-3.92S7.05 6.8 7.05 9.15Z" fill="url(#'+id+'-face)" stroke="url(#'+id+'-faceLine)" stroke-width=".9"/>'+
-   '<path d="M9.25 12.05h.01M14.74 12.05h.01M10.25 14.1c.95.72 2.55.72 3.5 0" fill="none" stroke="#7C3F27" stroke-width=".72" stroke-linecap="round"/>'+
-   '<path d="M4.8 9.2V7.7c0-3.55 3.12-5.95 7.2-5.95s7.2 2.4 7.2 5.95v1.5Z" fill="url(#'+id+'-helmet)" stroke="url(#'+id+'-helmetLine)" stroke-width="1.05" stroke-linejoin="round"/>'+
-   '<path d="M3.35 8.65h17.3v1.2c0 .88-.72 1.6-1.6 1.6H4.95c-.88 0-1.6-.72-1.6-1.6Z" fill="url(#'+id+'-helmetBand)" stroke="url(#'+id+'-helmetLine)" stroke-width=".92" stroke-linejoin="round"/>'+
-   '<path d="M12 2.25v5.95M7.1 5.1c.85-1.15 2.2-1.88 3.72-2.12" fill="none" stroke="#FFFFFF" stroke-opacity=".7" stroke-width=".72" stroke-linecap="round"/>'+
-   '<path d="M5 9.2h14" fill="none" stroke="#FFF7D6" stroke-opacity=".8" stroke-width=".48" stroke-linecap="round"/>';
+   '<path d="M2.15 22.2c.35-2.75 1.9-4.48 5.08-5.43l2.55-.78 2.22 2.32 2.22-2.32 2.55.78c3.18.95 4.73 2.68 5.08 5.43Z" fill="url(#'+id+'-clothes)" stroke="url(#'+id+'-clothesLine)" stroke-width="1.05" stroke-linejoin="round"/>'+
+   '<path d="m8.95 16.35 3.05 2.95 3.05-2.95M12 19.3v2.45" fill="none" stroke="url(#'+id+'-clothesHighlight)" stroke-width=".85" stroke-linecap="round" stroke-linejoin="round"/>'+
+   '<path d="M7.1 9.4v2.9c0 2.9 2.08 5.05 4.9 5.05s4.9-2.15 4.9-5.05V9.4c0-2.32-2.05-3.85-4.9-3.85S7.1 7.08 7.1 9.4Z" fill="url(#'+id+'-face)" stroke="url(#'+id+'-faceLine)" stroke-width=".9"/>'+
+   '<path d="M9.15 12.35h.18M14.67 12.35h.18M10.35 14.25c.85.62 2.45.62 3.3 0" fill="none" stroke="#7C3F27" stroke-width=".76" stroke-linecap="round"/>'+
+   '<path d="M4.55 8.85V7.55c0-3.55 3.18-5.9 7.45-5.9s7.45 2.35 7.45 5.9v1.3Z" fill="url(#'+id+'-helmet)" stroke="url(#'+id+'-helmetLine)" stroke-width="1.05" stroke-linejoin="round"/>'+
+   '<path d="M3.1 8.55c0-.56.44-1 1-1h15.8c.56 0 1 .44 1 1v.55c0 .95-.77 1.72-1.72 1.72H4.82c-.95 0-1.72-.77-1.72-1.72Z" fill="url(#'+id+'-helmetBand)" stroke="url(#'+id+'-helmetLine)" stroke-width=".9" stroke-linejoin="round"/>'+
+   '<path d="M12 2.05v6.35M7.1 5.5c.82-1.25 2.18-2 3.8-2.3" fill="none" stroke="#FFFFFF" stroke-opacity=".78" stroke-width=".72" stroke-linecap="round"/>'+
+   '<path d="M5 8.95h14" fill="none" stroke="#FFF7D6" stroke-opacity=".82" stroke-width=".5" stroke-linecap="round"/>'+
+   '<path d="M5.55 19.35h3.1M15.35 19.35h3.1" fill="none" stroke="url(#'+id+'-clothesHighlight)" stroke-width=".85" stroke-linecap="round"/>'+
+   '<path d="M11.2 19.55h1.6" fill="none" stroke="#E0F2FE" stroke-width=".6" stroke-linecap="round"/>;
  }else if(name==='database'){
   const pathMatch=paths.match(/<path d="([^"]+)"\/>/);
   const middleStart=pathMatch?pathMatch[1].indexOf('M4 12'):-1;

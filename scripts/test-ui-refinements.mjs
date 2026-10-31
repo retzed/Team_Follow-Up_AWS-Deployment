@@ -252,6 +252,25 @@ const profileRoleArabicPos=html.indexOf('for="accountRoleArabic"');
 const profileIconPos=html.indexOf('for="accountIcon"');
 check(profileRolePos>=0 && profileRoleArabicPos>profileRolePos && profileIconPos>profileRoleArabicPos,
   'Profile Label fields remain adjacent with Profile icon as the final personal-detail field.');
+
+const accountIconRegistryStart=html.indexOf('const ACCOUNT_ICONS=[');
+const profileIconResolverStart=html.indexOf('function profileIconName(value)');
+const profileIconResolverEnd=html.indexOf('function rawCurrentUser()',profileIconResolverStart);
+const userAvatarStart=html.indexOf('function userAvatar(');
+const userAvatarEnd=html.indexOf('function roleLabel(',userAvatarStart);
+const accountIconRegistry=html.slice(accountIconRegistryStart,profileIconResolverStart);
+const profileIconResolver=html.slice(profileIconResolverStart,profileIconResolverEnd);
+const userAvatarSource=html.slice(userAvatarStart,userAvatarEnd);
+check(accountIconRegistryStart>=0 && profileIconResolverStart>accountIconRegistryStart &&
+      accountIconRegistry.includes("{value:'profile-user'}") && !accountIconRegistry.includes("{value:'user'}") &&
+      profileIconResolver.includes("const profileName=name==='user'?'profile-user':name") &&
+      profileIconResolver.includes(":'profile-user';") &&
+      userAvatarSource.includes("raw.icon||roleIcons[raw.role]||'profile-user'") &&
+      html.includes("user:'<circle cx=\"12\" cy=\"8\" r=\"4\"/>") &&
+      html.includes("'profile-user':'<path d=\"M12 11.65") &&
+      html.includes("${icon('user',14)}"),
+  'The generic User glyph stays in UI controls while profile avatars use the separate profile-user bust; old saved user values continue to render as the bust.');
+
 const personStart=html.indexOf('function person(id)');
 const personEnd=html.indexOf('function currentUser()',personStart);
 const personSource=html.slice(personStart,personEnd);

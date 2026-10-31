@@ -1735,6 +1735,7 @@ const ICON_PALETTES = {
 let iconRenderSequence=0;
 function icon(name,size=16){
  const paths=ICONS[name]||ICONS.grid,palette=ICON_PALETTES[name];
+ if(name==='engineer')return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
  if(!palette)return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
  const id='app-icon-'+(++iconRenderSequence);
  const stops=colors=>colors.map((color,index)=>'<stop offset="'+(index/(colors.length-1)*100)+'%" stop-color="'+color+'"/>').join('');

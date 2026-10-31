@@ -651,20 +651,25 @@ def restore_root_completion_positions(ordered, selected_roots, selected_under):
 
 
 PROFILE_PRIVILEGES = {"Administrator", "Editor", "User"}
-PROFILE_ICONS = {"user", "compass", "terminal", "shield", "briefcase", "wrench", "settings", "cpu", "clipboard", "search", "code", "database", "networking", "systems", "communications-engineering", "engineer", "wave", "monitor", "rocket", "crown", "badge-check", "cowboy-hat", "layers", "sparkles", "target", "graduation-cap"}
+PROFILE_ICONS = {"user", "profile-user", "compass", "terminal", "shield", "briefcase", "wrench", "settings", "cpu", "clipboard", "search", "code", "database", "networking", "systems", "communications-engineering", "engineer", "wave", "monitor", "rocket", "crown", "badge-check", "cowboy-hat", "layers", "sparkles", "target", "graduation-cap"}
 PROFILE_PREFERENCE_LANGS = {"en", "ar"}
 PROFILE_PREFERENCE_THEMES = {"light", "dark"}
 
 
 def public_team_user(row, include_private=False):
     """Shape a team profile for the browser without exposing private fields to the team list."""
+    profile_icon = str(row.get("icon") or "profile-user")
+    # Older profile rows used "user" for the generic UI glyph; keep their bust
+    # appearance when the browser now reserves "user" for interface controls.
+    if profile_icon == "user":
+        profile_icon = "profile-user"
     result = {
         "id": str(row.get("userId") or ""),
         "name": str(row.get("displayName") or row.get("name") or ""),
         "nameArabic": str(row.get("displayNameArabic") or row.get("nameArabic") or ""),
         "role": str(row.get("role") or row.get("label") or "Team member"),
         "roleArabic": str(row.get("roleArabic") or row.get("labelArabic") or ""),
-        "icon": str(row.get("icon") or "user"),
+        "icon": profile_icon,
         "privilege": str(row.get("privilege") or ("Administrator" if str(row.get("userId") or "") in {"u1", "root"} else "User")),
         "enabled": row.get("enabled", True) is not False,
     }

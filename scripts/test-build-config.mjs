@@ -145,7 +145,7 @@ assert.equal(config.apiBaseUrl, 'https://app-api.execute-api.us-east-1.amazonaws
 assert.ok(!('localAuth' in config), 'runtime config must not contain a local-auth switch');
 assert.ok(!('dataMode' in config), 'runtime config must not contain a database-mode switch');
 assert.ok(!('identityMap' in config.cognito), 'team identity must not be overridable by a browser-side map');
-const embeddedSvgImages = [...output.matchAll(/(?:src|href)="data:image\\/svg\\+xml;base64,([^"]+)"/g)]
+const embeddedSvgImages = [...output.matchAll(/(?:src|href)="data:image[.]svg[+]xml;base64,([^"]+)"/g)]
   .map(match => Buffer.from(match[1], 'base64').toString('utf8'));
 const deployedLogo = embeddedSvgImages.find(svg => svg.includes('viewBox="0 0 512 420"'));
 assert.ok(deployedLogo, 'AWS artifact embeds the application logo as SVG data');
@@ -156,7 +156,7 @@ assert.ok(deployedFavicon, 'AWS artifact embeds the SVG favicon as image data');
 assert.ok(deployedFavicon.includes('fill="#5b62e8"'), 'embedded favicon uses the same application purple accent');
 assert.ok(!deployedFavicon.includes('#102e50'), 'embedded favicon no longer uses the low-contrast navy');
 assert.ok(output.includes('href="data:image/png;base64,') && output.includes('href="data:image/x-icon;base64,'), 'AWS artifact embeds PNG and ICO favicon variants');
-assert.ok(!/(?:src|href)=["'](?:\\.\\/|\\/)?[^"']+\\.(?:svg|png|jpe?g|gif|webp|ico)(?:[?#][^"']*)?["']/i.test(output), 'AWS artifact has no external image-file dependencies');
+assert.ok(!/(?:src|href)=["'][^"']+[.](?:svg|png|jpe?g|gif|webp|ico)(?:[?#][^"']*)?["']/i.test(output), 'AWS artifact has no external image-file dependencies');
 
 const template = await readFile('backend/template.yaml', 'utf8');
 // SAM is optional, but its template must be a complete from-scratch automation reference.

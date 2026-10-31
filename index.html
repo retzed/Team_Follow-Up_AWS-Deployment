@@ -1728,8 +1728,7 @@ const ICONS = {
 };
 const ICON_PALETTES = {
   wrench:{stroke:['#536477','#DCE5EF','#77879B'],fill:['#F8FAFC','#C7D2DF','#718096'],accent:['#FFFFFF','#E8EEF5','#8D9BAE']},
-  cpu:{stroke:['#64748B','#3B82F6','#22D3EE'],fill:['#111827','#1E293B','#334155'],accent:['#CFFAFE','#38BDF8','#0EA5E9'],pins:['#64748B','#E2E8F0','#94A3B8']},
-  engineer:{stroke:['#1E3A8A','#0F766E'],fill:['#FFF7D6','#FDE68A','#D97706'],accent:['#2563EB','#0F766E'],helmet:['#FFF4C2','#FACC15','#D97706'],helmetBand:['#FDE68A','#F59E0B'],helmetLine:['#A16207','#854D0E'],face:['#FFE0C2','#F2B18B'],faceLine:['#A65B3D','#7C3F27'],clothes:['#1E40AF','#0F766E'],clothesLine:['#1E3A8A','#115E59'],clothesHighlight:['#93C5FD','#2DD4BF']},
+  engineer:{stroke:['#1E3A8A','#0F766E'],fill:['#FFF7D6','#FDE68A','#D97706'],accent:['#2563EB','#0F766E'],helmet:['#FFF4C2','#FACC15','#D97706'],helmetBand:['#FDE68A','#F59E0B'],helmetLine:['#A16207','#854D0E'],face:['#FFE0C2','#F2B18B'],faceLine:['#A65B3D','#7C3F27'],clothes:['#1E40AF','#0F766E'],clothesLine:['#1E3A8A','#115E59'],clothesHighlight:['#93C5FD','#2DD4BF']}
   database:{stroke:['#3B82F6','#0F766E'],fill:['#2563EB','#312E81'],accent:['#A5F3FC','#22D3EE']},
   helmet:{stroke:['#657386','#DCE5EE','#8D9BAD'],fill:['#FFFFFF','#E5EBF2','#AAB6C5'],accent:['#F9FCFF','#CFD8E3','#8492A5']},
   layers:{stroke:['#F0444C','#3295D9','#6658DA','#F28A19'],fill:['#F0444C','#3295D9','#6658DA','#F28A19'],accent:['#FF9A42','#5B62E8','#F0444C']}
@@ -1755,29 +1754,16 @@ function icon(name,size=16){
  let body=paths;
  if(name==='wrench'){
   body=body.replace('<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z"/>','<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z" fill="url(#'+id+'-metal)" stroke="url(#'+id+'-stroke)" stroke-width="1.35"/>');
- }else if(name==='cpu'){
-  body=
-   '<path d="M7.2 1.65v2.5M10.4 1.65v2.5M13.6 1.65v2.5M16.8 1.65v2.5M7.2 19.85v2.5M10.4 19.85v2.5M13.6 19.85v2.5M16.8 19.85v2.5M1.65 7.2h2.5M1.65 10.4h2.5M1.65 13.6h2.5M1.65 16.8h2.5M19.85 7.2h2.5M19.85 10.4h2.5M19.85 13.6h2.5M19.85 16.8h2.5" fill="none" stroke="url(#'+id+'-metal)" stroke-width="1.25" stroke-linecap="round"/>'+
-   '<rect x="4.25" y="4.25" width="15.5" height="15.5" rx="2.55" fill="url(#'+id+'-fill)" stroke="url(#'+id+'-stroke)" stroke-width="1.25"/>'+
-   '<rect x="5.95" y="5.95" width="12.1" height="12.1" rx="1.7" fill="#0B1424" stroke="#64748B" stroke-opacity=".8" stroke-width=".6"/>'+
-   '<path d="M7.15 7.55h2.25M7.15 7.55v2.15M16.85 7.55H14.6M16.85 7.55v2.15M7.15 16.45h2.25M7.15 16.45V14.3M16.85 16.45H14.6M16.85 16.45V14.3" fill="none" stroke="#60A5FA" stroke-opacity=".85" stroke-width=".65" stroke-linecap="round"/>'+
-   '<rect x="8.05" y="8.05" width="7.9" height="7.9" rx="1.2" fill="url(#'+id+'-accent)" stroke="#A5F3FC" stroke-width=".72"/>'+
-   '<rect x="9.75" y="9.75" width="4.5" height="4.5" rx=".72" fill="#0E334F" stroke="#CFFAFE" stroke-width=".62"/>'+
-   '<path d="M10.75 11.2h2.5M10.75 12.8h2.5M12 10.75v2.5" fill="none" stroke="#ECFEFF" stroke-width=".55" stroke-linecap="round"/>'+
-   '<circle cx="9.05" cy="9.05" r=".42" fill="#FFFFFF" fill-opacity=".85"/><circle cx="14.95" cy="9.05" r=".42" fill="#FFFFFF" fill-opacity=".85"/><circle cx="9.05" cy="14.95" r=".42" fill="#FFFFFF" fill-opacity=".55"/><circle cx="14.95" cy="14.95" r=".42" fill="#FFFFFF" fill-opacity=".55"/>'+
-   '<path d="M5.2 5.2h4.1" fill="none" stroke="#FFFFFF" stroke-opacity=".38" stroke-width=".62" stroke-linecap="round"/>';
  }else if(name==='engineer'){
   body=
    '<path d="M2.15 22.2c.35-2.75 1.9-4.48 5.08-5.43l2.55-.78 2.22 2.32 2.22-2.32 2.55.78c3.18.95 4.73 2.68 5.08 5.43Z" fill="url(#'+id+'-clothes)" stroke="url(#'+id+'-clothesLine)" stroke-width="1.05" stroke-linejoin="round"/>'+
-   '<path d="m8.95 16.35 3.05 2.95 3.05-2.95M12 19.3v2.45" fill="none" stroke="url(#'+id+'-clothesHighlight)" stroke-width=".85" stroke-linecap="round" stroke-linejoin="round"/>'+
-   '<path d="M7.1 9.4v2.9c0 2.9 2.08 5.05 4.9 5.05s4.9-2.15 4.9-5.05V9.4c0-2.32-2.05-3.85-4.9-3.85S7.1 7.08 7.1 9.4Z" fill="url(#'+id+'-face)" stroke="url(#'+id+'-faceLine)" stroke-width=".9"/>'+
-   '<path d="M9.15 12.35h.18M14.67 12.35h.18M10.35 14.25c.85.62 2.45.62 3.3 0" fill="none" stroke="#7C3F27" stroke-width=".76" stroke-linecap="round"/>'+
-   '<path d="M4.55 8.85V7.55c0-3.55 3.18-5.9 7.45-5.9s7.45 2.35 7.45 5.9v1.3Z" fill="url(#'+id+'-helmet)" stroke="url(#'+id+'-helmetLine)" stroke-width="1.05" stroke-linejoin="round"/>'+
-   '<path d="M3.1 8.55c0-.56.44-1 1-1h15.8c.56 0 1 .44 1 1v.55c0 .95-.77 1.72-1.72 1.72H4.82c-.95 0-1.72-.77-1.72-1.72Z" fill="url(#'+id+'-helmetBand)" stroke="url(#'+id+'-helmetLine)" stroke-width=".9" stroke-linejoin="round"/>'+
-   '<path d="M12 2.05v6.35M7.1 5.5c.82-1.25 2.18-2 3.8-2.3" fill="none" stroke="#FFFFFF" stroke-opacity=".78" stroke-width=".72" stroke-linecap="round"/>'+
-   '<path d="M5 8.95h14" fill="none" stroke="#FFF7D6" stroke-opacity=".82" stroke-width=".5" stroke-linecap="round"/>'+
-   '<path d="M5.55 19.35h3.1M15.35 19.35h3.1" fill="none" stroke="url(#'+id+'-clothesHighlight)" stroke-width=".85" stroke-linecap="round"/>'+
-   '<path d="M11.2 19.55h1.6" fill="none" stroke="#E0F2FE" stroke-width=".6" stroke-linecap="round"/>';
+   '<path d="m8.75 16.3 3.25 3.0 3.25-3.0M12 19.3v2.5" fill="none" stroke="url(#'+id+'-clothesHighlight)" stroke-width=".85" stroke-linecap="round" stroke-linejoin="round"/>'+
+   '<path d="M7.15 10.15v2.25c0 2.85 2.05 4.95 4.85 4.95s4.85-2.1 4.85-4.95v-2.25c0-1.9-1.95-3.1-4.85-3.1s-4.85 1.2-4.85 3.1Z" fill="url(#'+id+'-face)" stroke="url(#'+id+'-faceLine)" stroke-width=".9"/>'+
+   '<path d="M9.3 13h.15M14.55 13h.15M10.35 14.7c.85.6 2.45.6 3.3 0" fill="none" stroke="#7C3F27" stroke-width=".7" stroke-linecap="round"/>'+
+   '<path d="M4.15 8.45V7.5c0-3.55 3.25-5.8 7.85-5.8s7.85 2.25 7.85 5.8v.95Z" fill="url(#'+id+'-helmet)" stroke="url(#'+id+'-helmetLine)" stroke-width="1.05" stroke-linejoin="round"/>'+
+   '<path d="M12 2.05v6.15M7.25 5.3c.9-1.3 2.4-2.05 4.0-2.3" fill="none" stroke="#FFFFFF" stroke-opacity=".72" stroke-width=".72" stroke-linecap="round"/>'+
+   '<path d="M2.85 8.1h18.3c.7 0 1.05.4 1.05 1.05v.55c0 .82-.65 1.45-1.48 1.45H3.28c-.83 0-1.48-.63-1.48-1.45v-.55c0-.65.35-1.05 1.05-1.05Z" fill="url(#'+id+'-helmetBand)" stroke="url(#'+id+'-helmetLine)" stroke-width=".95" stroke-linejoin="round"/>'+
+   '<path d="M4 8.6h16M4.3 9.8h15.4" fill="none" stroke="#FFF7D6" stroke-opacity=".8" stroke-width=".48" stroke-linecap="round"/>;
  }else if(name==='database'){
   const pathMatch=paths.match(/<path d="([^"]+)"\/>/);
   const middleStart=pathMatch?pathMatch[1].indexOf('M4 12'):-1;

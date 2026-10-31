@@ -102,27 +102,23 @@ const output = await readFile('dist/index.html', 'utf8');
 assert.ok(output.includes("$('#workspaceEyebrow').hidden=ui.page==='account';"), 'account page hides the duplicate MY ACCOUNT eyebrow while keeping the bold title');
 assert.ok(output.includes("cpu:'CPU'"), 'CPU profile-icon label uses the standard uppercase spelling');
 assert.ok(output.includes('const ICON_PALETTES = {'), 'profile icons use dedicated color palettes while retaining their source SVG paths');
-for (const name of ['wrench','engineer','database','helmet','layers']) {
+for (const name of ['wrench','database','helmet','layers']) {
   assert.ok(output.includes(name+':{stroke:['), `color palette is defined for ${name}`);
 }
 assert.ok(output.includes("wrench:{stroke:['#536477','#DCE5EF','#77879B']"), 'Wrench uses a silver/chrome palette');
 assert.ok(output.includes('compass:') && output.includes('circle cx="12" cy="12" r="10"') && output.includes('m16.2 7.8-2.7 5.7-5.7 2.7 2.7-5.7z') && !output.slice(output.indexOf('const ICON_PALETTES = {'),output.indexOf('let iconRenderSequence')).includes('compass:{') && !output.slice(output.indexOf('function icon(name,size=16){'),output.indexOf('\\nfunction ',output.indexOf('function icon(name,size=16){'))).includes("name==='compass'"), 'Compass is restored to its original unfilled currentColor outline');
 assert.ok(output.includes("cpu:'<rect") && output.includes('width="14" height="14" rx="2"') && !output.slice(output.indexOf('const ICON_PALETTES = {'),output.indexOf('};',output.indexOf('const ICON_PALETTES = {'))).includes('cpu:{'), 'CPU is restored to its original uncolored outline path and uses currentColor');
-assert.ok(output.includes("engineer:{stroke:['#1E3A8A','#0F766E']") && output.includes("helmet:['#FFF7CC','#FCD34D','#EAB308']") && output.includes("helmetLine:['#92400E','#78350F']") && output.includes("clothes:['#1E40AF','#0F766E']"), 'Engineer uses a distinct safety-yellow helmet with a deeper protective rim and blue/teal workwear');
+assert.ok(!output.slice(output.indexOf('const ICON_PALETTES = {'),output.indexOf('let iconRenderSequence')).includes('engineer:{') && output.includes("engineer:'<path d=\"M5.6 8.1C6 5 8.1 3.2") && output.includes('stroke=\"var(--accent)\"'), 'Engineer keeps the latest monochrome hard-hat SVG and uses the same single application-accent color as Compass');
 assert.ok(output.includes("database:{stroke:['#3B82F6','#0F766E']") && output.includes("accent:['#A5F3FC','#22D3EE']"), 'Database uses a modern blue-indigo cylinder with aqua data rings');
 const iconRendererStart=output.indexOf('function icon(name,size=16){');
 const iconRendererEnd=output.indexOf('\\nfunction ',iconRendererStart);
 const iconRenderer=output.slice(iconRendererStart,iconRendererEnd);
 assert.ok(!iconRenderer.includes("name==='compass'"), 'Compass renders through the standard outline icon path without a color override');
 assert.ok(!iconRenderer.includes("name==='cpu'"), 'CPU renders the original outline through the standard currentColor icon renderer');
-assert.ok(iconRenderer.includes("if(name==='engineer')") &&
-          iconRenderer.includes('M7.15 10.15v2.25') &&
-          iconRenderer.includes('M4.15 8.45V7.5') &&
-          iconRenderer.includes('M2.85 8.1h18.3') &&
-          iconRenderer.includes('M4.3 9.8h15.4') &&
-          iconRenderer.includes("gradient('helmetBand'") &&
-          iconRenderer.includes("gradient('helmetLine'"),
-  'Engineer helmet uses a rounded dome, projecting curved brim, separate golden rim and clear face spacing');
+assert.ok(iconRenderer.includes("if(name==='engineer')return") &&
+          iconRenderer.includes('stroke=\"var(--accent)\"') &&
+          output.includes("engineer:'<path d=\"M5.6 8.1C6 5 8.1 3.2"),
+  'Engineer uses the latest single-color hard-hat SVG with the application accent stroke and no multicolor palette');
 assert.ok(iconRenderer.includes('fill="none" stroke="#67E8F9"') &&
           iconRenderer.includes('middleRingPath=pathMatch[1].slice(middleStart)'),
   'Database cylinder and internal separator are styled as independent vector paths');

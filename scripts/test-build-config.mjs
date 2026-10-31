@@ -8,7 +8,7 @@ assert.ok(authGateStart >= 0, 'page includes the pre-authentication sign-in gate
 const authGateEnd = sourceHtml.indexOf('</script>', authGateStart);
 assert.ok(authGateEnd > authGateStart, 'pre-authentication sign-in gate is a complete script');
 const authGate = sourceHtml.slice(authGateStart, authGateEnd);
-assert.ok(authGate.includes('src="./logo.svg?v=20261030-brandrefresh2"'), 'sign-in logo is rendered without relying on the later app script');
+assert.ok(authGate.includes('src="data:image/svg+xml;base64,'), 'sign-in logo is embedded and rendered without relying on the later app script');
 assert.ok(!authGate.includes('applicationLogoMarkup()'), 'pre-auth sign-in cannot call helpers from the later app bootstrap script');
 
 assert.ok(sourceHtml.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v2:'"), 'AWS frontend may persist only the versioned API response cache.');
@@ -145,15 +145,18 @@ assert.equal(config.apiBaseUrl, 'https://app-api.execute-api.us-east-1.amazonaws
 assert.ok(!('localAuth' in config), 'runtime config must not contain a local-auth switch');
 assert.ok(!('dataMode' in config), 'runtime config must not contain a database-mode switch');
 assert.ok(!('identityMap' in config.cognito), 'team identity must not be overridable by a browser-side map');
-for (const asset of ['logo.svg', 'favicon.svg', 'favicon.png', 'favicon.ico', 'network-icon.svg']) {
-  assert.deepEqual(await readFile('dist/' + asset), await readFile(asset), `AWS artifact includes the deployed ${asset} asset`);
-}
-const deployedLogo = await readFile('dist/logo.svg', 'utf8');
-assert.ok(deployedLogo.includes('fill="#5b62e8"'), 'logo uses the application purple accent');
-assert.ok(!deployedLogo.includes('#102e50'), 'logo no longer uses the low-contrast navy');
-const deployedFavicon = await readFile('dist/favicon.svg', 'utf8');
-assert.ok(deployedFavicon.includes('fill="#5b62e8"'), 'favicon uses the same application purple accent');
-assert.ok(!deployedFavicon.includes('#102e50'), 'favicon no longer uses the low-contrast navy');
+const embeddedSvgImages = [...output.matchAll(/(?:src|href)="data:image\\/svg\\+xml;base64,([^"]+)"/g)]
+  .map(match => Buffer.from(match[1], 'base64').toString('utf8'));
+const deployedLogo = embeddedSvgImages.find(svg => svg.includes('viewBox="0 0 512 420"'));
+assert.ok(deployedLogo, 'AWS artifact embeds the application logo as SVG data');
+assert.ok(deployedLogo.includes('fill="#5b62e8"'), 'embedded logo uses the application purple accent');
+assert.ok(!deployedLogo.includes('#102e50'), 'embedded logo no longer uses the low-contrast navy');
+const deployedFavicon = embeddedSvgImages.find(svg => svg.includes('viewBox="0 0 512 512"'));
+assert.ok(deployedFavicon, 'AWS artifact embeds the SVG favicon as image data');
+assert.ok(deployedFavicon.includes('fill="#5b62e8"'), 'embedded favicon uses the same application purple accent');
+assert.ok(!deployedFavicon.includes('#102e50'), 'embedded favicon no longer uses the low-contrast navy');
+assert.ok(output.includes('href="data:image/png;base64,') && output.includes('href="data:image/x-icon;base64,'), 'AWS artifact embeds PNG and ICO favicon variants');
+assert.ok(!/(?:src|href)=["'](?:\\.\\/|\\/)?[^"']+\\.(?:svg|png|jpe?g|gif|webp|ico)(?:[?#][^"']*)?["']/i.test(output), 'AWS artifact has no external image-file dependencies');
 
 const template = await readFile('backend/template.yaml', 'utf8');
 // SAM is optional, but its template must be a complete from-scratch automation reference.

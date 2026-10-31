@@ -147,7 +147,6 @@ assert.ok(!('dataMode' in config), 'runtime config must not contain a database-m
 assert.ok(!('identityMap' in config.cognito), 'team identity must not be overridable by a browser-side map');
 const embeddedSvgImages = output.split('data:image/svg+xml;base64,').slice(1)
   .map(encoded => Buffer.from(encoded.slice(0, encoded.indexOf('"')), 'base64').toString('utf8'));
-  .map(match => Buffer.from(match[1], 'base64').toString('utf8'));
 const deployedLogo = embeddedSvgImages.find(svg => svg.includes('viewBox="0 0 512 420"'));
 assert.ok(deployedLogo, 'AWS artifact embeds the application logo as SVG data');
 assert.ok(deployedLogo.includes('fill="#5b62e8"'), 'embedded logo uses the application purple accent');

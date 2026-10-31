@@ -131,7 +131,11 @@ assert.ok(output.includes('M14.7 6.3a5 5 0 0 0-6.4 6.4') &&
           output.includes('M5.6 8.1C6 5 8.1 3.2') &&
           output.includes('M3.8 13.2v-1.5a8.2 8.2'),
   'Wrench, Engineer, and Helmet silhouettes remain based on the original SVG geometry');
-assert.ok(output.includes('networking:\'<image href="./network-icon.svg"'), 'Network profile icon renders the high-quality vector asset');
+assert.ok(output.includes('const NETWORKING_ICON_SVG =') &&
+          output.includes("if(name==='networking')") &&
+          output.includes('networking-icon-'),
+  'Network profile icon embeds the gradient artwork with unique per-instance SVG IDs');
+assert.ok(!output.includes('network-icon.svg'), 'Network artwork has no external file dependency');
 assert.ok(!output.includes("networking:'<circle cx=\"12\" cy=\"5\" r=\"2.5\""), 'old three-node network icon has been replaced');
 const config = getRuntimeConfig(output);
 assert.equal(config.cognito.userPoolId, 'us-east-1_Example123');

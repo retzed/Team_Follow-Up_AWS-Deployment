@@ -238,7 +238,7 @@ class HandlerHelperTests(unittest.TestCase):
 
         self.assertEqual(result["statusCode"], 200)
         payload = json.loads(result["body"])
-        self.assertEqual(payload, {"items": parents, "users": [{"id": "u1", "name": "Marwa", "nameArabic": "", "role": "Team Leader", "roleArabic": "", "icon": "user", "privilege": "Administrator", "enabled": True}]})
+        self.assertEqual(payload, {"items": parents, "users": [{"id": "u1", "name": "Marwa", "nameArabic": "", "role": "Team Leader", "roleArabic": "", "icon": "profile-user", "privilege": "Administrator", "enabled": True}]})
         query_items.assert_called_once_with(
             {"scope": "top-level", "dateMode": "updated", "direction": "desc"}
         )
@@ -344,13 +344,14 @@ class HandlerHelperTests(unittest.TestCase):
     def test_public_team_user_reads_legacy_arabic_profile_field_aliases(self):
         row = {
             "userId": "u2", "name": "Zyad", "nameArabic": "زياد",
-            "label": "Cloud Engineer", "labelArabic": "مهندس سحابة", "enabled": True,
+            "label": "Cloud Engineer", "labelArabic": "مهندس سحابة", "icon": "user", "enabled": True,
         }
         profile = handler.public_team_user(row, include_private=True)
         self.assertEqual(profile["name"], "Zyad")
         self.assertEqual(profile["nameArabic"], "زياد")
         self.assertEqual(profile["role"], "Cloud Engineer")
         self.assertEqual(profile["roleArabic"], "مهندس سحابة")
+        self.assertEqual(profile["icon"], "profile-user")
 
     def test_privilege_manager_bootstrap_and_explicit_demotion(self):
         self.assertTrue(handler.is_privilege_manager({"userId": "root"}))
@@ -380,6 +381,7 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(updates["roleArabic"], "مهندس سحابة")
         self.assertEqual(updates["icon"], "briefcase")
         self.assertEqual(handler.normalize_profile_updates({"icon": "cowboy-hat"}, actor, target)["icon"], "cowboy-hat")
+        self.assertEqual(handler.normalize_profile_updates({"icon": "profile-user"}, actor, target)["icon"], "profile-user")
         with self.assertRaises(ValueError):
             handler.normalize_profile_updates({"icon": "hard-hat"}, actor, target)
         for icon_value in ("networking", "systems", "communications-engineering", "engineer", "wave"):

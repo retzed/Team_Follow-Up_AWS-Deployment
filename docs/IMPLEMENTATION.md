@@ -210,3 +210,20 @@ The new Profile password form keeps the current-password field in the same two-c
 For the AWS implementation, the current-password check is a backend-dependent feature and must not be released as HTML-only. Before publishing it in the console-created environment, enable `ALLOW_ADMIN_USER_PASSWORD_AUTH` on the existing public `Team_FollowUp` app client (keep SRP and refresh-token flows), set Lambda `COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID`, and add the `VerifyCurrentCognitoPassword` statement from `backend/console-lambda-policy.json` with the real User Pool ARN. Publish the updated Lambda package before the frontend build. The handler verifies the requested Cognito username belongs to the same `sub` as the authenticated JWT, returns only a boolean, and never stores or logs the password. The existing authenticated catch-all API route is used; no DynamoDB schema/index migration, new Amplify variable, or new API Gateway route is required.
 
 The account resource inventory near the top of this document remains a dated, operator-reported snapshot from 15 October 2026; it has not been re-queried from AWS as part of this repository review. Treat the preceding settings as required deployment steps until they are verified in the live console.
+
+
+## Real-time item change delivery (source update: 2 November 2026)
+
+The repositories now contain an authenticated, low-payload real-time notification path. This is a **source-code and target-architecture change only**; it is not confirmation that the new AWS resources have been created in the current account.
+
+The target implementation adds:
+- A fifth DynamoDB table, `TeamFollowUp-Realtime`, using partition key `partitionKey`, sort key `sortKey`, and TTL `expiresAt`. It stores a seven-day compact change outbox, short-lived one-use ticket hashes, and renewable WebSocket connection leases.
+- A separate API Gateway WebSocket API with `$connect`, `$disconnect`, and `$default` routes, integrated with the existing `TeamFollowUp-Api` Lambda and a `prod` auto-deploy stage.
+- Lambda environment variables `REALTIME_TABLE` and `WEBSOCKET_MANAGEMENT_ENDPOINT`, in addition to the existing table/Cognito values.
+- The Amplify build variable `TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL`, required by the AWS frontend build.
+
+Before releasing this update to the console-created account, create/verify the Realtime table and TTL, create/verify the WebSocket API and routes, add its Lambda invoke permission, update the existing Lambda execution role using `backend/console-lambda-policy.json` with the real account ID, pool ID, and WebSocket API ID, set the two Lambda environment variables, package/publish the updated Lambda, set the Amplify WSS variable, and publish a successful frontend build. Follow the step-by-step instructions in `DEPLOYMENT.md` Sections 3.5, 7, 8.1 and 9. Do not update the live Lambda first: `REALTIME_TABLE` is a required import-time configuration value and the handler will not initialize until that table exists and is configured.
+
+The original four-table `currentConsoleBootstrap` inventory above remains the operator-reported 15 October 2026 snapshot. The new Realtime transport table and WebSocket API are intentionally documented separately and remain **not yet independently verified in the live AWS account**. The four business-data table definitions in `backend/table-schema.json` are unchanged; the additional transport contract is held in its separate `realtimeTransport` section.
+
+The change feed is metadata-only. Item create/update/delete/restore operations persist a compact outbox record alongside the item/audit transaction where supported, and Lambda sends a WebSocket hint to active sessions. Browsers query the ordered cursor feed and refresh only affected assignments, selected hierarchies, or open history/pinned views. A missed push is recovered on reconnect from the last cursor; there is no full-workspace broadcast or item content in a notification.

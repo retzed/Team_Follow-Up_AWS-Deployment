@@ -55,7 +55,7 @@ flowchart LR
 4. **Application logic:** Lambda resolves the verified token's Cognito `sub` to exactly one enabled `TeamFollowUp-Users` profile by matching `cognitoSub`. It does not trust browser-supplied creator/editor identity, timestamps, index helper attributes, or version numbers.
 5. **Shared persistence:** Lambda performs reads and writes against the four application-data DynamoDB tables. Item changes and audit events use transactions where supported; hierarchy rules are enforced in Lambda because DynamoDB does not implement relational foreign keys.
 6. **Real-time change delivery:** after a successful item/audit transaction, Lambda writes a compact change record to the Realtime outbox in the same transaction and then fans out a metadata-only WebSocket message to active connections. The browser uses the notification as a hint to query the authenticated ordered change feed from its last cursor, then refreshes only affected assigned/root/pinned/history views. A missed push is recovered from the durable outbox after reconnect or a later notification.
-6. **Operations:** API access and Lambda logs use CloudWatch. A dashboard summarizes request volume, Lambda invocations/errors/throttles and duration; alarms detect Lambda errors, Lambda throttles and API Gateway 5xx responses. AWS Budgets sends actual and forecast cost warning emails independently of application traffic.
+7. **Operations:** API access and Lambda/WebSocket logs use CloudWatch. A dashboard summarizes request volume, Lambda invocations/errors/throttles and duration; alarms detect Lambda errors, Lambda throttles and API Gateway 5xx responses. AWS Budgets sends actual and forecast cost warning emails independently of application traffic.
 
 ## 2. Component and ownership reference
 

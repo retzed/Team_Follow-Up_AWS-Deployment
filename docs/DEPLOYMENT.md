@@ -174,7 +174,7 @@ Review the six standard IDs/names plus `root` and the mapping results. Only then
 2. Select the intended branch (normally `main`). Use the Amazon Linux 2023 build image or a compatible image with Node.js 24; the repository's `amplify.yml` invokes `nvm use 24`.
 3. Keep the repository build settings from `amplify.yml`: run `node scripts/build.mjs`, publish `dist/`.
 4. Record the exact branch HTTPS URL, for example `https://main.<generated-app-domain>`. The CORS origin must be only the origin (scheme + host), with no path or trailing slash.
-5. A first build may fail until `TEAM_FOLLOW_UP_API_BASE_URL` is available. Continue with backend creation, then configure all environment variables in Step 9 and trigger a fresh build.
+5. A first build may fail until the HTTP API URL and WebSocket API WSS URL are available. Continue with backend creation, then configure all environment variables in Step 9 and trigger a fresh build.
 
 ## 7. Create and configure the Lambda function through the console
 
@@ -296,11 +296,11 @@ If the Amplify branch hostname changes, update the API CORS origin before relyin
 
 ### Frontend-only releases
 
-The fixes to modal action dispatch, hierarchy traversal, and child Activity sorting are frontend-only. They do not change the Lambda handler, API request/response contract, Cognito setup, DynamoDB table/index schema, IAM role, or the four `TEAM_FOLLOW_UP_*` Amplify variables.
+The fixes to modal action dispatch, hierarchy traversal, child Activity sorting, and the view-refresh logic are frontend-only. Real-time transport itself is not frontend-only and requires the WebSocket API, Realtime table, Lambda environment and IAM resources described earlier.
 
 For a frontend-only change in this console-first deployment:
 
-1. Run `npm test` and `npm run build` from the repository root. Confirm the generated `dist/index.html` exists and the checks pass. A local AWS build requires the real public configuration values from Step 9: `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, and `TEAM_FOLLOW_UP_API_BASE_URL`. Supply them in the build shell; Amplify supplies its configured branch variables automatically. The build intentionally fails if values are missing or placeholders.
+1. Run `npm test` and `npm run build` from the repository root. Confirm the generated `dist/index.html` exists and the checks pass. A local AWS build requires the real public configuration values from Step 9: `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID`, `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID`, `TEAM_FOLLOW_UP_API_BASE_URL`, and `TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL`. Supply them in the build shell; Amplify supplies its configured branch variables automatically. The build intentionally fails if values are missing or placeholders.
 2. Commit/push the tested source to the branch connected to Amplify (normally `main`). If automatic builds are enabled, monitor **Amplify → Hosting → Build history**; otherwise start a new build for that branch in the console.
 3. Confirm the build succeeds and test the deployed URL: sign in; open/close Edit and New Project/Job dialogs repeatedly; create a child item; verify Activity opens and can be searched; confirm no duplicate action occurs.
 4. Do **not** rebuild/re-upload the Lambda package, change API Gateway routes/CORS, edit the Cognito app client, modify DynamoDB indexes, or run SAM/CloudFormation solely for a frontend-only change.

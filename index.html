@@ -3398,7 +3398,7 @@ async function applyRealtimeChangeBatch(changes){
    else void loadAccountAssignedItems();
   }
  }
- if(itemIds.size&&ui.accountPinnedRows?.some(row=>itemIds.has(String(row.id)))){
+ if((itemIds.size||rootIds.size)&&ui.accountPinnedRows?.some(row=>itemIds.has(String(row.id))||rootIds.has(String(row.rootParentId||rootParent(row)?.id||'')))){
   ui.accountPinnedLoaded=false;
   if(ui.page==='account'&&ui.accountTab==='pinned'&&!ui.accountPinnedLoading)void loadAccountPinnedItems();
  }
@@ -3447,10 +3447,11 @@ async function catchUpRealtimeChanges(){
     const changes=Array.isArray(result?.changes)?result.changes:[];
     if(changes.length)await applyRealtimeChangeBatch(changes);
     const nextCursor=String(result?.nextCursor||realtimeCursor);
-    if(nextCursor!==realtimeCursor)realtimeCursor=nextCursor;
+    const cursorAdvanced=nextCursor!==realtimeCursor;
+    if(cursorAdvanced)realtimeCursor=nextCursor;
     if(!result?.hasMore)break;
     if(++pages>=20){realtimeCatchupRequested=true;break;}
-    if(nextCursor===realtimeCursor&&!changes.length)break;
+    if(!cursorAdvanced&&!changes.length)break;
    }
   }while(realtimeRunning&&realtimeCatchupRequested);
  })().catch(error=>{

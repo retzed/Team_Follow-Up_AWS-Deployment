@@ -11,6 +11,7 @@ import hashlib
 import logging
 import os
 import re
+import secrets
 import uuid
 from datetime import datetime, timezone
 from urllib.parse import unquote
@@ -31,7 +32,7 @@ def av_map(item):
     return {str(k): SERIALIZER.serialize(v) for k, v in item.items() if v is not None}
 
 
-def commit_item_with_events(item, events, condition=None, expected_version=None):
+def commit_item_with_events(item, events, condition=None, expected_version=None, change_event=None):
     writes=[{'Put': {'TableName': WORK.name, 'Item': av_map(item)}}]
     if condition == 'create':
         writes[0]['Put']['ConditionExpression']='attribute_not_exists(#itemId)'
@@ -42,6 +43,8 @@ def commit_item_with_events(item, events, condition=None, expected_version=None)
         writes[0]['Put']['ExpressionAttributeValues']={':expected':SERIALIZER.serialize(expected_version)}
     for event in events:
         writes.append({'Put': {'TableName': ACTIVITY.name, 'Item': av_map(event), 'ConditionExpression': 'attribute_not_exists(#activityKey)', 'ExpressionAttributeNames': {'#activityKey': 'activityKey'}}})
+    if change_event:
+        writes.append(realtime_change_put(change_event))
     ddb.meta.client.transact_write_items(TransactItems=writes)
 
 ddb = boto3.resource('dynamodb')
@@ -49,6 +52,8 @@ WORK = ddb.Table(os.environ['ITEMS_TABLE'])
 ACTIVITY = ddb.Table(os.environ['ACTIVITY_TABLE'])
 USERS = ddb.Table(os.environ['USERS_TABLE'])
 ARCHIVE = ddb.Table(os.environ['ARCHIVE_TABLE'])
+REALTIME_TABLE = ddb.Table(os.environ['REALTIME_TABLE'])
+WEBSOCKET_MANAGEMENT_ENDPOINT = os.environ.get('WEBSOCKET_MANAGEMENT_ENDPOINT', '').strip()
 COGNITO_USER_POOL_ID = os.environ.get('COGNITO_USER_POOL_ID', '').strip()
 COGNITO_CLIENT_ID = os.environ.get('COGNITO_CLIENT_ID', '').strip()
 COGNITO_IDP = boto3.client('cognito-idp')
@@ -897,8 +902,261 @@ def verify_current_password(body, claims, profile):
     })
 
 
+
+# ---------------------------------------------------------------------------
+# Authenticated real-time change delivery
+# ---------------------------------------------------------------------------
+REALTIME_CHANGE_RETENTION_SECONDS = 7 * 24 * 60 * 60
+REALTIME_TICKET_SECONDS = 30
+REALTIME_CONNECTION_TTL_SECONDS = 9 * 60
+REALTIME_PAGE_SIZE = 100
+
+
+def epoch_seconds():
+    return int(datetime.now(timezone.utc).timestamp())
+
+
+def make_realtime_change(item, previous=None, affected_items=None, change_kind='updated', deleted=False):
+    """Create a compact, durable change record; never include full item/profile data."""
+    affected = [dict(row) for row in (affected_items or []) if isinstance(row, dict)]
+    candidates = [row for row in (previous, item, *affected) if isinstance(row, dict)]
+    root_ids, top_level_ids, parent_ids, assignee_ids = set(), set(), set(), set()
+    for row in candidates:
+        item_id = str(row.get('itemId') or row.get('id') or '').strip()
+        item_type = str(row.get('type') or '').strip()
+        parent_id = str(row.get('parentId') or '').strip()
+        root_id = str(row.get('rootParentId') or '').strip()
+        if item_type in ('project', 'job'):
+            root_id = root_id or item_id
+            if item_id:
+                top_level_ids.add(item_id)
+        if not root_id and item_id and item_type in ('project', 'job'):
+            root_id = item_id
+        if root_id:
+            root_ids.add(root_id)
+        if parent_id:
+            parent_ids.add(parent_id)
+        owner_id = str(row.get('ownerId') or '').strip()
+        if owner_id:
+            assignee_ids.add(owner_id)
+    primary = dict(item or {})
+    item_id = str(primary.get('itemId') or primary.get('id') or '').strip()
+    change_id = 'chg_' + uuid.uuid4().hex
+    occurred_at = now()
+    sort_key = occurred_at + '#' + change_id
+    return {
+        'partitionKey': 'CHANGE',
+        'sortKey': sort_key,
+        'expiresAt': epoch_seconds() + REALTIME_CHANGE_RETENTION_SECONDS,
+        'changeId': change_id,
+        'changeType': 'items.changed',
+        'changeKind': str(change_kind),
+        'itemId': item_id,
+        'rootParentIds': sorted(root_ids),
+        'topLevelIds': sorted(top_level_ids),
+        'parentIds': sorted(parent_ids),
+        'assigneeIds': sorted(assignee_ids),
+        'deleted': bool(deleted),
+        'version': int(primary.get('version') or 0),
+        'occurredAt': occurred_at,
+    }
+
+
+def realtime_change_put(change):
+    return {
+        'Put': {
+            'TableName': REALTIME_TABLE.name,
+            'Item': av_map(change),
+            'ConditionExpression': 'attribute_not_exists(#partitionKey) AND attribute_not_exists(#sortKey)',
+            'ExpressionAttributeNames': {'#partitionKey': 'partitionKey', '#sortKey': 'sortKey'},
+        }
+    }
+
+
+def public_realtime_change(row):
+    return {
+        'type': row.get('changeType') or 'items.changed',
+        'changeId': str(row.get('changeId') or ''),
+        'cursor': str(row.get('sortKey') or ''),
+        'changeKind': str(row.get('changeKind') or 'updated'),
+        'itemId': str(row.get('itemId') or ''),
+        'rootParentIds': list(row.get('rootParentIds') or []),
+        'topLevelIds': list(row.get('topLevelIds') or []),
+        'parentIds': list(row.get('parentIds') or []),
+        'assigneeIds': list(row.get('assigneeIds') or []),
+        'deleted': bool(row.get('deleted')),
+        'version': int(row.get('version') or 0),
+        'occurredAt': str(row.get('occurredAt') or ''),
+    }
+
+
+def latest_realtime_cursor():
+    result = REALTIME_TABLE.query(
+        KeyConditionExpression=Key('partitionKey').eq('CHANGE'),
+        ScanIndexForward=False,
+        Limit=1,
+        ProjectionExpression='#sortKey',
+        ExpressionAttributeNames={'#sortKey': 'sortKey'},
+        ConsistentRead=True,
+    )
+    items = result.get('Items') or []
+    return str(items[0].get('sortKey') or '') if items else ''
+
+
+def publish_realtime_change(change):
+    """Best-effort WebSocket fan-out after the durable transaction has committed."""
+    if not change or not WEBSOCKET_MANAGEMENT_ENDPOINT:
+        return
+    payload = json.dumps(public_realtime_change(change), ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    try:
+        management = boto3.client('apigatewaymanagementapi', endpoint_url=WEBSOCKET_MANAGEMENT_ENDPOINT)
+        connections = all_pages(
+            REALTIME_TABLE,
+            KeyConditionExpression=Key('partitionKey').eq('CONNECTION'),
+            ProjectionExpression='#partitionKey, #sortKey, connectionId, expiresAt',
+            ExpressionAttributeNames={'#partitionKey': 'partitionKey', '#sortKey': 'sortKey'},
+        )
+        sent = 0
+        removed = 0
+        for connection in connections:
+            connection_id = str(connection.get('connectionId') or connection.get('sortKey') or '')
+            if not connection_id:
+                continue
+            if int(connection.get('expiresAt') or 0) <= epoch_seconds():
+                REALTIME_TABLE.delete_item(Key={'partitionKey': 'CONNECTION', 'sortKey': connection_id})
+                removed += 1
+                continue
+            try:
+                management.post_to_connection(ConnectionId=connection_id, Data=payload)
+                sent += 1
+            except ClientError as exc:
+                code = str(exc.response.get('Error', {}).get('Code') or '')
+                status = exc.response.get('ResponseMetadata', {}).get('HTTPStatusCode')
+                if code == 'GoneException' or status == 410:
+                    REALTIME_TABLE.delete_item(Key={'partitionKey': 'CONNECTION', 'sortKey': connection_id})
+                    removed += 1
+                else:
+                    logger.warning('realtime_delivery_failed', extra={'errorCode': code, 'connectionId': connection_id})
+        logger.info('realtime_change_published', extra={'changeId': change.get('changeId'), 'connectionsSent': sent, 'connectionsRemoved': removed})
+    except Exception as exc:
+        # A failed push must never roll back or turn a successfully saved item into an API error.
+        logger.warning('realtime_fanout_failed', extra={'changeId': change.get('changeId'), 'errorType': type(exc).__name__})
+
+
+def create_realtime_ticket(profile):
+    if not WEBSOCKET_MANAGEMENT_ENDPOINT:
+        return response(503, {'message': 'Real-time updates are not configured on this API.'})
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+    expires_at = epoch_seconds() + REALTIME_TICKET_SECONDS
+    REALTIME_TABLE.put_item(Item={
+        'partitionKey': 'TICKET#' + token_hash,
+        'sortKey': 'TOKEN',
+        'userId': str(profile.get('userId') or ''),
+        'expiresAt': expires_at,
+    }, ConditionExpression='attribute_not_exists(partitionKey) AND attribute_not_exists(sortKey)')
+    return response(201, {
+        'ticket': token,
+        'expiresIn': REALTIME_TICKET_SECONDS,
+        'cursor': latest_realtime_cursor(),
+    })
+
+
+def query_realtime_changes(since, limit=REALTIME_PAGE_SIZE):
+    cursor = str(since or '')
+    if not cursor:
+        return {'changes': [], 'nextCursor': latest_realtime_cursor(), 'hasMore': False}
+    page_size = max(1, min(REALTIME_PAGE_SIZE, int(limit or REALTIME_PAGE_SIZE)))
+    result = REALTIME_TABLE.query(
+        KeyConditionExpression=Key('partitionKey').eq('CHANGE') & Key('sortKey').gt(cursor),
+        ScanIndexForward=True,
+        Limit=page_size,
+        ConsistentRead=True,
+    )
+    items = result.get('Items') or []
+    changes = [public_realtime_change(row) for row in items]
+    return {
+        'changes': changes,
+        'nextCursor': str(items[-1].get('sortKey') or cursor) if items else cursor,
+        'hasMore': bool(result.get('LastEvaluatedKey')),
+    }
+
+
+def websocket_handler(event):
+    """Handle API Gateway WebSocket lifecycle events using a single-use ticket."""
+    request_context = event.get('requestContext') or {}
+    route = str(request_context.get('routeKey') or '')
+    connection_id = str(request_context.get('connectionId') or '')
+    if route == '$connect':
+        ticket = str((event.get('queryStringParameters') or {}).get('ticket') or '')
+        if not ticket or len(ticket) > 256 or not connection_id:
+            return {'statusCode': 401, 'body': 'Unauthorized'}
+        token_hash = hashlib.sha256(ticket.encode('utf-8')).hexdigest()
+        ticket_key = {'partitionKey': 'TICKET#' + token_hash, 'sortKey': 'TOKEN'}
+        stored = REALTIME_TABLE.get_item(Key=ticket_key, ConsistentRead=True).get('Item') or {}
+        if not stored or int(stored.get('expiresAt') or 0) <= epoch_seconds() or not stored.get('userId'):
+            return {'statusCode': 401, 'body': 'Invalid or expired real-time ticket'}
+        connected_at = now()
+        expires_at = epoch_seconds() + REALTIME_CONNECTION_TTL_SECONDS
+        connection_row = {
+            'partitionKey': 'CONNECTION',
+            'sortKey': connection_id,
+            'connectionId': connection_id,
+            'userId': str(stored['userId']),
+            'connectedAt': connected_at,
+            'expiresAt': expires_at,
+        }
+        try:
+            ddb.meta.client.transact_write_items(TransactItems=[
+                {'Delete': {
+                    'TableName': REALTIME_TABLE.name,
+                    'Key': av_map(ticket_key),
+                    'ConditionExpression': '#expiresAt > :now',
+                    'ExpressionAttributeNames': {'#expiresAt': 'expiresAt'},
+                    'ExpressionAttributeValues': {':now': SERIALIZER.serialize(epoch_seconds())},
+                }},
+                {'Put': {
+                    'TableName': REALTIME_TABLE.name,
+                    'Item': av_map(connection_row),
+                    'ConditionExpression': 'attribute_not_exists(#partitionKey) AND attribute_not_exists(#sortKey)',
+                    'ExpressionAttributeNames': {'#partitionKey': 'partitionKey', '#sortKey': 'sortKey'},
+                }},
+            ])
+        except ClientError:
+            return {'statusCode': 401, 'body': 'Invalid or already-used real-time ticket'}
+        return {'statusCode': 200, 'body': 'Connected'}
+    if route == '$disconnect':
+        if connection_id:
+            REALTIME_TABLE.delete_item(Key={'partitionKey': 'CONNECTION', 'sortKey': connection_id})
+        return {'statusCode': 200, 'body': ''}
+    if route == '$default':
+        message = body_of(event)
+        if message.get('__invalid_json_body__'):
+            return {'statusCode': 400, 'body': 'Invalid message'}
+        if message.get('action') == 'ping' and connection_id:
+            try:
+                REALTIME_TABLE.update_item(
+                    Key={'partitionKey': 'CONNECTION', 'sortKey': connection_id},
+                    UpdateExpression='SET #expiresAt = :expiresAt, #lastSeenAt = :lastSeenAt',
+                    ConditionExpression='attribute_exists(#connectionId)',
+                    ExpressionAttributeNames={'#expiresAt': 'expiresAt', '#lastSeenAt': 'lastSeenAt', '#connectionId': 'connectionId'},
+                    ExpressionAttributeValues={
+                        ':expiresAt': REALTIME_CONNECTION_TTL_SECONDS + epoch_seconds(),
+                        ':lastSeenAt': now(),
+                    },
+                )
+            except ClientError:
+                return {'statusCode': 410, 'body': 'Connection expired'}
+            return {'statusCode': 200, 'body': ''}
+        return {'statusCode': 400, 'body': 'Unsupported real-time action'}
+    return {'statusCode': 400, 'body': 'Unsupported WebSocket route'}
+
+
+
 def lambda_handler(event, context):
-    """Handle API Gateway HTTP API requests."""
+    """Handle API Gateway HTTP API and WebSocket requests."""
+    if str((event.get('requestContext') or {}).get('routeKey') or '') in ('$connect', '$disconnect', '$default'):
+        return websocket_handler(event)
     request_id = getattr(context, "aws_request_id", None) or event.get("requestContext", {}).get("requestId", "unknown")
     method = (
         event.get("requestContext", {}).get("http", {}).get("method")
@@ -921,6 +1179,10 @@ def lambda_handler(event, context):
         profile=current_profile(event)
         if not profile:
             return response(403,{'message':'Cognito identity is not mapped to an enabled team profile.'})
+        if method == 'POST' and path == '/realtime/ticket':
+            return create_realtime_ticket(profile)
+        if method == 'GET' and path == '/realtime/changes':
+            return response(200, query_realtime_changes(qs.get('since'), qs.get('limit', REALTIME_PAGE_SIZE)))
         if method=='GET' and path=='/bootstrap':
             # Keep startup lightweight: return only top-level Projects/Jobs and team
             # profiles. Descendant items and Activity history are fetched on demand.
@@ -1137,6 +1399,9 @@ def lambda_handler(event, context):
                             chunk_root_ids.append(root_id)
                 for audit_event in chunk_events:
                     writes.append({'Put':{'TableName':ACTIVITY.name,'Item':av_map(audit_event),'ConditionExpression':'attribute_not_exists(#activityKey)','ExpressionAttributeNames':{'#activityKey':'activityKey'}}})
+                chunk_change=make_realtime_change(prepared[0] if prepared else {},affected_items=prepared,change_kind='restored') if prepared else None
+                if chunk_change:
+                    writes.append(realtime_change_put(chunk_change))
                 try:
                     ddb.meta.client.transact_write_items(TransactItems=writes)
                 except ClientError:
@@ -1158,6 +1423,8 @@ def lambda_handler(event, context):
                                     batch.put_item(Item=event)
                             all_events.extend(public_event(e) for e in partial)
                     return response(409,{'message':'Some items may already have been restored. Refresh Archive to see the remaining items and retry.','restoredIds':restored_ids,'restoredItems':restored_items,'activityEvents':all_events})
+                if chunk_change:
+                    publish_realtime_change(chunk_change)
                 restored_ids.extend(str(x['itemId']) for x in prepared)
                 restored_items.extend(public_item(x) for x in prepared)
                 completed_root_ids.update(chunk_root_ids)
@@ -1247,7 +1514,9 @@ def lambda_handler(event, context):
             item['itemId']=item.get('id') or item.get('itemId') or 'itm_'+uuid.uuid4().hex
             clean,actor=validate_item(event,item)
             normalized_events=build_audit_events(clean,profile,'create',events,at=clean.get('createdAt'))
-            commit_item_with_events(clean,normalized_events,condition='create')
+            change_event=make_realtime_change(clean,change_kind='created')
+            commit_item_with_events(clean,normalized_events,condition='create',change_event=change_event)
+            publish_realtime_change(change_event)
             return response(201,{'item':public_item(clean),'activityEvents':[public_event(e) for e in normalized_events]})
         m=re.fullmatch(r'/items/([^/]+)',path)
         if m and method=='PATCH':
@@ -1263,11 +1532,13 @@ def lambda_handler(event, context):
             expected=int(old.get('version',0))
             normalized_events=build_audit_events(clean,profile,'update',events,previous=old,at=clean.get('updatedAt'))
             try:
-                commit_item_with_events(clean,normalized_events,condition='version',expected_version=expected)
+                change_event=make_realtime_change(clean,previous=old,change_kind='updated')
+                commit_item_with_events(clean,normalized_events,condition='version',expected_version=expected,change_event=change_event)
             except ClientError as e:
                 if e.response['Error']['Code']=='ConditionalCheckFailedException' or e.response.get('Error',{}).get('Code')=='TransactionCanceledException':
                     return response(409,{'message':'This item changed after you opened it. Refresh before saving.'})
                 raise
+            publish_realtime_change(change_event)
             return response(200,{'item':public_item(clean),'activityEvents':[public_event(e) for e in normalized_events]})
         if m and method=='DELETE':
             item_id=m.group(1)
@@ -1314,6 +1585,7 @@ def lambda_handler(event, context):
             archive_rows=[make_archive_record(row,archived_at,actor_id,archive_lookup_cache) for row,_ in collected]
             expected_versions={str(row.get('itemId')):int(row.get('version',0)) for row,_ in collected}
             normalized_events=build_audit_events(old,profile,'delete',supplied,at=archived_at,affected_count=len(collected))
+            change_event=make_realtime_change(old,previous=old,affected_items=[row for row,_ in collected],change_kind='deleted',deleted=True)
             completed=[]
             chunk_size=40
             try:
@@ -1331,6 +1603,8 @@ def lambda_handler(event, context):
                     if is_final:
                         for event_row in normalized_events:
                             writes.append({'Put':{'TableName':ACTIVITY.name,'Item':av_map(event_row),'ConditionExpression':'attribute_not_exists(#activityKey)','ExpressionAttributeNames':{'#activityKey':'activityKey'}}})
+                        if change_event:
+                            writes.append(realtime_change_put(change_event))
                     ddb.meta.client.transact_write_items(TransactItems=writes)
                     completed.extend(chunk)
             except ClientError:
@@ -1353,6 +1627,7 @@ def lambda_handler(event, context):
                     rollback_ok=False
                 message='The item changed while it was being archived. Refresh and retry.' if rollback_ok else 'The archive operation was interrupted; refresh the workspace and Archive to reconcile the saved state.'
                 return response(409,{'message':message,'rolledBack':rollback_ok})
+            publish_realtime_change(change_event)
             return response(200,{'ok':True,'itemId':item_id,'archived':True,'archivedItemIds':[str(row.get('itemId')) for row,_ in collected],'activityEvents':[public_event(e) for e in normalized_events]})
         if path=='/activity' and method=='POST':
             return response(405,{'message':'Activity events must be written atomically with an item create, update, or delete.'})

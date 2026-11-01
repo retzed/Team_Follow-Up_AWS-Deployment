@@ -35,6 +35,7 @@ const envKeys = [
   'TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID',
   'TEAM_FOLLOW_UP_COGNITO_CLIENT_ID',
   'TEAM_FOLLOW_UP_API_BASE_URL',
+  'TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL',
   'TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE'
 ];
 const baseEnv = { ...process.env };
@@ -71,7 +72,8 @@ assert.notEqual(missingApi.status, 0, 'AWS-only build must require the API URL')
 const invalidPool = build({
   TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID: 'REPLACE_WITH_POOL',
   TEAM_FOLLOW_UP_COGNITO_CLIENT_ID: 'examplepublicclient123456789',
-  TEAM_FOLLOW_UP_API_BASE_URL: 'https://app-api.execute-api.us-east-1.amazonaws.com'
+  TEAM_FOLLOW_UP_API_BASE_URL: 'https://app-api.execute-api.us-east-1.amazonaws.com',
+  TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL: 'wss://app-realtime.execute-api.us-east-1.amazonaws.com/prod'
 });
 assert.notEqual(invalidPool.status, 0, 'Build must reject placeholder Cognito IDs');
 
@@ -85,15 +87,41 @@ for (const apiUrl of [
   const badApi = build({
     TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID: 'us-east-1_Example123',
     TEAM_FOLLOW_UP_COGNITO_CLIENT_ID: 'examplepublicclient123456789',
-    TEAM_FOLLOW_UP_API_BASE_URL: apiUrl
+    TEAM_FOLLOW_UP_API_BASE_URL: apiUrl,
+    TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL: 'wss://app-realtime.execute-api.us-east-1.amazonaws.com/prod'
   });
   assert.notEqual(badApi.status, 0, `Build must reject invalid API base URL: ${apiUrl}`);
 }
+
+for (const websocketUrl of [
+  'https://app-realtime.execute-api.us-east-1.amazonaws.com/prod',
+  'wss://example.com/prod',
+  'wss://user:pass@app-realtime.execute-api.us-east-1.amazonaws.com/prod',
+  'wss://app-realtime.execute-api.us-east-1.amazonaws.com/prod?ticket=bad',
+  'wss://app-realtime.execute-api.us-east-1.amazonaws.com/'
+]) {
+  const badWebSocket = build({
+    TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID: 'us-east-1_Example123',
+    TEAM_FOLLOW_UP_COGNITO_CLIENT_ID: 'examplepublicclient123456789',
+    TEAM_FOLLOW_UP_API_BASE_URL: 'https://app-api.execute-api.us-east-1.amazonaws.com',
+    TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL: websocketUrl
+  });
+  assert.notEqual(badWebSocket.status, 0, `Build must reject invalid real-time WebSocket URL: ${websocketUrl}`);
+}
+
+const missingWebSocket = build({
+  TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID: 'us-east-1_Example123',
+  TEAM_FOLLOW_UP_COGNITO_CLIENT_ID: 'examplepublicclient123456789',
+  TEAM_FOLLOW_UP_API_BASE_URL: 'https://app-api.execute-api.us-east-1.amazonaws.com'
+});
+assert.notEqual(missingWebSocket.status, 0, 'AWS-only build must require the real-time WebSocket URL.');
+assert.match(missingWebSocket.stderr, /TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL/);
 
 const valid = build({
   TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID: 'us-east-1_Example123',
   TEAM_FOLLOW_UP_COGNITO_CLIENT_ID: 'examplepublicclient123456789',
   TEAM_FOLLOW_UP_API_BASE_URL: 'https://app-api.execute-api.us-east-1.amazonaws.com',
+  TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL: 'wss://app-realtime.execute-api.us-east-1.amazonaws.com/prod',
   TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE: 'custom:teamUserId'
 });
 assert.equal(valid.status, 0, `AWS-configured build should succeed: ${valid.stderr}`);
@@ -142,6 +170,7 @@ assert.equal(config.cognito.userPoolId, 'us-east-1_Example123');
 assert.equal(config.cognito.userPoolClientId, 'examplepublicclient123456789');
 assert.equal(config.cognito.teamUserAttribute, 'custom:teamUserId');
 assert.equal(config.apiBaseUrl, 'https://app-api.execute-api.us-east-1.amazonaws.com');
+assert.equal(config.realtimeWebSocketUrl, 'wss://app-realtime.execute-api.us-east-1.amazonaws.com/prod');
 assert.ok(!('localAuth' in config), 'runtime config must not contain a local-auth switch');
 assert.ok(!('dataMode' in config), 'runtime config must not contain a database-mode switch');
 assert.ok(!('identityMap' in config.cognito), 'team identity must not be overridable by a browser-side map');

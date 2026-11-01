@@ -7,6 +7,7 @@ import sys
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
+from boto3.dynamodb.conditions import ConditionExpressionBuilder
 
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
@@ -15,6 +16,7 @@ os.environ.setdefault("ACTIVITY_TABLE", "UnitTest-Activity")
 os.environ.setdefault("USERS_TABLE", "UnitTest-Users")
 os.environ.setdefault("ARCHIVE_TABLE", "UnitTest-Archive")
 os.environ.setdefault("REALTIME_TABLE", "UnitTest-Realtime")
+os.environ.setdefault("WEBSOCKET_MANAGEMENT_ENDPOINT", "https://unit-test.execute-api.us-east-1.amazonaws.com/prod")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 import handler  # noqa: E402
@@ -513,7 +515,9 @@ class RealtimeDeliveryTests(unittest.TestCase):
         query = query_changes.call_args.kwargs
         self.assertEqual(query["Limit"], handler.REALTIME_PAGE_SIZE)
         self.assertTrue(query["ConsistentRead"])
-        self.assertIn("#sortKey > :sortKey", str(query["KeyConditionExpression"]))
+        built = ConditionExpressionBuilder().build_expression(query["KeyConditionExpression"], is_key_condition=True)
+        self.assertIn(">", built.condition_expression)
+        self.assertIn("cursor-1", built.attribute_value_placeholders.values())
 
     def test_change_query_with_empty_cursor_includes_first_outbox_event(self):
         rows = [{
@@ -527,8 +531,9 @@ class RealtimeDeliveryTests(unittest.TestCase):
         self.assertEqual([row["changeId"] for row in result["changes"]], ["chg-first"])
         self.assertEqual(result["nextCursor"], rows[0]["sortKey"])
         self.assertFalse(result["hasMore"])
-        expression = query_changes.call_args.kwargs["ExpressionAttributeValues"]
-        self.assertEqual(expression[":sortKey"], {"S": ""})
+        built = ConditionExpressionBuilder().build_expression(query_changes.call_args.kwargs["KeyConditionExpression"], is_key_condition=True)
+        self.assertIn(">", built.condition_expression)
+        self.assertIn("", built.attribute_value_placeholders.values())
 
     def test_ticket_creation_stores_only_hash_and_short_expiry(self):
         profile = {"userId": "u2"}

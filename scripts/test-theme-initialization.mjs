@@ -110,4 +110,96 @@ assert.ok(!html.includes("theme:['light','dark'].includes(u.preferences?.theme)?
 assert.ok(html.includes('theme:resolvePreferredTheme(incomingPreferences.theme,oldPreferences.theme,initialPreferences.theme)'),
   'Profile hydration must prioritize stored preferences and use the detected OS theme only when no saved theme exists.');
 
-console.log('Theme initialization tests passed: OS light/dark detection, unsupported locales, safe dark fallback, saved user preference precedence, and missing-theme profile hydration.');
+
+
+// Theme changes are a root-level style update. They must not rebuild the
+// workspace or account DOM while the browser is repainting the new palette.
+const applyThemeStart = html.indexOf('function applyTheme(){');
+const applyTranslationsStart = html.indexOf('function applyTranslations(){', applyThemeStart);
+assert.ok(applyThemeStart >= 0 && applyTranslationsStart > applyThemeStart,
+  'A dedicated applyTheme helper must exist before translation rendering.');
+const applyThemeSource = html.slice(applyThemeStart, applyTranslationsStart);
+function verifyApplyTheme(theme) {
+  const button = { innerHTML: '', title: '', attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
+  const themeSelect = { value: theme === 'light' ? 'dark' : 'light' };
+  const context = {
+    ui: { theme },
+    document: { documentElement: { dataset: { theme: theme === 'light' ? 'dark' : 'light' } } },
+    $: selector => selector === '#themeToggle' ? button : selector === '#accountTheme' ? themeSelect : null,
+    icon: name => `icon:${name}`
+  };
+  vm.runInNewContext(applyThemeSource + '\\nthis.applyTheme = applyTheme;', context);
+  context.applyTheme();
+  assert.equal(context.document.documentElement.dataset.theme, theme);
+  assert.equal(button.innerHTML, theme === 'light' ? 'icon:moon' : 'icon:sun');
+  assert.equal(button.title, theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
+  assert.equal(button.attributes['aria-label'], button.title);
+  assert.equal(themeSelect.value, theme, 'The account theme selector stays synchronized.');
+}
+verifyApplyTheme('light');
+verifyApplyTheme('dark');
+
+const preferenceHandlerStart = html.indexOf('async function changeUserPreference(key,value){');
+const renderFunctionStart = html.indexOf('function render(){', preferenceHandlerStart);
+assert.ok(preferenceHandlerStart >= 0 && renderFunctionStart > preferenceHandlerStart,
+  'The preference handler must remain available for targeted update testing.');
+const preferenceHandlerSource = html.slice(preferenceHandlerStart, renderFunctionStart);
+async function simulatePreferenceChange({ key, value, fail = false }) {
+  let renderCalls = 0;
+  let applyThemeCalls = 0;
+  let savedPreferences = null;
+  const context = {
+    ui: { lang: 'en', theme: 'dark' },
+    rawCurrentUser: () => ({ id: 'u1', preferences: { lang: 'en', theme: 'dark' } }),
+    render: () => { renderCalls += 1; },
+    applyTheme: () => { applyThemeCalls += 1; },
+    window: {
+      TeamFollowUpDataApi: {
+        updateMyProfile: async fields => {
+          savedPreferences = fields.preferences;
+          if (fail) throw new Error('simulated save failure');
+          return { user: { id: 'u1' } };
+        }
+      }
+    },
+    mergeProfileIntoData: () => {},
+    toast: () => {},
+    tr: () => 'Account error'
+  };
+  vm.runInNewContext(preferenceHandlerSource + '\\nthis.changeUserPreference = changeUserPreference;', context);
+  await context.changeUserPreference(key, value);
+  return { context, renderCalls, applyThemeCalls, savedPreferences };
+}
+{
+  const result = await simulatePreferenceChange({ key: 'theme', value: 'light' });
+  assert.equal(result.context.ui.theme, 'light');
+  assert.equal(result.renderCalls, 0, 'A successful theme change must not run the full renderer.');
+  assert.equal(result.applyThemeCalls, 2, 'Apply the theme immediately and resynchronize after the save.');
+  assert.equal(result.savedPreferences.theme, 'light', 'The selected theme is still persisted to the signed-in user profile.');
+}
+{
+  const result = await simulatePreferenceChange({ key: 'theme', value: 'light', fail: true });
+  assert.equal(result.context.ui.theme, 'dark', 'A failed theme save restores the previous theme.');
+  assert.equal(result.renderCalls, 0, 'Theme rollback must not run the full renderer.');
+  assert.equal(result.applyThemeCalls, 2, 'Theme rollback is applied directly.');
+}
+{
+  const result = await simulatePreferenceChange({ key: 'lang', value: 'ar' });
+  assert.equal(result.context.ui.lang, 'ar');
+  assert.equal(result.renderCalls, 2, 'Language changes still render the translated interface.');
+  assert.equal(result.applyThemeCalls, 0, 'The theme-only path does not alter language updates.');
+}
+
+// During API hydration, capture the persisted theme and apply it only after
+// the initial workspace render has finished. This avoids interleaving a full
+// data render with the saved-theme palette change.
+assert.ok(html.includes("if(['light','dark'].includes(profile.preferences.theme))hydratedUserTheme=profile.preferences.theme;"),
+  'Workspace hydration must retain the signed-in user theme for post-render application.');
+assert.ok(html.includes('skipNextSidebarApiRefresh=true;render();\\n  if(hydratedUserTheme){ui.theme=hydratedUserTheme;applyTheme();}'),
+  'The saved API theme must be applied after the initial workspace render.');
+if (html.includes('savedUserTheme=null;')) {
+  assert.ok(html.includes('render();\\n if(savedUserTheme){ui.theme=savedUserTheme;applyTheme();}'),
+    'The local demo theme must also be applied after its initial render.');
+}
+
+console.log('Theme tests passed: OS preference detection, saved-theme precedence, fast theme-only application, save rollback, and post-render hydration.');

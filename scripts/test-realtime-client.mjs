@@ -68,7 +68,7 @@ function createContext(overrides = {}) {
     },
     navigator: { onLine: true },
     WebSocket: MockWebSocket,
-    ui, data,
+    ui, data, lastApiSnapshot: null,
     dataLoadState: { childrenLoaded: new Set() },
     rawCurrentUser: () => ({ id: 'u2' }),
     rootParent: row => row?.rootParentId ? { id: row.rootParentId } : null,

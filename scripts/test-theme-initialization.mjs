@@ -122,23 +122,41 @@ const applyThemeSource = html.slice(applyThemeStart, applyTranslationsStart);
 function verifyApplyTheme(theme) {
   const button = { innerHTML: '', title: '', attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
   const themeSelect = { value: theme === 'light' ? 'dark' : 'light' };
+  const classes = new Set();
+  const frameCallbacks = [];
   const context = {
     ui: { theme },
-    document: { documentElement: { dataset: { theme: theme === 'light' ? 'dark' : 'light' } } },
+    document: { documentElement: {
+      dataset: { theme: theme === 'light' ? 'dark' : 'light' },
+      classList: {
+        add(value) { classes.add(value); },
+        remove(value) { classes.delete(value); }
+      }
+    } },
+    requestAnimationFrame: callback => frameCallbacks.push(callback),
     $: selector => selector === '#themeToggle' ? button : selector === '#accountTheme' ? themeSelect : null,
     icon: name => `icon:${name}`
   };
   vm.runInNewContext(applyThemeSource + '\nthis.applyTheme = applyTheme;', context);
   context.applyTheme();
   assert.equal(context.document.documentElement.dataset.theme, theme);
+  assert.ok(classes.has('theme-switching'), 'Theme transitions stay suppressed during the palette repaint.');
+  assert.equal(frameCallbacks.length, 1, 'The suppression cleanup waits for an animation frame.');
   assert.equal(button.innerHTML, theme === 'light' ? 'icon:moon' : 'icon:sun');
   assert.equal(button.title, theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
   assert.equal(button.attributes['aria-label'], button.title);
   assert.equal(themeSelect.value, theme, 'The account theme selector stays synchronized.');
+  frameCallbacks.shift()();
+  assert.ok(classes.has('theme-switching'), 'Suppression remains active through the next frame.');
+  assert.equal(frameCallbacks.length, 1, 'Cleanup waits one additional frame so the new palette can paint.');
+  frameCallbacks.shift()();
+  assert.ok(!classes.has('theme-switching'), 'Normal interactions regain their transitions after the theme repaint.');
 }
 verifyApplyTheme('light');
 verifyApplyTheme('dark');
 
+assert.ok(html.includes('html.theme-switching *,html.theme-switching *::before,html.theme-switching *::after{transition:none!important;animation:none!important}'),
+  'Theme changes must suppress all descendant and pseudo-element transitions while the palette is repainted.');
 const preferenceHandlerStart = html.indexOf('async function changeUserPreference(key,value){');
 const renderFunctionStart = html.indexOf('function render(){', preferenceHandlerStart);
 assert.ok(preferenceHandlerStart >= 0 && renderFunctionStart > preferenceHandlerStart,

@@ -3359,12 +3359,20 @@ async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
 }
 let realtimeSocket=null,realtimeReconnectTimer=null,realtimeHeartbeatTimer=null,realtimeCatchupTimer=null;
 let realtimeRunning=false,realtimeGeneration=0,realtimeReconnectDelay=1000,realtimeCursor='';
-let realtimeCatchupPromise=null,realtimeCatchupRequested=false,realtimeAssignedRefreshPending=false;
+let realtimeCatchupPromise=null,realtimeCatchupRequested=false,realtimeAssignedRefreshPending=false,realtimeInitialSyncComplete=false;
 const REALTIME_APPLIED_CHANGE_LIMIT=2000;
 let realtimeAppliedChangeIds=new Set(),realtimeAppliedChangeOrder=[],realtimeApplyQueue=Promise.resolve();
 function clearRealtimeHeartbeat(){if(realtimeHeartbeatTimer){clearInterval(realtimeHeartbeatTimer);realtimeHeartbeatTimer=null;}}
+function synchronizeRealtimeInitialAssignments(){
+ if(realtimeInitialSyncComplete)return;
+ realtimeInitialSyncComplete=true;ui.accountAssignedLoaded=false;
+ if(ui.page==='account'&&ui.accountTab==='assigned'){
+  if(ui.accountAssignedLoading)realtimeAssignedRefreshPending=true;
+  else void loadAccountAssignedItems();
+ }
+}
 function stopRealtimeNotifications(){
- realtimeRunning=false;realtimeGeneration++;realtimeCursor='';realtimeCatchupRequested=false;
+ realtimeRunning=false;realtimeGeneration++;realtimeCursor='';realtimeCatchupRequested=false;realtimeInitialSyncComplete=false;
  if(realtimeReconnectTimer){clearTimeout(realtimeReconnectTimer);realtimeReconnectTimer=null;}
  if(realtimeCatchupTimer){clearTimeout(realtimeCatchupTimer);realtimeCatchupTimer=null;}
  clearRealtimeHeartbeat();
@@ -3519,6 +3527,7 @@ async function connectRealtimeNotifications(generation){
    realtimeReconnectDelay=1000;
    const ping=()=>{if(socket.readyState===WebSocket.OPEN){try{socket.send(JSON.stringify({action:'ping'}));}catch(error){try{socket.close();}catch(closeError){}}}};
    clearRealtimeHeartbeat();ping();realtimeHeartbeatTimer=setInterval(()=>{ping();scheduleRealtimeCatchup(0);},4*60*1000);
+   synchronizeRealtimeInitialAssignments();
    scheduleRealtimeCatchup(0);
   };
   socket.onmessage=event=>{

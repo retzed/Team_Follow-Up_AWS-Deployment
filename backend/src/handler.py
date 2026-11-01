@@ -1063,9 +1063,9 @@ def create_realtime_ticket(profile):
 
 
 def query_realtime_changes(since, limit=REALTIME_PAGE_SIZE):
+    # An empty cursor means the ticket was issued before the first outbox event
+    # existed. Query from the beginning so that the first subsequent write is not skipped.
     cursor = str(since or '')
-    if not cursor:
-        return {'changes': [], 'nextCursor': latest_realtime_cursor(), 'hasMore': False}
     page_size = max(1, min(REALTIME_PAGE_SIZE, int(limit or REALTIME_PAGE_SIZE)))
     result = REALTIME_TABLE.query(
         KeyConditionExpression=Key('partitionKey').eq('CHANGE') & Key('sortKey').gt(cursor),

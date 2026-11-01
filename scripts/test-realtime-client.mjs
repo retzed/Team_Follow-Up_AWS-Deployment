@@ -201,7 +201,9 @@ function createContext(overrides = {}) {
   assert.equal(url.searchParams.get('ticket'), 'one-time-ticket', 'the one-time ticket is passed only to the WebSocket handshake');
   socket.readyState = MockWebSocket.OPEN;
   socket.onopen();
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(JSON.parse(socket.sent[0]).action, 'ping', 'an immediate heartbeat extends the connection lease');
+  assert.equal(calls.assigned, 1, 'the first successful connection revalidates Assigned Items after the initial snapshot/ticket race');
   context.stopRealtimeNotifications();
   assert.equal(context.getRealtimeState().running, false);
   assert.equal(socket.readyState, MockWebSocket.CLOSED, 'sign-out/page lifecycle cleanup closes the active channel');
@@ -214,6 +216,8 @@ function createContext(overrides = {}) {
   const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
   socket.readyState = MockWebSocket.OPEN;
   socket.onopen();
+  await new Promise(resolve => setImmediate(resolve));
+  const assignedCallsAtConnect = calls.assigned;
   const pushed = {
     type: 'items.changed', changeId: 'pushed-assignment', cursor: 'cursor-pushed',
     itemId: 'task-1', rootParentIds: ['project-1'], topLevelIds: [], parentIds: ['project-1'],
@@ -222,10 +226,10 @@ function createContext(overrides = {}) {
   socket.onmessage({ data: JSON.stringify(pushed) });
   await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(calls.assigned, 1, 'the WebSocket payload itself refreshes the newly assigned user without waiting for an outbox query');
+  assert.equal(calls.assigned, assignedCallsAtConnect + 1, 'the WebSocket payload itself refreshes the newly assigned user without waiting for an outbox query');
   assert.equal(calls.queryCursors, undefined, 'direct push application does not depend on a change-feed round trip');
   await context.queueRealtimeChangeBatch([pushed]);
-  assert.equal(calls.assigned, 1, 'the same event in durable catch-up is deduplicated');
+  assert.equal(calls.assigned, assignedCallsAtConnect + 1, 'the same event in durable catch-up is deduplicated');
   context.stopRealtimeNotifications();
 }
 

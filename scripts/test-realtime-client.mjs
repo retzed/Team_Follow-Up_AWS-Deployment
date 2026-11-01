@@ -28,7 +28,7 @@ class MockWebSocket {
 }
 
 function createContext(overrides = {}) {
-  const calls = { assigned: 0, pinned: 0, roots: [], resolved: [], parentRenders: 0, detailRenders: 0, activity: 0, globalHistory: 0 };
+  const calls = { assigned: 0, pinned: 0, roots: [], resolved: [], parentRenders: 0, detailRenders: 0, activity: 0, globalHistory: 0, accountRenders: 0 };
   const ui = {
     actingUserId: 'u2', page: 'account', accountTab: 'assigned',
     accountAssignedLoaded: true, accountAssignedLoading: false,
@@ -75,6 +75,7 @@ function createContext(overrides = {}) {
     invalidateHierarchyIndex: () => {},
     renderParentList: () => { calls.parentRenders += 1; },
     renderDetail: () => { calls.detailRenders += 1; },
+    renderAccountPage: () => { calls.accountRenders += 1; },
     ensureRootChildrenLoaded: async (id, options) => { calls.roots.push([String(id), options]); },
     refreshActivityFor: async () => { calls.activity += 1; },
     refreshApplicationHistory: () => { calls.globalHistory += 1; },
@@ -136,6 +137,19 @@ function createContext(overrides = {}) {
   assert.equal(ui.selectedParentId, 'project-new', 'a deleted selection moves to an active root');
   assert.ok(!data.children.some(row => row.rootParentId === 'project-deleted'), 'children of a deleted root are evicted from the loaded view');
   assert.ok(calls.roots.some(entry => entry[0] === 'project-new'), 'the replacement selected root is loaded');
+}
+
+{
+  const { context, calls, ui } = createContext({
+    resolvedItems: [{ id: 'project-1', type: 'project', updatedAt: '2026-11-02T00:00:00.000Z' }]
+  });
+  ui.accountTab = 'search';
+  await context.applyRealtimeChangeBatch([{
+    type: 'items.changed', changeId: 'search-refresh',
+    itemId: 'project-1', rootParentIds: ['project-1'], topLevelIds: ['project-1'],
+    assigneeIds: ['u3'], parentIds: [], deleted: false, version: 2
+  }]);
+  assert.equal(calls.accountRenders, 1, 'the open Account Search tab rerenders from the refreshed top-level records');
 }
 
 {

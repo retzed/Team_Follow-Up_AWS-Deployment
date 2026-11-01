@@ -472,6 +472,8 @@ class RealtimeDeliveryTests(unittest.TestCase):
         self.assertEqual(public["version"], 4)
         self.assertEqual(public["changeKind"], "updated")
         self.assertTrue(public["cursor"])
+        cursor_timestamp = change["sortKey"].split("#", 1)[0]
+        self.assertEqual(len(cursor_timestamp.rsplit(".", 1)[1].rstrip("Z")), 6, "durable cursors retain microsecond precision")
         serialized = json.dumps(public)
         self.assertNotIn("Private", serialized)
         self.assertNotIn("description", public)

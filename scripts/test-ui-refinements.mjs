@@ -7,7 +7,7 @@ const femaleUserIcon = html.match(/'female-user':'([^']+)'/);
 const genericUserIcon = html.match(/\buser:'([^']+)'/);
 assert.ok(femaleUserIcon && genericUserIcon, 'Both Female User and generic User must exist in the inline SVG icon registry.');
 assert.notEqual(femaleUserIcon[1], genericUserIcon[1], 'Female User must have a distinct glyph rather than duplicating the generic User icon.');
-assert.ok(femaleUserIcon[1].includes('M7.8 9c-.7-3.3') && femaleUserIcon[1].includes('M8 7.5c1.9.5') && femaleUserIcon[1].includes('M7.9 8.2c-1.5 1'), 'Female User must use a short bob with a side-swept fringe and jaw-length ends, not a long enclosing veil.');
+assert.ok(femaleUserIcon[1].includes('M8.1 13.7C7.2 13 6.6 12 6.7 10.7') && femaleUserIcon[1].includes('M8.1 7.2C9.5 7.7 11 7.1 12.1 5.8') && femaleUserIcon[1].includes('stroke-width="1.1"'), 'Female User must use one continuous bob outline, a side-swept fringe, and fine strand details instead of separate circular hair shapes.');
 assert.ok(femaleUserIcon[1].includes('L12 18l2.8-2.6') && html.includes("{value:'female-user'}") && html.includes("'female-user':'Female User'"), 'Female User must include its neckline and remain selectable with its explicit label.');
 const targetedStart = html.indexOf('<style id="targeted-history-and-child-search-polish">');
 const targetedEnd = html.indexOf('</style>', targetedStart);

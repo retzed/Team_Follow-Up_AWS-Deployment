@@ -68,12 +68,12 @@ function validateRealtimeWebSocketUrl(value) {
     parsed.search ||
     parsed.hash ||
     parsed.pathname === '/' ||
-    /example\\.(com|invalid)$/i.test(parsed.hostname) ||
+    /example\.(com|invalid)$/i.test(parsed.hostname) ||
     /REPLACE|YOUR_|<|>/i.test(value)
   ) {
     throw new Error(`${required.realtimeWebSocketUrl} must be a real WSS endpoint including its stage path, without credentials, query, or fragment.`);
   }
-  return parsed.origin + parsed.pathname.replace(/\\/+$/, '');
+  return parsed.origin + parsed.pathname.replace(/\/+$/, '');
 }
 
 const source = await readFile(SOURCE_PATH, 'utf8');

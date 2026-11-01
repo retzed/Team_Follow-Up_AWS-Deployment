@@ -3436,7 +3436,7 @@ async function applyRealtimeChangeBatch(changes){
  }
 }
 async function catchUpRealtimeChanges(){
- if(!realtimeRunning||!realtimeCursor)return;
+ if(!realtimeRunning)return;
  if(realtimeCatchupPromise){realtimeCatchupRequested=true;return realtimeCatchupPromise;}
  realtimeCatchupPromise=(async()=>{
   do{
@@ -3481,7 +3481,7 @@ async function connectRealtimeNotifications(generation){
    if(!realtimeRunning||generation!==realtimeGeneration||realtimeSocket!==socket){try{socket.close(1000,'Stale connection');}catch(error){}return;}
    realtimeReconnectDelay=1000;
    const ping=()=>{if(socket.readyState===WebSocket.OPEN){try{socket.send(JSON.stringify({action:'ping'}));}catch(error){try{socket.close();}catch(closeError){}}}};
-   clearRealtimeHeartbeat();ping();realtimeHeartbeatTimer=setInterval(ping,4*60*1000);
+   clearRealtimeHeartbeat();ping();realtimeHeartbeatTimer=setInterval(()=>{ping();scheduleRealtimeCatchup(0);},4*60*1000);
    scheduleRealtimeCatchup(0);
   };
   socket.onmessage=event=>{

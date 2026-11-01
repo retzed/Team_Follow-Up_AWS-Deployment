@@ -14,6 +14,7 @@ os.environ.setdefault("ITEMS_TABLE", "UnitTest-Items")
 os.environ.setdefault("ACTIVITY_TABLE", "UnitTest-Activity")
 os.environ.setdefault("USERS_TABLE", "UnitTest-Users")
 os.environ.setdefault("ARCHIVE_TABLE", "UnitTest-Archive")
+os.environ.setdefault("REALTIME_TABLE", "UnitTest-Realtime")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 import handler  # noqa: E402
@@ -422,6 +423,181 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(event["action"], "Updated profile name")
 
 
+
+
+
+class RealtimeDeliveryTests(unittest.TestCase):
+    def test_change_record_contains_only_targeted_refresh_metadata(self):
+        previous = {
+            "itemId": "task-1", "type": "task", "parentId": "project-old",
+            "rootParentId": "project-old", "ownerId": "u2", "version": 3,
+            "name": "Private old title", "description": "Private old description",
+        }
+        updated = {
+            "itemId": "task-1", "type": "task", "parentId": "project-new",
+            "rootParentId": "project-new", "ownerId": "u3", "version": 4,
+            "name": "Private new title", "description": "Private new description",
+        }
+        change = handler.make_realtime_change(updated, previous=previous, change_kind="updated")
+        public = handler.public_realtime_change(change)
+
+        self.assertEqual(public["type"], "items.changed")
+        self.assertEqual(public["itemId"], "task-1")
+        self.assertEqual(set(public["rootParentIds"]), {"project-old", "project-new"})
+        self.assertEqual(set(public["parentIds"]), {"project-old", "project-new"})
+        self.assertEqual(set(public["assigneeIds"]), {"u2", "u3"})
+        self.assertEqual(public["version"], 4)
+        self.assertEqual(public["changeKind"], "updated")
+        self.assertTrue(public["cursor"])
+        serialized = json.dumps(public)
+        self.assertNotIn("Private", serialized)
+        self.assertNotIn("description", public)
+        self.assertLessEqual(change["expiresAt"] - handler.epoch_seconds(), handler.REALTIME_CHANGE_RETENTION_SECONDS)
+
+    def test_subtree_delete_change_includes_affected_roots_and_assignees(self):
+        root = {"itemId": "project-1", "type": "project", "rootParentId": "project-1", "ownerId": "u1"}
+        task = {"itemId": "task-1", "type": "task", "parentId": "project-1", "rootParentId": "project-1", "ownerId": "u2"}
+        followup = {"itemId": "followup-1", "type": "followup", "parentId": "task-1", "rootParentId": "project-1", "ownerId": "u3"}
+        change = handler.public_realtime_change(handler.make_realtime_change(
+            root, affected_items=[root, task, followup], change_kind="deleted", deleted=True,
+        ))
+        self.assertTrue(change["deleted"])
+        self.assertEqual(change["rootParentIds"], ["project-1"])
+        self.assertEqual(set(change["parentIds"]), {"project-1", "task-1"})
+        self.assertEqual(set(change["assigneeIds"]), {"u1", "u2", "u3"})
+
+    def test_change_outbox_put_uses_durable_change_partition(self):
+        change = {
+            "partitionKey": "CHANGE", "sortKey": "2026-11-02T00:00:00.000Z#chg-1",
+            "changeId": "chg-1", "expiresAt": 1793577600,
+        }
+        put = handler.realtime_change_put(change)["Put"]
+        self.assertEqual(put["TableName"], handler.REALTIME_TABLE.name)
+        self.assertEqual(put["Item"]["partitionKey"], {"S": "CHANGE"})
+        self.assertEqual(put["Item"]["changeId"], {"S": "chg-1"})
+        self.assertIn("attribute_not_exists(#partitionKey)", put["ConditionExpression"])
+
+    def test_change_query_uses_exclusive_cursor_and_returns_next_cursor(self):
+        rows = [
+            {"sortKey": "cursor-2", "changeId": "chg-2", "changeType": "items.changed", "itemId": "task-2"},
+            {"sortKey": "cursor-3", "changeId": "chg-3", "changeType": "items.changed", "itemId": "task-3"},
+        ]
+        with patch.object(handler.REALTIME_TABLE, "query", return_value={
+            "Items": rows, "LastEvaluatedKey": {"partitionKey": "CHANGE", "sortKey": "cursor-3"},
+        }) as query_changes:
+            result = handler.query_realtime_changes("cursor-1", 999)
+        self.assertEqual([row["changeId"] for row in result["changes"]], ["chg-2", "chg-3"])
+        self.assertEqual(result["nextCursor"], "cursor-3")
+        self.assertTrue(result["hasMore"])
+        query = query_changes.call_args.kwargs
+        self.assertEqual(query["Limit"], handler.REALTIME_PAGE_SIZE)
+        self.assertTrue(query["ConsistentRead"])
+        self.assertIn("#sortKey > :sortKey", str(query["KeyConditionExpression"]))
+
+    def test_ticket_creation_stores_only_hash_and_short_expiry(self):
+        profile = {"userId": "u2"}
+        with patch.object(handler.REALTIME_TABLE, "put_item") as put_ticket, \
+             patch.object(handler, "latest_realtime_cursor", return_value="cursor-current"), \
+             patch.object(handler, "epoch_seconds", return_value=1000):
+            result = handler.create_realtime_ticket(profile)
+        payload = json.loads(result["body"])
+        self.assertEqual(result["statusCode"], 201)
+        self.assertEqual(payload["expiresIn"], handler.REALTIME_TICKET_SECONDS)
+        self.assertEqual(payload["cursor"], "cursor-current")
+        item = put_ticket.call_args.kwargs["Item"]
+        self.assertEqual(item["userId"], "u2")
+        self.assertEqual(item["expiresAt"], 1000 + handler.REALTIME_TICKET_SECONDS)
+        self.assertTrue(item["partitionKey"].startswith("TICKET#"))
+        self.assertNotIn(payload["ticket"], item["partitionKey"])
+        self.assertNotIn("ticket", item)
+
+    def test_websocket_connect_consumes_single_use_ticket_transactionally(self):
+        connection_event = {
+            "requestContext": {"routeKey": "$connect", "connectionId": "connection-1"},
+            "queryStringParameters": {"ticket": "opaque-single-use-ticket"},
+        }
+        ticket = {"userId": "u3", "expiresAt": handler.epoch_seconds() + 20}
+        with patch.object(handler.REALTIME_TABLE, "get_item", return_value={"Item": ticket}) as get_ticket, \
+             patch.object(handler.ddb.meta.client, "transact_write_items") as transact:
+            result = handler.websocket_handler(connection_event)
+        self.assertEqual(result["statusCode"], 200)
+        get_ticket.assert_called_once()
+        transaction = transact.call_args.kwargs["TransactItems"]
+        self.assertEqual(len(transaction), 2)
+        self.assertEqual(transaction[0]["Delete"]["TableName"], handler.REALTIME_TABLE.name)
+        self.assertEqual(transaction[1]["Put"]["Item"]["connectionId"], {"S": "connection-1"})
+        self.assertEqual(transaction[1]["Put"]["Item"]["userId"], {"S": "u3"})
+
+    def test_websocket_connect_rejects_expired_or_missing_ticket(self):
+        connection_event = {
+            "requestContext": {"routeKey": "$connect", "connectionId": "connection-1"},
+            "queryStringParameters": {"ticket": "expired-ticket"},
+        }
+        with patch.object(handler.REALTIME_TABLE, "get_item", return_value={"Item": {
+            "userId": "u3", "expiresAt": handler.epoch_seconds() - 1,
+        }}), patch.object(handler.ddb.meta.client, "transact_write_items") as transact:
+            result = handler.websocket_handler(connection_event)
+        self.assertEqual(result["statusCode"], 401)
+        transact.assert_not_called()
+
+    def test_websocket_ping_extends_connection_and_disconnect_removes_it(self):
+        with patch.object(handler.REALTIME_TABLE, "update_item") as update, \
+             patch.object(handler.REALTIME_TABLE, "delete_item") as delete, \
+             patch.object(handler, "epoch_seconds", return_value=2000):
+            ping = handler.websocket_handler({
+                "requestContext": {"routeKey": "$default", "connectionId": "connection-7"},
+                "body": json.dumps({"action": "ping"}),
+            })
+            disconnect = handler.websocket_handler({
+                "requestContext": {"routeKey": "$disconnect", "connectionId": "connection-7"},
+            })
+        self.assertEqual(ping["statusCode"], 200)
+        self.assertEqual(update.call_args.kwargs["ExpressionAttributeValues"][":expiresAt"], 2000 + handler.REALTIME_CONNECTION_TTL_SECONDS)
+        self.assertEqual(disconnect["statusCode"], 200)
+        self.assertEqual(delete.call_args.kwargs["Key"], {"partitionKey": "CONNECTION", "sortKey": "connection-7"})
+
+    def test_change_publish_fans_out_only_compact_metadata_and_cleans_gone_connections(self):
+        connections = [
+            {"connectionId": "live-1", "expiresAt": handler.epoch_seconds() + 100},
+            {"connectionId": "gone-1", "expiresAt": handler.epoch_seconds() + 100},
+        ]
+        management = SimpleNamespace(post_to_connection=unittest.mock.Mock(side_effect=[
+            None,
+            handler.ClientError({"Error": {"Code": "GoneException"}}, "PostToConnection"),
+        ]))
+        change = {
+            "changeId": "chg-1", "sortKey": "cursor-1", "changeType": "items.changed",
+            "changeKind": "updated", "itemId": "task-1", "rootParentIds": ["project-1"],
+            "topLevelIds": [], "parentIds": ["project-1"], "assigneeIds": ["u2"],
+            "deleted": False, "version": 4, "occurredAt": "2026-11-02T00:00:00.000Z",
+        }
+        with patch.object(handler, "all_pages", return_value=connections), \
+             patch.object(handler.boto3, "client", return_value=management), \
+             patch.object(handler.REALTIME_TABLE, "delete_item") as delete:
+            handler.publish_realtime_change(change)
+        self.assertEqual(management.post_to_connection.call_count, 2)
+        message = json.loads(management.post_to_connection.call_args_list[0].kwargs["Data"])
+        self.assertEqual(message["changeId"], "chg-1")
+        self.assertEqual(message["assigneeIds"], ["u2"])
+        self.assertNotIn("name", message)
+        self.assertEqual(delete.call_count, 1)
+        self.assertEqual(delete.call_args.kwargs["Key"]["sortKey"], "gone-1")
+
+    def test_realtime_ticket_route_requires_authenticated_team_profile(self):
+        event = {
+            "rawPath": "/realtime/ticket",
+            "requestContext": {
+                "http": {"method": "POST"},
+                "authorizer": {"jwt": {"claims": {"sub": "mapped-sub"}}},
+            },
+            "body": "{}",
+        }
+        with patch.object(handler, "current_profile", return_value={"userId": "u2"}) as profile_lookup, \
+             patch.object(handler, "create_realtime_ticket", return_value=handler.response(201, {"ticket": "x"})) as create_ticket:
+            result = handler.lambda_handler(event, SimpleNamespace(aws_request_id="realtime-ticket-test"))
+        self.assertEqual(result["statusCode"], 201)
+        profile_lookup.assert_called_once_with(event)
+        create_ticket.assert_called_once_with({"userId": "u2"})
 
 class CurrentPasswordVerificationTests(unittest.TestCase):
     claims = {"sub": "cognito-sub-u2"}

@@ -5,7 +5,8 @@ const OUTPUT_PATH = 'dist/index.html';
 const required = {
   userPoolId: 'TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID',
   userPoolClientId: 'TEAM_FOLLOW_UP_COGNITO_CLIENT_ID',
-  apiBaseUrl: 'TEAM_FOLLOW_UP_API_BASE_URL'
+  apiBaseUrl: 'TEAM_FOLLOW_UP_API_BASE_URL',
+  realtimeWebSocketUrl: 'TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL'
 };
 
 function requireValue(envName) {
@@ -52,6 +53,29 @@ function validateApiBaseUrl(value) {
   return parsed.origin;
 }
 
+function validateRealtimeWebSocketUrl(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${required.realtimeWebSocketUrl} must be a valid WSS API Gateway WebSocket URL.`);
+  }
+  if (
+    parsed.protocol !== 'wss:' ||
+    !parsed.hostname ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash ||
+    parsed.pathname === '/' ||
+    /example\\.(com|invalid)$/i.test(parsed.hostname) ||
+    /REPLACE|YOUR_|<|>/i.test(value)
+  ) {
+    throw new Error(`${required.realtimeWebSocketUrl} must be a real WSS endpoint including its stage path, without credentials, query, or fragment.`);
+  }
+  return parsed.origin + parsed.pathname.replace(/\\/+$/, '');
+}
+
 const source = await readFile(SOURCE_PATH, 'utf8');
 const configRegex = /<script id="team-follow-up-runtime-config">[\s\S]*?<\/script>/;
 if (!configRegex.test(source)) {
@@ -61,6 +85,7 @@ if (!configRegex.test(source)) {
 const userPoolId = validateUserPoolId(requireValue(required.userPoolId));
 const userPoolClientId = validateClientId(requireValue(required.userPoolClientId));
 const apiBaseUrl = validateApiBaseUrl(requireValue(required.apiBaseUrl));
+const realtimeWebSocketUrl = validateRealtimeWebSocketUrl(requireValue(required.realtimeWebSocketUrl));
 const teamUserAttribute = (process.env.TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE || 'custom:teamUserId').trim();
 if (teamUserAttribute !== 'custom:teamUserId') {
   throw new Error('TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE must be custom:teamUserId; team identity mapping is managed by Cognito.');
@@ -68,7 +93,8 @@ if (teamUserAttribute !== 'custom:teamUserId') {
 
 const runtimeConfig = {
   cognito: { userPoolId, userPoolClientId, teamUserAttribute },
-  apiBaseUrl
+  apiBaseUrl,
+  realtimeWebSocketUrl
 };
 const serialized = JSON.stringify(runtimeConfig, null, 2).replaceAll('<', '\\u003c');
 const replacement = `<script id="team-follow-up-runtime-config">\n/* Generated at build time from public AWS configuration. Never put secrets here. */\nwindow.TEAM_FOLLOW_UP_CONFIG = Object.freeze(${serialized});\n</script>`;
@@ -77,4 +103,4 @@ const output = source.replace(configRegex, replacement);
 await mkdir('dist', { recursive: true });
 await writeFile(OUTPUT_PATH, output, 'utf8');
 
-console.log(`Built AWS-only frontend to ${OUTPUT_PATH} (Cognito + HTTPS API configured).`);
+console.log(`Built AWS-only frontend to ${OUTPUT_PATH} (Cognito + HTTPS API + authenticated real-time WebSocket configured).`);

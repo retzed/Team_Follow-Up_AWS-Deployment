@@ -3399,7 +3399,7 @@ function queueRealtimeChangeBatch(changes){
 function realtimeCatchupQueryCursor(){
  const cursor=String(realtimeCursor||'');if(!cursor)return cursor;
  const timestamp=cursor.split('#',1)[0];
- if(!/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3,6}Z$/.test(timestamp))return cursor;
+ if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3,6}Z$/.test(timestamp))return cursor;
  const milliseconds=Date.parse(timestamp);
  if(!Number.isFinite(milliseconds))return cursor;
  const cutoff=new Date(milliseconds-60*1000).toISOString().replace(/\.(\d{3})Z$/,(_,fraction)=>'.'+fraction+'000Z');

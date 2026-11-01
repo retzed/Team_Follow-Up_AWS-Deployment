@@ -191,7 +191,7 @@ function createContext(overrides = {}) {
 }
 
 {
-  const { context } = createContext();
+  const { context, calls } = createContext();
   context.startRealtimeNotifications();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(context.getRealtimeState().running, true);

@@ -5,20 +5,23 @@
 (function(){
  const root=document.documentElement;
  root.classList.add('app-booting','auth-pending');
- let lang='en', theme='dark', supported=false;
+ let lang='en',theme='dark';
  try{
   const raw=(Array.isArray(navigator.languages)&&navigator.languages.length?navigator.languages[0]:navigator.language);
   if(typeof raw==='string'&&raw.trim()){
    const tag=raw.trim().toLowerCase();
-   if(tag==='en'||tag.startsWith('en-')){lang='en';supported=true;}
-   else if(tag==='ar'||tag.startsWith('ar-')){lang='ar';supported=true;}
+   if(tag==='en'||tag.startsWith('en-'))lang='en';
+   else if(tag==='ar'||tag.startsWith('ar-'))lang='ar';
   }
-  if(supported&&typeof window.matchMedia==='function'&&!window.matchMedia('(forced-colors: active)').matches){
+ }catch(e){lang='en';}
+ // Resolve the OS theme independently of the browser's interface language.
+ try{
+  if(typeof window.matchMedia==='function'&&!window.matchMedia('(forced-colors: active)').matches){
    const dark=window.matchMedia('(prefers-color-scheme: dark)'),light=window.matchMedia('(prefers-color-scheme: light)');
    if(typeof dark.matches==='boolean'&&typeof light.matches==='boolean'&&dark.matches!==light.matches)theme=dark.matches?'dark':'light';
   }
- }catch(e){lang='en';theme='dark';}
- root.lang=lang;root.dir=lang==='ar'?'rtl':'ltr';root.dataset.theme=theme;
+ }catch(e){theme='dark';}
+ root.lang=lang;root.dir=lang==='ar'?'rtl':'ltr';root.dataset.systemTheme=theme;root.dataset.theme=theme;
 })();
 </script>
 <meta charset="utf-8">
@@ -1277,7 +1280,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   for(const key of ['archiveId','archivePK','archiveSort','archiveRootPK','archiveRootSort','archiveParentId','archivedByUserId','deletedAt'])delete item[key];
   return item;
  }
- function toAppUser(user){const id=String(user.userId||user.id||'');return {id,name:String(user.displayName||user.name||''),nameArabic:String(user.displayNameArabic||user.nameArabic||''),role:String(user.role||'AWS Engineer'),roleArabic:String(user.roleArabic||''),icon:String(user.icon||((id==='u1'||user.role==='Team Leader')?'compass':'terminal')),privilege:String(user.privilege||(id==='u1'?'Administrator':'User')),phoneNumber:String(user.phoneNumber||''),email:String(user.email||''),preferences:{lang:['en','ar'].includes(user.preferences?.lang)?user.preferences.lang:'en',theme:['light','dark'].includes(user.preferences?.theme)?user.preferences.theme:'dark'},pinnedItemIds:Array.isArray(user.pinnedItemIds)?[...new Set(user.pinnedItemIds.map(String))]:[]};}
+ function toAppUser(user){const id=String(user.userId||user.id||'');return {id,name:String(user.displayName||user.name||''),nameArabic:String(user.displayNameArabic||user.nameArabic||''),role:String(user.role||'AWS Engineer'),roleArabic:String(user.roleArabic||''),icon:String(user.icon||((id==='u1'||user.role==='Team Leader')?'compass':'terminal')),privilege:String(user.privilege||(id==='u1'?'Administrator':'User')),phoneNumber:String(user.phoneNumber||''),email:String(user.email||''),preferences:{lang:['en','ar'].includes(user.preferences?.lang)?user.preferences.lang:'en',...(['light','dark'].includes(user.preferences?.theme)?{theme:user.preferences.theme}:{})},pinnedItemIds:Array.isArray(user.pinnedItemIds)?[...new Set(user.pinnedItemIds.map(String))]:[]};}
  async function request(method,path,body){
   const auth=window.TeamFollowUpAuth;
   if(!auth||typeof auth.authenticatedFetch!=='function')throw new Error('The Cognito-authenticated API client is unavailable. Sign in again.');
@@ -1801,22 +1804,30 @@ const copyWorkspace = value => {try{if(typeof structuredClone==='function')retur
 data={schema:4,users:[],parents:[],children:[],activity:[]};
 const dataLoadState={initialComplete:false,usersReady:false,parentsReady:false,childrenLoaded:new Set(),activityLoaded:new Set(),rootErrors:new Map(),initialError:''};
 function detectInitialPreferences(){
- const fallback={lang:'en',theme:'dark'};
+ let lang='en',theme='dark';
+ // Language support and color-scheme detection are independent settings.
  try{
   const preferred=(Array.isArray(navigator.languages)&&navigator.languages.length?navigator.languages[0]:navigator.language);
-  if(typeof preferred!=='string'||!preferred.trim()||typeof window.matchMedia!=='function')return fallback;
-  const tag=preferred.trim().toLowerCase();
-  let lang;
-  if(tag==='en'||tag.startsWith('en-'))lang='en';
-  else if(tag==='ar'||tag.startsWith('ar-'))lang='ar';
-  else return fallback;
-  // Forced/custom contrast themes and indeterminate media-query results use the safe fallback.
-  if(window.matchMedia('(forced-colors: active)').matches)return fallback;
-  const dark=window.matchMedia('(prefers-color-scheme: dark)');
-  const light=window.matchMedia('(prefers-color-scheme: light)');
-  if(typeof dark.matches!=='boolean'||typeof light.matches!=='boolean'||dark.matches===light.matches)return fallback;
-  return {lang,theme:dark.matches?'dark':'light'};
- }catch{return fallback;}
+  if(typeof preferred==='string'&&preferred.trim()){
+   const tag=preferred.trim().toLowerCase();
+   if(tag==='en'||tag.startsWith('en-'))lang='en';
+   else if(tag==='ar'||tag.startsWith('ar-'))lang='ar';
+  }
+ }catch{}
+ try{
+  // Forced colors and indeterminate media-query results use the safe dark fallback.
+  if(typeof window.matchMedia==='function'&&!window.matchMedia('(forced-colors: active)').matches){
+   const dark=window.matchMedia('(prefers-color-scheme: dark)');
+   const light=window.matchMedia('(prefers-color-scheme: light)');
+   if(typeof dark.matches==='boolean'&&typeof light.matches==='boolean'&&dark.matches!==light.matches)theme=dark.matches?'dark':'light';
+  }
+ }catch{}
+ return {lang,theme};
+}
+function resolvePreferredTheme(userTheme,existingTheme,systemTheme){
+ if(userTheme==='light'||userTheme==='dark')return userTheme;
+ if(existingTheme==='light'||existingTheme==='dark')return existingTheme;
+ return systemTheme==='light'?'light':'dark';
 }
 const initialPreferences=detectInitialPreferences();
 function isMobileSidebarViewport(){try{return typeof window.matchMedia==='function'&&window.matchMedia('(max-width: 820px)').matches;}catch{return false;}}
@@ -2566,7 +2577,7 @@ function mergeProfileIntoData(raw,options={}){
   email:pickString(['email'],existing?.email??''),
   preferences:{
    lang:['en','ar'].includes(incomingPreferences.lang)?incomingPreferences.lang:(['en','ar'].includes(oldPreferences.lang)?oldPreferences.lang:'en'),
-   theme:['light','dark'].includes(incomingPreferences.theme)?incomingPreferences.theme:(['light','dark'].includes(oldPreferences.theme)?oldPreferences.theme:'dark')
+   theme:resolvePreferredTheme(incomingPreferences.theme,oldPreferences.theme,initialPreferences.theme)
   },
   pinnedItemIds:Array.isArray(source.pinnedItemIds)?[...new Set(source.pinnedItemIds.map(String))]:[...(existing?.pinnedItemIds||[]).map(String)]
  };

@@ -91,7 +91,7 @@ function createContext(overrides = {}) {
     clearInterval: id => scheduledTimeouts.delete(id),
     Math, URL, URLSearchParams, JSON, Promise, Set, Map, String, Number, WebSocket: MockWebSocket
   };
-  vm.runInNewContext(managerSource + '\nthis.applyRealtimeChangeBatch=applyRealtimeChangeBatch;this.catchUpRealtimeChanges=catchUpRealtimeChanges;this.startRealtimeNotifications=startRealtimeNotifications;this.stopRealtimeNotifications=stopRealtimeNotifications;this.getRealtimeState=()=>({running:realtimeRunning,cursor:realtimeCursor});', context);
+  vm.runInNewContext(managerSource + '\nthis.applyRealtimeChangeBatch=applyRealtimeChangeBatch;this.queueRealtimeChangeBatch=queueRealtimeChangeBatch;this.catchUpRealtimeChanges=catchUpRealtimeChanges;this.startRealtimeNotifications=startRealtimeNotifications;this.stopRealtimeNotifications=stopRealtimeNotifications;this.getRealtimeState=()=>({running:realtimeRunning,cursor:realtimeCursor});', context);
   return { context, calls, api, ui, data, windowEvents };
 }
 
@@ -191,7 +191,7 @@ function createContext(overrides = {}) {
 }
 
 {
-  const { context, api } = createContext();
+  const { context } = createContext();
   context.startRealtimeNotifications();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(context.getRealtimeState().running, true);
@@ -207,8 +207,32 @@ function createContext(overrides = {}) {
   assert.equal(socket.readyState, MockWebSocket.CLOSED, 'sign-out/page lifecycle cleanup closes the active channel');
 }
 
-assert.ok(managerSource.includes("if(message?.type==='items.changed')scheduleRealtimeCatchup(0)"),
-  'WebSocket frames act as hints; clients fetch ordered, durable change records instead of trusting push order.');
+{
+  const { context, calls } = createContext();
+  context.startRealtimeNotifications();
+  await new Promise(resolve => setImmediate(resolve));
+  const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+  socket.readyState = MockWebSocket.OPEN;
+  socket.onopen();
+  const pushed = {
+    type: 'items.changed', changeId: 'pushed-assignment', cursor: 'cursor-pushed',
+    itemId: 'task-1', rootParentIds: ['project-1'], topLevelIds: [], parentIds: ['project-1'],
+    assigneeIds: ['u1', 'u2'], deleted: false, version: 5
+  };
+  socket.onmessage({ data: JSON.stringify(pushed) });
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.assigned, 1, 'the WebSocket payload itself refreshes the newly assigned user without waiting for an outbox query');
+  assert.equal(calls.queryCursors, undefined, 'direct push application does not depend on a change-feed round trip');
+  await context.queueRealtimeChangeBatch([pushed]);
+  assert.equal(calls.assigned, 1, 'the same event in durable catch-up is deduplicated');
+  context.stopRealtimeNotifications();
+}
+
+assert.ok(managerSource.includes("if(message?.type==='items.changed'){") && managerSource.includes('void queueRealtimeChangeBatch([message])'),
+  'WebSocket payloads are applied immediately instead of being discarded as hints.');
+assert.ok(managerSource.includes('if(changes.length)await queueRealtimeChangeBatch(changes);'),
+  'durable outbox catch-up shares the serialized, deduplicated event processor.');
 assert.ok(managerSource.includes('realtimeReconnectDelay=Math.min(30000'),
   'connection retries use bounded exponential backoff.');
 assert.ok(managerSource.includes('setInterval(()=>{ping();scheduleRealtimeCatchup(0);},4*60*1000)'),

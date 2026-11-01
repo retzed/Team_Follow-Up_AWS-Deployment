@@ -114,11 +114,11 @@ assert.ok(html.includes('theme:resolvePreferredTheme(incomingPreferences.theme,o
 
 // Theme changes are a root-level style update. They must not rebuild the
 // workspace or account DOM while the browser is repainting the new palette.
-const applyThemeStart = html.indexOf('function applyTheme(){');
-const applyTranslationsStart = html.indexOf('function applyTranslations(){', applyThemeStart);
-assert.ok(applyThemeStart >= 0 && applyTranslationsStart > applyThemeStart,
-  'A dedicated applyTheme helper must exist before translation rendering.');
-const applyThemeSource = html.slice(applyThemeStart, applyTranslationsStart);
+const themeHelperStart = html.indexOf('let themeSwitchSequence=0;');
+const applyTranslationsStart = html.indexOf('function applyTranslations(){', themeHelperStart);
+assert.ok(themeHelperStart >= 0 && applyTranslationsStart > themeHelperStart,
+  'The complete dedicated applyTheme helper and its sequence counter must exist before translation rendering.');
+const applyThemeSource = html.slice(themeHelperStart, applyTranslationsStart);
 function verifyApplyTheme(theme) {
   const button = { innerHTML: '', title: '', attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
   const themeSelect = { value: theme === 'light' ? 'dark' : 'light' };

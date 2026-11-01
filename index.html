@@ -1251,7 +1251,8 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
     userPoolClientId: "",
     teamUserAttribute: "custom:teamUserId"
   },
-  apiBaseUrl: ""
+  apiBaseUrl: "",
+  realtimeWebSocketUrl: ""
 });
 </script>
 <script id="team-follow-up-data-api">
@@ -1374,6 +1375,8 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   for(const eventId of oldEvents.keys())if(!newEvents.has(eventId))throw new Error('Activity history is append-only. Refresh the workspace before retrying.');
   if(!sameRecordFields(previous.users||[],next.users||[]))throw new Error('Team profiles are managed in AWS and cannot be edited from the workspace.');
  }
+ async function createRealtimeTicket(){return request('POST','/realtime/ticket',{});}
+ async function queryRealtimeChanges(since,options={}){const params=new URLSearchParams();if(since)params.set('since',String(since));params.set('limit',String(Math.max(1,Math.min(100,Number(options.limit)||100))));return request('GET','/realtime/changes?'+params.toString());}
  async function queryTopLevel(options={}){
   const dateMode=options.dateMode||'updated',params=new URLSearchParams({scope:'top-level',dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
@@ -1433,7 +1436,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function updateUserPrivilege(userId,privilege){return request('PATCH','/users/'+encodeURIComponent(userId),{privilege});}
  async function updateMyPins(itemIds){return request('PATCH','/users/me/pins',{itemIds:[...new Set((itemIds||[]).map(String))]});}
  async function resolveItems(ids){const params=new URLSearchParams({ids:[...new Set((ids||[]).map(String))].join(',')});return request('GET','/items/resolve?'+params.toString());}
- window.TeamFollowUpDataApi=Object.freeze({remoteApi:true,request,bootstrap,commitSnapshot,queryTopLevel,queryChildren,queryRootItems,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive,verifyCurrentPassword,getMyProfile,updateMyProfile,updateUserPrivilege,updateMyPins,resolveItems});
+window.TeamFollowUpDataApi=Object.freeze({remoteApi:true,request,bootstrap,commitSnapshot,createRealtimeTicket,queryRealtimeChanges,
 })();
 </script>
 
@@ -1501,7 +1504,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   catch(e){setError(copy.unknown);}
   finally{setBusy(false);}
  }
- function isConfigured(){if(!(typeof cognito.userPoolId==='string'&&/^[-\w]+_[A-Za-z0-9]+$/.test(cognito.userPoolId)&&typeof cognito.userPoolClientId==='string'&&cognito.userPoolClientId.length>8&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolClientId)&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolId)))return false;try{const api=new URL(String(cfg.apiBaseUrl||''));return api.protocol==='https:'&&!api.username&&!api.password&&!api.search&&!api.hash&&['','/'].includes(api.pathname);}catch(error){return false;}}
+ function isConfigured(){if(!(typeof cognito.userPoolId==='string'&&/^[-\\w]+_[A-Za-z0-9]+$/.test(cognito.userPoolId)&&typeof cognito.userPoolClientId==='string'&&cognito.userPoolClientId.length>8&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolClientId)&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolId)))return false;try{const api=new URL(String(cfg.apiBaseUrl||'')),ws=new URL(String(cfg.realtimeWebSocketUrl||''));return api.protocol==='https:'&&!api.username&&!api.password&&!api.search&&!api.hash&&['','/'].includes(api.pathname)&&ws.protocol==='wss:'&&!ws.username&&!ws.password&&!ws.search&&!ws.hash&&ws.pathname!=='/';}catch(error){return false;}}
  function resolveTeamUserId(attributes){const customName=String(cognito.teamUserAttribute||'custom:teamUserId');const custom=String(attributes?.[customName]||'').trim();return validIds.includes(custom)?custom:null;}
  async function ensureAuthenticatedContext(){
   const current=await state.modules.getCurrentUser();const session=await state.modules.fetchAuthSession();

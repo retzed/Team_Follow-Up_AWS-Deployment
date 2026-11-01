@@ -1765,8 +1765,8 @@ function icon(name,size=16){
  if(name==='profile-user'||name==='female-user'){
   const badge='<circle cx="18.5" cy="5.7" r="4.1" fill="var(--panel)" stroke="var(--border)" stroke-width=".85"/>';
   const genderSymbol=name==='profile-user'
-   ? '<circle cx="17.8" cy="6.5" r="1.85" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35"/><path d="m19.1 5.2 2.7-2.7m-2.1 0h2.1v2.1" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>'
-   : '<circle cx="18.5" cy="5.3" r="1.85" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35"/><path d="M18.5 7.15v2.5m-1.25-1h2.5" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>';
+   ? '<circle cx="17.5" cy="6.6" r="2.1" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35"/><path d="m19 5.1 2.7-2.7m-2 0h2v2" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>'
+   : '<circle cx="18.5" cy="5.3" r="2.1" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35"/><path d="M18.5 7.4v2.1m-1.6-.9h3.2" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>';
   body='<g>'+paths+'</g>'+badge+genderSymbol;
  }
  if(name==='wrench'){

@@ -1436,7 +1436,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function updateUserPrivilege(userId,privilege){return request('PATCH','/users/'+encodeURIComponent(userId),{privilege});}
  async function updateMyPins(itemIds){return request('PATCH','/users/me/pins',{itemIds:[...new Set((itemIds||[]).map(String))]});}
  async function resolveItems(ids){const params=new URLSearchParams({ids:[...new Set((ids||[]).map(String))].join(',')});return request('GET','/items/resolve?'+params.toString());}
-window.TeamFollowUpDataApi=Object.freeze({remoteApi:true,request,bootstrap,commitSnapshot,createRealtimeTicket,queryRealtimeChanges,
+ window.TeamFollowUpDataApi=Object.freeze({remoteApi:true,request,bootstrap,commitSnapshot,createRealtimeTicket,queryRealtimeChanges,queryTopLevel,queryChildren,queryRootItems,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive,verifyCurrentPassword,getMyProfile,updateMyProfile,updateUserPrivilege,updateMyPins,resolveItems});
 })();
 </script>
 

@@ -128,7 +128,7 @@ function verifyApplyTheme(theme) {
     $: selector => selector === '#themeToggle' ? button : selector === '#accountTheme' ? themeSelect : null,
     icon: name => `icon:${name}`
   };
-  vm.runInNewContext(applyThemeSource + '\\nthis.applyTheme = applyTheme;', context);
+  vm.runInNewContext(applyThemeSource + '\nthis.applyTheme = applyTheme;', context);
   context.applyTheme();
   assert.equal(context.document.documentElement.dataset.theme, theme);
   assert.equal(button.innerHTML, theme === 'light' ? 'icon:moon' : 'icon:sun');
@@ -166,7 +166,7 @@ async function simulatePreferenceChange({ key, value, fail = false }) {
     toast: () => {},
     tr: () => 'Account error'
   };
-  vm.runInNewContext(preferenceHandlerSource + '\\nthis.changeUserPreference = changeUserPreference;', context);
+  vm.runInNewContext(preferenceHandlerSource + '\nthis.changeUserPreference = changeUserPreference;', context);
   await context.changeUserPreference(key, value);
   return { context, renderCalls, applyThemeCalls, savedPreferences };
 }
@@ -195,10 +195,10 @@ async function simulatePreferenceChange({ key, value, fail = false }) {
 // data render with the saved-theme palette change.
 assert.ok(html.includes("if(['light','dark'].includes(profile.preferences.theme))hydratedUserTheme=profile.preferences.theme;"),
   'Workspace hydration must retain the signed-in user theme for post-render application.');
-assert.ok(html.includes('skipNextSidebarApiRefresh=true;render();\\n  if(hydratedUserTheme){ui.theme=hydratedUserTheme;applyTheme();}'),
+assert.ok(html.includes('skipNextSidebarApiRefresh=true;render();\n  if(hydratedUserTheme){ui.theme=hydratedUserTheme;applyTheme();}'),
   'The saved API theme must be applied after the initial workspace render.');
 if (html.includes('savedUserTheme=null;')) {
-  assert.ok(html.includes('render();\\n if(savedUserTheme){ui.theme=savedUserTheme;applyTheme();}'),
+  assert.ok(html.includes('render();\n if(savedUserTheme){ui.theme=savedUserTheme;applyTheme();}'),
     'The local demo theme must also be applied after its initial render.');
 }
 

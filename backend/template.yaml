@@ -47,6 +47,8 @@ Globals:
         ACTIVITY_TABLE: !Ref ActivityTable
         USERS_TABLE: !Ref UsersTable
         ARCHIVE_TABLE: !Ref ArchiveTable
+        REALTIME_TABLE: !Ref RealtimeTable
+        WEBSOCKET_MANAGEMENT_ENDPOINT: !Sub 'https://${RealtimeWebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
         COGNITO_USER_POOL_ID: !Ref TeamFollowUpUserPool
         COGNITO_CLIENT_ID: !Ref TeamFollowUpAppClient
 
@@ -271,6 +273,37 @@ Resources:
         - Key: Project
           Value: TeamFollowUp
 
+  RealtimeTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub '${ResourceNamePrefix}-Realtime'
+      BillingMode: PROVISIONED
+      TableClass: STANDARD
+      AttributeDefinitions:
+        - AttributeName: partitionKey
+          AttributeType: S
+        - AttributeName: sortKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: partitionKey
+          KeyType: HASH
+        - AttributeName: sortKey
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      DeletionProtectionEnabled: false
+      Tags:
+        - Key: Project
+          Value: TeamFollowUp
+
   ApiAccessLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -357,6 +390,7 @@ Resources:
                   - !Sub '${UsersTable.Arn}/index/*'
                   - !GetAtt ArchiveTable.Arn
                   - !Sub '${ArchiveTable.Arn}/index/*'
+                  - !GetAtt RealtimeTable.Arn
               - Sid: AllowPartialRestoreActivitySummaries
                 Effect: Allow
                 Action:
@@ -374,6 +408,7 @@ Resources:
                   - !GetAtt ActivityTable.Arn
                   - !GetAtt ArchiveTable.Arn
                   - !GetAtt UsersTable.Arn
+                  - !GetAtt RealtimeTable.Arn
                 Condition:
                   ForAnyValue:StringEquals:
                     dynamodb:EnclosingOperation:
@@ -387,6 +422,19 @@ Resources:
                   - !GetAtt ActivityTable.Arn
                   - !GetAtt ArchiveTable.Arn
                   - !GetAtt UsersTable.Arn
+                  - !GetAtt RealtimeTable.Arn
+              - Sid: ManageRealtimeSessionRecords
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt RealtimeTable.Arn
+              - Sid: PostToRealtimeWebSocketConnections
+                Effect: Allow
+                Action:
+                  - execute-api:ManageConnections
+                Resource: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RealtimeWebSocketApi}/prod/POST/@connections/*'
               - Sid: VerifyCurrentCognitoPassword
                 Effect: Allow
                 Action:
@@ -413,6 +461,61 @@ Resources:
             ApiId: !Ref TeamFollowUpApi
             Path: /{proxy+}
             Method: ANY
+
+  RealtimeWebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${ResourceNamePrefix}-Realtime'
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: '$request.body.action'
+
+  RealtimeWebSocketIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref RealtimeWebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiFunction.Arn}/invocations'
+      IntegrationMethod: POST
+      PayloadFormatVersion: '1.0'
+
+  RealtimeWebSocketConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref RealtimeWebSocketApi
+      RouteKey: '$connect'
+      AuthorizationType: NONE
+      Target: !Join ['', ['integrations/', !Ref RealtimeWebSocketIntegration]]
+
+  RealtimeWebSocketDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref RealtimeWebSocketApi
+      RouteKey: '$disconnect'
+      AuthorizationType: NONE
+      Target: !Join ['', ['integrations/', !Ref RealtimeWebSocketIntegration]]
+
+  RealtimeWebSocketDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref RealtimeWebSocketApi
+      RouteKey: '$default'
+      AuthorizationType: NONE
+      Target: !Join ['', ['integrations/', !Ref RealtimeWebSocketIntegration]]
+
+  RealtimeWebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref RealtimeWebSocketApi
+      StageName: prod
+      AutoDeploy: true
+
+  RealtimeWebSocketLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ApiFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RealtimeWebSocketApi}/*'
 
   ApiLambdaErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -590,6 +693,8 @@ Resources:
           Value: !Ref TeamFollowUpAppClient
         - Name: TEAM_FOLLOW_UP_API_BASE_URL
           Value: !Sub 'https://${TeamFollowUpApi}.execute-api.${AWS::Region}.amazonaws.com'
+        - Name: TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL
+          Value: !Sub 'wss://${RealtimeWebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
         - Name: TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE
           Value: custom:teamUserId
       Tags:
@@ -615,6 +720,12 @@ Outputs:
   ArchiveTableName:
     Description: Archive table created by this stack; primary key is archiveId with two GSIs.
     Value: !Ref ArchiveTable
+  RealtimeTableName:
+    Description: Realtime outbox, one-time ticket, and WebSocket connection table.
+    Value: !Ref RealtimeTable
+  RealtimeWebSocketUrl:
+    Description: WebSocket endpoint used by active authenticated browser sessions for change notifications.
+    Value: !Sub 'wss://${RealtimeWebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
   ApiBaseUrl:
     Description: API Gateway HTTPS base URL used by the Amplify branch.
     Value: !Sub 'https://${TeamFollowUpApi}.execute-api.${AWS::Region}.amazonaws.com'

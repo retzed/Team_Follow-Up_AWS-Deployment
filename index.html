@@ -3396,6 +3396,13 @@ function queueRealtimeChangeBatch(changes){
  realtimeApplyQueue=queued.catch(error=>{console.warn('Queued real-time change processing failed; durable catch-up will retry.',error);});
  return queued;
 }
+function realtimeCatchupQueryCursor(){
+ const cursor=String(realtimeCursor||'');if(!cursor)return cursor;
+ const timestamp=cursor.split('#',1)[0],milliseconds=Date.parse(timestamp);
+ if(!Number.isFinite(milliseconds))return cursor;
+ const cutoff=new Date(milliseconds-60*1000).toISOString().replace(/\.(\d{3})Z$/,(_,fraction)=>'.'+fraction+'000Z');
+ return cutoff+'#';
+}
 async function applyRealtimeChangeBatch(changes){
  const api=window.TeamFollowUpDataApi;if(!api||!Array.isArray(changes)||!changes.length)return;
  const pendingChanges=[];
@@ -3468,14 +3475,15 @@ async function catchUpRealtimeChanges(){
  realtimeCatchupPromise=(async()=>{
   do{
    realtimeCatchupRequested=false;
-   let pages=0;
+   let pages=0,queryCursor=realtimeCatchupQueryCursor();
    while(realtimeRunning){
-    const result=await window.TeamFollowUpDataApi.queryRealtimeChanges(realtimeCursor,{limit:100});
+    const result=await window.TeamFollowUpDataApi.queryRealtimeChanges(queryCursor,{limit:100});
     const changes=Array.isArray(result?.changes)?result.changes:[];
     if(changes.length)await queueRealtimeChangeBatch(changes);
-    const nextCursor=String(result?.nextCursor||realtimeCursor);
-    const cursorAdvanced=nextCursor!==realtimeCursor;
-    if(cursorAdvanced)realtimeCursor=nextCursor;
+    const nextCursor=String(result?.nextCursor||queryCursor);
+    const cursorAdvanced=nextCursor!==queryCursor;
+    if(cursorAdvanced)queryCursor=nextCursor;
+    if(nextCursor>realtimeCursor)realtimeCursor=nextCursor;
     if(!result?.hasMore)break;
     if(++pages>=20){realtimeCatchupRequested=true;break;}
     if(!cursorAdvanced&&!changes.length)break;

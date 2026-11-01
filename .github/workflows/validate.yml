@@ -39,6 +39,7 @@ jobs:
           TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID: us-east-1_CiValidation123
           TEAM_FOLLOW_UP_COGNITO_CLIENT_ID: ciValidationPublicClient123456789
           TEAM_FOLLOW_UP_API_BASE_URL: https://ci-api.execute-api.us-east-1.amazonaws.com
+          TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL: wss://ci-realtime.execute-api.us-east-1.amazonaws.com/prod
           TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE: custom:teamUserId
         run: npm run build
 

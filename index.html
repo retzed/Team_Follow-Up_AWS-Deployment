@@ -1733,9 +1733,7 @@ const ICON_PALETTES = {
   wrench:{stroke:['#536477','#DCE5EF','#77879B'],fill:['#F8FAFC','#C7D2DF','#718096'],accent:['#FFFFFF','#E8EEF5','#8D9BAE']},
   database:{stroke:['#3B82F6','#0F766E'],fill:['#2563EB','#312E81'],accent:['#A5F3FC','#22D3EE']},
   helmet:{stroke:['#657386','#DCE5EE','#8D9BAD'],fill:['#FFFFFF','#E5EBF2','#AAB6C5'],accent:['#F9FCFF','#CFD8E3','#8492A5']},
-  layers:{stroke:['#F0444C','#3295D9','#6658DA','#F28A19'],fill:['#F0444C','#3295D9','#6658DA','#F28A19'],accent:['#FF9A42','#5B62E8','#F0444C']},
-  'profile-user':{stroke:['#2875BD','#3295D9','#5B62E8'],fill:['#EAF4FF','#EFF0FF'],accent:['#22D3EE','#5B62E8']},
-  'female-user':{stroke:['#5B62E8','#8066D8','#B452D8'],fill:['#EFF0FF','#F5EFFF'],accent:['#A78BFA','#D946EF']}
+  layers:{stroke:['#F0444C','#3295D9','#6658DA','#F28A19'],fill:['#F0444C','#3295D9','#6658DA','#F28A19'],accent:['#FF9A42','#5B62E8','#F0444C']}
 };
 let iconRenderSequence=0;
 function icon(name,size=16){
@@ -1762,13 +1760,6 @@ function icon(name,size=16){
   (palette.clothesHighlight?gradient('clothesHighlight',palette.clothesHighlight):'')+
   '</defs>';
  let body=paths;
- if(name==='profile-user'||name==='female-user'){
-  const badge='<circle cx="18.5" cy="5.7" r="4.1" fill="var(--panel)" stroke="var(--border)" stroke-width=".85"/>';
-  const genderSymbol=name==='profile-user'
-   ? '<circle cx="17.5" cy="6.6" r="2.1" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35"/><path d="m19 5.1 2.7-2.7m-2 0h2v2" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>'
-   : '<circle cx="18.5" cy="5.3" r="2.1" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35"/><path d="M18.5 7.4v2.1m-1.6-.9h3.2" fill="none" stroke="url(#'+id+'-accent)" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>';
-  body='<g>'+paths+'</g>'+badge+genderSymbol;
- }
  if(name==='wrench'){
   body=body.replace('<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z"/>','<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z" fill="url(#'+id+'-metal)" stroke="url(#'+id+'-stroke)" stroke-width="1.35"/>');
  }else if(name==='database'){

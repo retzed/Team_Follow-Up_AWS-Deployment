@@ -174,7 +174,15 @@ def main():
         "ActivityTable": "AWS::DynamoDB::Table",
         "UsersTable": "AWS::DynamoDB::Table",
         "ArchiveTable": "AWS::DynamoDB::Table",
+        "RealtimeTable": "AWS::DynamoDB::Table",
         "TeamFollowUpApi": "AWS::Serverless::HttpApi",
+        "RealtimeWebSocketApi": "AWS::ApiGatewayV2::Api",
+        "RealtimeWebSocketIntegration": "AWS::ApiGatewayV2::Integration",
+        "RealtimeWebSocketConnectRoute": "AWS::ApiGatewayV2::Route",
+        "RealtimeWebSocketDisconnectRoute": "AWS::ApiGatewayV2::Route",
+        "RealtimeWebSocketDefaultRoute": "AWS::ApiGatewayV2::Route",
+        "RealtimeWebSocketStage": "AWS::ApiGatewayV2::Stage",
+        "RealtimeWebSocketLambdaPermission": "AWS::Lambda::Permission",
         "ApiExecutionRole": "AWS::IAM::Role",
         "ApiFunction": "AWS::Serverless::Function",
         "ApiAccessLogGroup": "AWS::Logs::LogGroup",
@@ -378,11 +386,27 @@ def main():
         if isinstance(statement, dict)
     ]
     policy_text = str(policies)
-    for logical_id in ("ItemsTable", "ActivityTable", "UsersTable", "ArchiveTable"):
+    for logical_id in ("ItemsTable", "ActivityTable", "UsersTable", "ArchiveTable", "RealtimeTable"):
         if logical_id not in policy_text:
             fail(f"Lambda IAM must scope access to {logical_id} created by the template.")
     if "/index/*" not in policy_text:
         fail("Lambda IAM must include the secondary-index ARNs.")
+    realtime_table = resources["RealtimeTable"]["Properties"]
+    if realtime_table.get("TableName") != {"Sub": "${ResourceNamePrefix}-Realtime"}:
+        fail("RealtimeTable must use the documented -Realtime physical name.")
+    if realtime_table.get("KeySchema") != [{"AttributeName": "partitionKey", "KeyType": "HASH"}, {"AttributeName": "sortKey", "KeyType": "RANGE"}]:
+        fail("RealtimeTable must use partitionKey + sortKey so tickets, connections, and ordered changes share one table.")
+    if realtime_table.get("TimeToLiveSpecification") != {"AttributeName": "expiresAt", "Enabled": True}:
+        fail("RealtimeTable must expire connection tickets, connection leases, and old change records through expiresAt TTL.")
+    if realtime_table.get("ProvisionedThroughput") != {"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}:
+        fail("RealtimeTable must use 1 RCU / 1 WCU.")
+    websocket_api = resources["RealtimeWebSocketApi"]["Properties"]
+    if websocket_api.get("ProtocolType") != "WEBSOCKET" or websocket_api.get("RouteSelectionExpression") != "$request.body.action":
+        fail("Realtime WebSocket API must route heartbeat messages with the action field.")
+    if resources["RealtimeWebSocketStage"]["Properties"].get("StageName") != "prod" or resources["RealtimeWebSocketStage"]["Properties"].get("AutoDeploy") is not True:
+        fail("Realtime WebSocket stage must auto-deploy the prod routes.")
+    if "RealtimeTable" not in str(resources["RealtimeWebSocketApi"].get("Properties", {})) and not resources.get("RealtimeWebSocketLambdaPermission"):
+        fail("Realtime WebSocket resources and Lambda permission must be present.")
     read_statement = next((s for s in statements if "dynamodb:Scan" in str(s.get("Action", []))), None)
     if not read_statement or not all(a in str(read_statement.get("Action", [])) for a in (
         "dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan"
@@ -417,7 +441,7 @@ def main():
         statement.get("Resource", []) if isinstance(statement.get("Resource", []), list) else [statement.get("Resource")]
     )]:
         fail("Console Lambda policy must not grant resource-wide wildcard access.")
-    for table_name in ("TeamFollowUp-Items", "TeamFollowUp-Activity", "TeamFollowUp-Users", "TeamFollowUp-Archive"):
+    for table_name in ("TeamFollowUp-Items", "TeamFollowUp-Activity", "TeamFollowUp-Users", "TeamFollowUp-Archive", "TeamFollowUp-Realtime"):
         if table_name not in serialized_console_policy:
             fail(f"Console Lambda policy must include the target {table_name} table.")
     if "REPLACE_WITH_12_DIGIT_ACCOUNT_ID" not in serialized_console_policy:
@@ -432,7 +456,7 @@ def main():
         fail("Console Lambda policy BatchWriteItem must be scoped to the Activity table only.")
     console_transact = next((s for s in console_statements if "dynamodb:TransactWriteItems" in str(s.get("Action", []))), None)
     if not console_transact or not all(name in str(console_transact.get("Resource")) for name in (
-        "TeamFollowUp-Items", "TeamFollowUp-Activity", "TeamFollowUp-Archive", "TeamFollowUp-Users"
+        "TeamFollowUp-Items", "TeamFollowUp-Activity", "TeamFollowUp-Archive", "TeamFollowUp-Users", "TeamFollowUp-Realtime"
     )):
         fail("Console Lambda policy transactions must be scoped to Items, Activity, Archive, and Users profile writes.")
     if "dynamodb:EnclosingOperation" not in serialized_console_policy:
@@ -456,10 +480,12 @@ def main():
         "AllowPartialRestoreActivitySummaries",
         "AllowTransactionalItemOperationsOnly",
         "AllowAtomicWorkItemArchiveAndAuditTransactions",
+        "ManageRealtimeSessionRecords",
+        "PostToRealtimeWebSocketConnections",
         "VerifyCurrentCognitoPassword",
     }
     if set(template_by_sid) != expected_sids or set(console_by_sid) != expected_sids:
-        fail("Console and template IAM policies must contain the same five narrowly scoped statement IDs.")
+        fail("Console and template IAM policies must contain the same seven narrowly scoped statement IDs.")
     for sid in sorted(expected_sids):
         template_statement = template_by_sid[sid]
         console_statement = console_by_sid[sid]
@@ -503,6 +529,9 @@ def main():
     for name, value in expected_branch_vars.items():
         if branch_vars.get(name) != value:
             fail(f"Amplify branch must set {name} to the matching Cognito configuration.")
+    websocket_env = branch_vars.get("TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL", {})
+    if not isinstance(websocket_env, dict) or "RealtimeWebSocketApi" not in str(websocket_env.get("Sub", "")):
+        fail("Amplify branch must receive the authenticated real-time WSS URL.")
     api_env_value = branch_vars.get("TEAM_FOLLOW_UP_API_BASE_URL", {})
     if not isinstance(api_env_value, dict) or "TeamFollowUpApi" not in str(api_env_value.get("Sub", "")):
         fail("Amplify branch must receive the API URL generated by this template.")
@@ -549,6 +578,7 @@ def main():
         "ActivityTableName": {"Ref": "ActivityTable"},
         "UsersTableName": {"Ref": "UsersTable"},
         "ArchiveTableName": {"Ref": "ArchiveTable"},
+        "RealtimeTableName": {"Ref": "RealtimeTable"},
         "CloudWatchDashboardName": {"Ref": "TeamFollowUpDashboard"},
         "ApiExecutionRoleName": {"Ref": "ApiExecutionRole"},
         "MonthlyCostBudgetName": {"Ref": "MonthlyCostBudget"},
@@ -558,6 +588,8 @@ def main():
             fail(f"Output {name} must expose the resource created by this template.")
     if not isinstance(outputs.get("ApiBaseUrl", {}).get("Value"), dict) or "TeamFollowUpApi" not in str(outputs["ApiBaseUrl"]["Value"]):
         fail("ApiBaseUrl output must point to the created HTTP API.")
+    if not isinstance(outputs.get("RealtimeWebSocketUrl", {}).get("Value"), dict) or "RealtimeWebSocketApi" not in str(outputs["RealtimeWebSocketUrl"]["Value"]):
+        fail("RealtimeWebSocketUrl output must point to the created WSS API.")
     if not isinstance(outputs.get("FrontendUrl", {}).get("Value"), dict) or "FrontendApp.DefaultDomain" not in str(outputs["FrontendUrl"]["Value"]):
         fail("FrontendUrl output must identify the generated Amplify branch URL.")
 

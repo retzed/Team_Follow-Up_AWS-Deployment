@@ -91,7 +91,7 @@ function createContext(overrides = {}) {
     clearInterval: id => scheduledTimeouts.delete(id),
     Math, URL, URLSearchParams, JSON, Promise, Set, Map, String, Number, WebSocket: MockWebSocket
   };
-  vm.runInNewContext(managerSource + '\nthis.applyRealtimeChangeBatch=applyRealtimeChangeBatch;this.queueRealtimeChangeBatch=queueRealtimeChangeBatch;this.catchUpRealtimeChanges=catchUpRealtimeChanges;this.startRealtimeNotifications=startRealtimeNotifications;this.stopRealtimeNotifications=stopRealtimeNotifications;this.getRealtimeState=()=>({running:realtimeRunning,cursor:realtimeCursor});', context);
+  vm.runInNewContext(managerSource + '\nthis.applyRealtimeChangeBatch=applyRealtimeChangeBatch;this.queueRealtimeChangeBatch=queueRealtimeChangeBatch;this.catchUpRealtimeChanges=catchUpRealtimeChanges;this.startRealtimeNotifications=startRealtimeNotifications;this.stopRealtimeNotifications=stopRealtimeNotifications;this.getRealtimeState=()=>({running:realtimeRunning,cursor:realtimeCursor});this.getRealtimeCatchupQueryCursor=realtimeCatchupQueryCursor;', context);
   return { context, calls, api, ui, data, windowEvents };
 }
 
@@ -227,6 +227,14 @@ function createContext(overrides = {}) {
   await context.queueRealtimeChangeBatch([pushed]);
   assert.equal(calls.assigned, 1, 'the same event in durable catch-up is deduplicated');
   context.stopRealtimeNotifications();
+}
+
+{
+  const { context, calls } = createContext();
+  vm.runInNewContext('realtimeRunning=true;realtimeCursor="2026-11-02T12:30:00.123456Z#latest";', context);
+  await context.catchUpRealtimeChanges();
+  assert.deepEqual(calls.queryCursors, ['2026-11-02T12:29:00.123000Z#'], 'durable catch-up overlaps the last minute to recover late-committing transactions');
+  assert.equal(context.getRealtimeState().cursor, '2026-11-02T12:30:00.123456Z#latest', 'overlap scans never move the saved cursor backwards');
 }
 
 assert.ok(managerSource.includes("if(message?.type==='items.changed'){") && managerSource.includes('void queueRealtimeChangeBatch([message])'),

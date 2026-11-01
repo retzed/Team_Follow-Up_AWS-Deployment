@@ -46,6 +46,19 @@ def validate_console_bootstrap():
     if schema.get("thisFileProvisionsAwsResources") is not False:
         fail("table-schema.json is a documentation/schema reference, not an AWS provisioning mechanism.")
 
+    realtime_contract = schema.get("realtimeTransport", {})
+    if realtime_contract.get("physicalNameTemplate") != "${ResourceNamePrefix}-Realtime":
+        fail("The real-time transport table must use the configured -Realtime physical name.")
+    if realtime_contract.get("primaryKey") != {"partition": "partitionKey", "partitionType": "S", "sort": "sortKey", "sortType": "S"}:
+        fail("The real-time transport table must use partitionKey + sortKey, without modifying the original four-table schema.")
+    if realtime_contract.get("ttl") != {"attribute": "expiresAt", "enabled": True}:
+        fail("The real-time transport table must enable TTL on expiresAt.")
+    if realtime_contract.get("provisionedThroughput") != {"readCapacityUnits": 1, "writeCapacityUnits": 1}:
+        fail("The real-time transport table must retain the 1 RCU / 1 WCU low-cost target.")
+    record_types = realtime_contract.get("recordTypes", {})
+    if record_types.get("changes", {}).get("retentionSeconds") != 604800 or record_types.get("tickets", {}).get("ttlSeconds") != 30 or record_types.get("connections", {}).get("leaseSeconds") != 540:
+        fail("Real-time change, ticket and connection lease lifetimes must match the backend implementation.")
+
     bootstrap = schema.get("currentConsoleBootstrap")
     if not isinstance(bootstrap, dict) or bootstrap.get("region") != "us-east-1":
         fail("Current console bootstrap must document the manually configured us-east-1 resources.")
@@ -334,11 +347,17 @@ def main():
         "ACTIVITY_TABLE": "ActivityTable",
         "USERS_TABLE": "UsersTable",
         "ARCHIVE_TABLE": "ArchiveTable",
+        "REALTIME_TABLE": "RealtimeTable",
+        "WEBSOCKET_MANAGEMENT_ENDPOINT": None,
         "COGNITO_USER_POOL_ID": "TeamFollowUpUserPool",
         "COGNITO_CLIENT_ID": "TeamFollowUpAppClient",
     }
     for variable, logical_id in expected_variables.items():
-        if variables.get(variable) != {"Ref": logical_id}:
+        if variable == "WEBSOCKET_MANAGEMENT_ENDPOINT":
+            endpoint = variables.get(variable)
+            if not isinstance(endpoint, dict) or "RealtimeWebSocketApi" not in str(endpoint.get("Sub", "")) or "/prod" not in str(endpoint.get("Sub", "")):
+                fail("WEBSOCKET_MANAGEMENT_ENDPOINT must point to the WebSocket API HTTPS management endpoint and prod stage.")
+        elif variables.get(variable) != {"Ref": logical_id}:
             fail(f"Lambda environment variable {variable} must reference the created {logical_id} resource.")
 
     api_properties = resources["TeamFollowUpApi"]["Properties"]
@@ -405,8 +424,15 @@ def main():
         fail("Realtime WebSocket API must route heartbeat messages with the action field.")
     if resources["RealtimeWebSocketStage"]["Properties"].get("StageName") != "prod" or resources["RealtimeWebSocketStage"]["Properties"].get("AutoDeploy") is not True:
         fail("Realtime WebSocket stage must auto-deploy the prod routes.")
-    if "RealtimeTable" not in str(resources["RealtimeWebSocketApi"].get("Properties", {})) and not resources.get("RealtimeWebSocketLambdaPermission"):
-        fail("Realtime WebSocket resources and Lambda permission must be present.")
+    ws_integration = resources["RealtimeWebSocketIntegration"].get("Properties", {})
+    if ws_integration.get("ApiId") != {"Ref": "RealtimeWebSocketApi"} or "ApiFunction.Arn" not in str(ws_integration.get("IntegrationUri", "")):
+        fail("The WebSocket API must use the same Lambda proxy integration as the HTTP API.")
+    for route_id, route_key in (("RealtimeWebSocketConnectRoute", "$connect"), ("RealtimeWebSocketDisconnectRoute", "$disconnect"), ("RealtimeWebSocketDefaultRoute", "$default")):
+        route = resources[route_id].get("Properties", {})
+        if route.get("RouteKey") != route_key or route.get("ApiId") != {"Ref": "RealtimeWebSocketApi"} or "RealtimeWebSocketIntegration" not in str(route.get("Target", "")):
+            fail(f"{route_id} must point to the matching route and common WebSocket Lambda integration.")
+    if "RealtimeWebSocketApi" not in str(resources["RealtimeWebSocketLambdaPermission"].get("Properties", {}).get("SourceArn", "")):
+        fail("The WebSocket API must have explicit permission to invoke the API Lambda.")
     read_statement = next((s for s in statements if "dynamodb:Scan" in str(s.get("Action", []))), None)
     if not read_statement or not all(a in str(read_statement.get("Action", [])) for a in (
         "dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan"

@@ -427,6 +427,27 @@ class HandlerHelperTests(unittest.TestCase):
 
 
 class RealtimeDeliveryTests(unittest.TestCase):
+    def test_item_activity_and_outbox_are_committed_in_one_transaction(self):
+        item = {
+            "itemId": "task-1", "type": "task", "name": "Task One",
+            "parentId": "project-1", "rootParentId": "project-1",
+            "ownerId": "u2", "version": 2,
+        }
+        activity = {
+            "itemId": "task-1", "activityKey": "2026-11-02T00:00:00.000Z#event-1",
+            "eventId": "event-1", "userId": "u1", "action": "Updated task",
+        }
+        change = handler.make_realtime_change(item, change_kind="updated")
+        with patch.object(handler.ddb.meta.client, "transact_write_items") as transact:
+            handler.commit_item_with_events(item, [activity], condition="version", expected_version=1, change_event=change)
+        writes = transact.call_args.kwargs["TransactItems"]
+        self.assertEqual(len(writes), 3, "item, audit event, and compact change outbox are committed together")
+        self.assertEqual(writes[0]["Put"]["TableName"], handler.WORK.name)
+        self.assertEqual(writes[1]["Put"]["TableName"], handler.ACTIVITY.name)
+        self.assertEqual(writes[2]["Put"]["TableName"], handler.REALTIME_TABLE.name)
+        self.assertEqual(writes[2]["Put"]["Item"]["partitionKey"], {"S": "CHANGE"})
+        self.assertNotIn("name", writes[2]["Put"]["Item"])
+
     def test_change_record_contains_only_targeted_refresh_metadata(self):
         previous = {
             "itemId": "task-1", "type": "task", "parentId": "project-old",

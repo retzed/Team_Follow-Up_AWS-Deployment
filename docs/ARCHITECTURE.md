@@ -15,12 +15,14 @@ flowchart LR
     Host["Amplify Hosting<br/>builds and serves dist/"]
     Auth["Cognito User Pool<br/>public app client<br/>custom:teamUserId"]
     Api["API Gateway HTTP API<br/>JWT authorizer<br/>HTTPS + exact-origin CORS"]
-    Fn["Python 3.12 Lambda<br/>identity + validation<br/>hierarchy + audit logic"]
+    Ws["API Gateway WebSocket API<br/>ticket-authenticated connections<br/>prod stage"]
+    Fn["Python 3.12 Lambda<br/>identity + validation<br/>hierarchy + audit + fan-out"]
     Items[("DynamoDB Items<br/>projects, jobs, tasks, follow-ups")]
     Activity[("DynamoDB Activity<br/>append-only event history")]
     Users[("DynamoDB Users<br/>team profile mappings")]
     Archive[("DynamoDB Archive<br/>archived snapshots")]
-    Obs["CloudWatch<br/>Lambda/API logs"]
+    Realtime[("DynamoDB Realtime<br/>durable change outbox + short-lived sessions")]
+    Obs["CloudWatch<br/>Lambda/API/WebSocket logs"]
     Ops["CloudWatch dashboard<br/>error and throttle alarms"]
     Budget["AWS Budgets<br/>account-level monthly cost alerts"]
 
@@ -29,12 +31,17 @@ flowchart LR
     Member <-->|SRP sign-in / session tokens| Auth
     Member -->|Bearer access token + JSON| Api
     Auth -.->|issuer / client identity| Api
+    Member <-->|WSS: compact change hints| Ws
+    Ws -->|single-use ticket on connect / ping| Fn
     Api --> Fn
+    Fn -->|targeted notifications| Ws
     Fn <--> Items
     Fn <--> Activity
     Fn <--> Users
     Fn <--> Archive
+    Fn <--> Realtime
     Api --> Obs
+    Ws --> Obs
     Fn --> Obs
     Obs --> Ops
     Budget -.->|email notifications only| Ops
@@ -46,7 +53,8 @@ flowchart LR
 2. **Authentication:** the frontend signs in directly against Cognito using the SRP flow and keeps the resulting session in the browser auth SDK. The current app does not use Cognito managed login/hosted UI, so a hosted-login domain or OAuth callback URL is not required.
 3. **API edge:** the browser sends an access token as `Authorization: Bearer ...`. API Gateway's JWT authorizer validates the token signature, issuer and app-client audience. CORS permits the exact Amplify branch HTTPS origin, the `Authorization` and `content-type` request headers, and the methods the client uses.
 4. **Application logic:** Lambda resolves the verified token's Cognito `sub` to exactly one enabled `TeamFollowUp-Users` profile by matching `cognitoSub`. It does not trust browser-supplied creator/editor identity, timestamps, index helper attributes, or version numbers.
-5. **Shared persistence:** Lambda performs reads and writes against the four DynamoDB tables. Item changes and audit events use transactions where supported; hierarchy rules are enforced in Lambda because DynamoDB does not implement relational foreign keys.
+5. **Shared persistence:** Lambda performs reads and writes against the four application-data DynamoDB tables. Item changes and audit events use transactions where supported; hierarchy rules are enforced in Lambda because DynamoDB does not implement relational foreign keys.
+6. **Real-time change delivery:** after a successful item/audit transaction, Lambda writes a compact change record to the Realtime outbox in the same transaction and then fans out a metadata-only WebSocket message to active connections. The browser uses the notification as a hint to query the authenticated ordered change feed from its last cursor, then refreshes only affected assigned/root/pinned/history views. A missed push is recovered from the durable outbox after reconnect or a later notification.
 6. **Operations:** API access and Lambda logs use CloudWatch. A dashboard summarizes request volume, Lambda invocations/errors/throttles and duration; alarms detect Lambda errors, Lambda throttles and API Gateway 5xx responses. AWS Budgets sends actual and forecast cost warning emails independently of application traffic.
 
 ## 2. Component and ownership reference
@@ -61,12 +69,26 @@ flowchart LR
 | DynamoDB Activity | Activity history. Partition key `itemId`, sort key `activityKey`; no GSIs. | Create table with composite key only. | `ActivityTable`. |
 | DynamoDB Users | Team profile and Cognito subject mapping. Partition key `userId`; no GSIs. | Create table; seed profiles after Cognito accounts exist. | `UsersTable`. |
 | DynamoDB Archive | Archived copies/hierarchy metadata. Partition key `archiveId`; GSIs `GSI_ArchiveIndex`, `GSI_ArchiveRoot`. | Create table and two indexes. | `ArchiveTable`. |
+| DynamoDB Realtime | Durable item-change outbox, one-use ticket hashes, and expiring WebSocket connection leases. Partition key `partitionKey`; sort key `sortKey`; TTL `expiresAt`; no GSIs. | Create the fifth, separate transport table and enable TTL. | `RealtimeTable`. |
 | API Gateway HTTP API | Authenticated JSON endpoints, Cognito JWT authorizer, access logs and CORS. | Create API, Lambda integration, route and authorizer in the console. | `TeamFollowUpApi` with the same JWT/CORS contract. |
-| Lambda | Python 3.12 handler, 256 MB, 20-second timeout, structured JSON logs. | Package `backend/src`, configure the four table names plus Cognito pool/client IDs, and add the required scoped IAM actions. | `ApiExecutionRole` plus `ApiFunction`; DynamoDB writes remain table-scoped, while current-password verification uses only `AdminGetUser` and `AdminInitiateAuth` against the one User Pool. |
+| API Gateway WebSocket API | `prod` WSS transport for active sessions; Lambda validates 30-second single-use tickets issued by the JWT-protected HTTP API. | Create `$connect`, `$disconnect`, `$default` routes to the same Lambda integration. | `RealtimeWebSocketApi`, integration, routes and `RealtimeWebSocketStage`. |
+| Lambda | Python 3.12 handler, 256 MB, 20-second timeout, structured JSON logs. | Package `backend/src`, configure five table names, Cognito IDs, the HTTPS WebSocket management endpoint, and narrowly scoped IAM actions. | `ApiExecutionRole` plus `ApiFunction`; transactionally writes the outbox and uses scoped `execute-api:ManageConnections` for fan-out. |
 | CloudWatch | 30-day API/Lambda access logs, dashboard, Lambda error/throttle alarms, API 5xx alarm. | Create log groups, dashboard and alarms. | Log groups, `TeamFollowUpDashboard` and three alarms. |
 | AWS Budgets | USD $1 monthly cost budget; actual thresholds at 50%, 80%, 100%, plus forecast 100%; email notifications only. | Create budget and enter the notification email. | `MonthlyCostBudget`; recipient is a deployment parameter, not committed. |
 
 The console procedure and the template should create the same logical service set, table/index names and low-capacity data settings. AWS-generated identifiers (Cognito pool ID, app-client ID, API ID and Amplify app ID) will naturally differ between deployments.
+
+### Real-time item update lifecycle
+
+The WebSocket API is a notification transport, not a second source of item data:
+
+1. After sign-in, the browser calls the JWT-authorized `POST /realtime/ticket`. Lambda resolves the enabled team profile and returns a random ticket valid for 30 seconds plus the current durable change cursor. Only the ticket hash is stored.
+2. The browser connects to the WebSocket API using the one-use ticket. The `$connect` Lambda route consumes that ticket in the same DynamoDB transaction that records the connection lease. No JWT, Cognito token, or user profile is sent over the WebSocket.
+3. Each create/update/delete/restore operation writes a compact change row to the Realtime table atomically with the associated item/audit write, where the operation supports a transaction. The row contains IDs, prior/current assignees, root/parent IDs, version, kind, and timestamp—not item content.
+4. Lambda fans out a small `items.changed` hint to active connections. Clients do not trust push order or treat it as the data payload: they query `GET /realtime/changes?since=<cursor>`, consume ordered records, and refresh only affected views using the existing authenticated item APIs. Affected assignees refresh Assigned Items; the selected root refreshes its hierarchy/Activity; pinned/history popups refresh only when affected IDs overlap.
+5. A four-minute heartbeat renews the server-side nine-minute connection lease. Exponential-backoff reconnect obtains a new one-use ticket and resumes from the last processed cursor. Outbox retention is seven days, after which expired notifications are removed by DynamoDB TTL.
+
+This keeps notification payloads small and avoids re-downloading the full workspace for each update. A temporary WebSocket outage does not roll back a successful item write: the durable cursor feed allows the browser to catch up when it reconnects or receives a later hint. WebSocket/API Gateway and Realtime-table resources must exist before deploying the updated Lambda and frontend; CI template validation does not provision those resources.
 
 ### Frontend request lifecycle and responsiveness
 
@@ -80,7 +102,7 @@ A normal frontend-only source update is published by rebuilding the static artif
 
 ## 3. DynamoDB physical schema and access patterns
 
-The four tables use the DynamoDB **Standard** table class, **Provisioned** billing, and **1 RCU / 1 WCU** for every base table and GSI. The target is **9 RCUs and 9 WCUs** across four base tables and five GSIs. Auto scaling, point-in-time recovery, deletion protection and Streams are off in the low-cost baseline. DynamoDB encryption at rest uses the AWS-owned default key.
+The four application-data tables use the DynamoDB **Standard** table class, **Provisioned** billing, and **1 RCU / 1 WCU** for every base table and GSI. They total **9 RCUs and 9 WCUs** across four base tables and five GSIs. The separate Realtime transport table adds 1 RCU / 1 WCU, bringing the complete target to **10 RCUs and 10 WCUs**. Auto scaling, point-in-time recovery, deletion protection and Streams are off in the low-cost baseline. DynamoDB encryption at rest uses the AWS-owned default key.
 
 | Table | Key schema | Indexes | Runtime access |
 |---|---|---|---|
@@ -88,6 +110,7 @@ The four tables use the DynamoDB **Standard** table class, **Provisioned** billi
 | `TeamFollowUp-Activity` | Partition `itemId` (String), sort `activityKey` (String) | None | `activityKey = ISO timestamp + "#" + eventId`. Single-item history uses Query; all-activity uses Scan. `eventId` is not the table key. |
 | `TeamFollowUp-Users` | Partition `userId` (String) | None | Lambda scans this small team table to resolve the JWT `sub` against `cognitoSub`. Missing, duplicate or disabled mappings are denied. |
 | `TeamFollowUp-Archive` | Partition `archiveId` (String) | `GSI_ArchiveIndex`: `archivePK` / `archiveSort`; `GSI_ArchiveRoot`: `archiveRootPK` / `archiveRootSort`. All projection. | Archived hierarchy listings and restore. |
+| `TeamFollowUp-Realtime` | Partition `partitionKey` (String), sort `sortKey` (String) | None; TTL `expiresAt` | `CHANGE` / ordered UTC cursor: compact 7-day change outbox; `CONNECTION` / connection ID: 9-minute renewable session lease; `TICKET#hash` / `TOKEN`: 30-second single-use ticket. All change events are committed atomically with the associated work-item transaction. |
 
 The schema reference is [`backend/table-schema.json`](../backend/table-schema.json), and the handler's current index names are checked by `scripts/test-infrastructure.py`. Activity/Users scans are intentional in the current small-team design; their cost and latency grow with table size. Do not run the legacy `migrate_activity_application_index.py` script against this table contract.
 
@@ -125,7 +148,7 @@ The intended project workflow is to create/configure AWS resources manually in t
 
 ### Optional automation reference: CloudFormation/SAM
 
-The end-to-end optional automation procedure is documented in [`AUTOMATED_DEPLOYMENT.md`](AUTOMATED_DEPLOYMENT.md). [`backend/template.yaml`](../backend/template.yaml) is a **full-stack, from-scratch template**. It creates a Cognito pool and public client, four DynamoDB tables/indexes, API Gateway, Lambda/IAM, CloudWatch logs/dashboard/alarms, an Amplify Hosting app/branch and the $1 monthly Budget. It does not accept IDs or names of pre-existing data resources. At the default prefix, it uses the same DynamoDB names and schema as the console runbook.
+The end-to-end optional automation procedure is documented in [`AUTOMATED_DEPLOYMENT.md`](AUTOMATED_DEPLOYMENT.md). [`backend/template.yaml`](../backend/template.yaml) is a **full-stack, from-scratch template**. It creates a Cognito pool and public client, four application-data DynamoDB tables/indexes plus the Realtime transport table, HTTP and WebSocket APIs, Lambda/IAM, CloudWatch logs/dashboard/alarms, an Amplify Hosting app/branch and the $1 monthly Budget. It does not accept IDs or names of pre-existing data resources. At the default prefix, it uses the same DynamoDB names and schema as the console runbook.
 
 This template is **not** the planned day-to-day deployment method. Run `sam validate` and `sam build` for optional validation/build checks; do not run `sam deploy` as part of the console-first workflow. To exercise the automation alternative, use a fresh environment or deliberately choose a different resource prefix. Do not deploy it on top of the current console-created pool/tables/budget: CloudFormation does not automatically adopt them, and duplicate physical names will fail. The template needs deployment-time GitHub repository access and a budget-alert email; neither value belongs in Git. The template creates the exact branch HTTPS origin for CORS from Amplify's generated domain and injects the generated API URL into the branch configuration.
 

@@ -123,8 +123,8 @@ function createContext(overrides = {}) {
   const { context, calls, data, ui } = createContext({
     resolvedItems: [{ id: 'project-new', type: 'project', updatedAt: '2026-11-02T00:00:00.000Z' }]
   });
-  data.parents.push({ id: 'project-deleted', type: 'project' });
-  data.children.push({ id: 'task-deleted', type: 'task', rootParentId: 'project-deleted' });
+  data.parents = [{ id: 'project-deleted', type: 'project' }];
+  data.children = [{ id: 'task-deleted', type: 'task', rootParentId: 'project-deleted' }];
   ui.selectedParentId = 'project-deleted';
   await context.applyRealtimeChangeBatch([{
     type: 'items.changed', changeId: 'top-level-delete',

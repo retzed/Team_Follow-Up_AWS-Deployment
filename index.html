@@ -3360,6 +3360,8 @@ async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
 let realtimeSocket=null,realtimeReconnectTimer=null,realtimeHeartbeatTimer=null,realtimeCatchupTimer=null;
 let realtimeRunning=false,realtimeGeneration=0,realtimeReconnectDelay=1000,realtimeCursor='';
 let realtimeCatchupPromise=null,realtimeCatchupRequested=false,realtimeAssignedRefreshPending=false;
+const REALTIME_APPLIED_CHANGE_LIMIT=2000;
+let realtimeAppliedChangeIds=new Set(),realtimeAppliedChangeOrder=[],realtimeApplyQueue=Promise.resolve();
 function clearRealtimeHeartbeat(){if(realtimeHeartbeatTimer){clearInterval(realtimeHeartbeatTimer);realtimeHeartbeatTimer=null;}}
 function stopRealtimeNotifications(){
  realtimeRunning=false;realtimeGeneration++;realtimeCursor='';realtimeCatchupRequested=false;
@@ -3380,8 +3382,31 @@ function scheduleRealtimeCatchup(delay=0){
  if(realtimeCatchupTimer)clearTimeout(realtimeCatchupTimer);
  realtimeCatchupTimer=setTimeout(()=>{realtimeCatchupTimer=null;void catchUpRealtimeChanges();},Math.max(0,delay));
 }
+function rememberRealtimeChange(change){
+ const changeId=String(change?.changeId||'');if(!changeId||realtimeAppliedChangeIds.has(changeId))return;
+ realtimeAppliedChangeIds.add(changeId);realtimeAppliedChangeOrder.push(changeId);
+ while(realtimeAppliedChangeOrder.length>REALTIME_APPLIED_CHANGE_LIMIT){const expired=realtimeAppliedChangeOrder.shift();realtimeAppliedChangeIds.delete(expired);}
+}
+function queueRealtimeChangeBatch(changes){
+ const generation=realtimeGeneration;
+ const queued=realtimeApplyQueue.then(()=>{
+  if(!realtimeRunning||generation!==realtimeGeneration)return;
+  return applyRealtimeChangeBatch(changes);
+ });
+ realtimeApplyQueue=queued.catch(error=>{console.warn('Queued real-time change processing failed; durable catch-up will retry.',error);});
+ return queued;
+}
 async function applyRealtimeChangeBatch(changes){
  const api=window.TeamFollowUpDataApi;if(!api||!Array.isArray(changes)||!changes.length)return;
+ const pendingChanges=[];
+ for(const change of changes){
+  if(change?.type!=='items.changed')continue;
+  const changeId=String(change.changeId||'');
+  if(changeId&&realtimeAppliedChangeIds.has(changeId))continue;
+  pendingChanges.push(change);
+ }
+ if(!pendingChanges.length)return;
+ changes=pendingChanges;
  const rootIds=new Set(),topLevelIds=new Set(),assigneeIds=new Set(),itemIds=new Set();
  for(const change of changes){
   if(change?.type!=='items.changed')continue;
@@ -3435,6 +3460,7 @@ async function applyRealtimeChangeBatch(changes){
   const modalRoot=String(modalItem?.rootParentId||rootParent(modalItem)?.id||ui.modal.itemId||'');
   if(rootIds.has(modalRoot))void refreshActivityFor(modalRoot,'all');
  }
+ for(const change of changes)rememberRealtimeChange(change);
 }
 async function catchUpRealtimeChanges(){
  if(!realtimeRunning)return;
@@ -3446,7 +3472,7 @@ async function catchUpRealtimeChanges(){
    while(realtimeRunning){
     const result=await window.TeamFollowUpDataApi.queryRealtimeChanges(realtimeCursor,{limit:100});
     const changes=Array.isArray(result?.changes)?result.changes:[];
-    if(changes.length)await applyRealtimeChangeBatch(changes);
+    if(changes.length)await queueRealtimeChangeBatch(changes);
     const nextCursor=String(result?.nextCursor||realtimeCursor);
     const cursorAdvanced=nextCursor!==realtimeCursor;
     if(cursorAdvanced)realtimeCursor=nextCursor;
@@ -3487,7 +3513,15 @@ async function connectRealtimeNotifications(generation){
   };
   socket.onmessage=event=>{
    if(!realtimeRunning||generation!==realtimeGeneration)return;
-   try{const message=JSON.parse(String(event.data||'{}'));if(message?.type==='items.changed')scheduleRealtimeCatchup(0);}catch(error){console.warn('Ignored an invalid real-time notification.',error);}
+   try{
+    const message=JSON.parse(String(event.data||'{}'));
+    if(message?.type==='items.changed'){
+     void queueRealtimeChangeBatch([message]).then(()=>scheduleRealtimeCatchup(0)).catch(error=>{
+      console.warn('Could not apply a pushed real-time change; durable catch-up will retry.',error);
+      scheduleRealtimeCatchup(1000);
+     });
+    }
+   }catch(error){console.warn('Ignored an invalid real-time notification.',error);}
   };
   socket.onerror=()=>{try{socket.close();}catch(error){}};
   socket.onclose=()=>{

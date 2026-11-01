@@ -4,9 +4,11 @@ import vm from 'node:vm';
 
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const femaleUserIcon = html.match(/'female-user':'([^']+)'/);
-assert.ok(femaleUserIcon, 'Female User must exist in the inline SVG icon registry.');
-assert.ok(femaleUserIcon[1].includes('<circle cx="12" cy="8" r="4"/>') && femaleUserIcon[1].includes('M8 8.4c0 2.7-.6 4.8-2.1 6.2'), 'Female User must retain the User icon head silhouette and add matching long-hair details.');
-assert.ok(html.includes("{value:'female-user'}") && html.includes("'female-user':'Female User'"), 'Female User must be selectable and have its explicit display label.');
+const genericUserIcon = html.match(/\buser:'([^']+)'/);
+assert.ok(femaleUserIcon && genericUserIcon, 'Both Female User and generic User must exist in the inline SVG icon registry.');
+assert.notEqual(femaleUserIcon[1], genericUserIcon[1], 'Female User must have a distinct glyph rather than duplicating the generic User icon.');
+assert.ok(femaleUserIcon[1].includes('M7.5 8.7C6.3 7.5') && femaleUserIcon[1].includes('M7.1 5.4C5.6 6.8') && femaleUserIcon[1].includes('M16.9 5.4c1.5 1.4'), 'Female User must include a shaped hair cap and long side locks.');
+assert.ok(femaleUserIcon[1].includes('l2.9 2.4') && html.includes("{value:'female-user'}") && html.includes("'female-user':'Female User'"), 'Female User must include its neckline and remain selectable with its explicit label.');
 const targetedStart = html.indexOf('<style id="targeted-history-and-child-search-polish">');
 const targetedEnd = html.indexOf('</style>', targetedStart);
 assert.ok(targetedStart >= 0 && targetedEnd > targetedStart, 'Targeted refinements stylesheet must exist.');

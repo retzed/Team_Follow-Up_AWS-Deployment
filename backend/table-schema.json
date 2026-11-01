@@ -205,7 +205,9 @@
     "The template creates the Cognito pool and public app client, the four DynamoDB tables, Amplify Hosting app/branch, API Gateway HTTP API, Lambda and scoped IAM, CloudWatch logs/dashboard/alarms, and a $1 monthly budget with actual/forecast email alerts. It is an automation reference, not the primary deployment method.",
     "The handler uses the physical Items/Archive indexes listed here. It scans the small Users table for cognitoSub and scans Activity for application-wide history because neither table has a GSI.",
     "Activity's itemId + activityKey primary key is authoritative; eventId is a regular attribute. The frontend has no local database/demo adapter; application data goes through the Cognito-authenticated API.",
-    "DynamoDB data tables use CloudFormation DeletionPolicy/UpdateReplacePolicy Retain in the automation template. Deleting the stack therefore retains table data; the retained tables must be handled before recreating a stack with the same names."
+    "DynamoDB data tables use CloudFormation DeletionPolicy/UpdateReplacePolicy Retain in the automation template. Deleting the stack therefore retains table data; the retained tables must be handled before recreating a stack with the same names.",
+    "Real-time delivery uses a separate TeamFollowUp-Realtime transport table with partitionKey + sortKey and TTL expiresAt. It is intentionally not included in the four original business-data tables array or the dated four-table currentConsoleBootstrap inventory.",
+    "Item changes are written to the Realtime CHANGE partition atomically with the associated item/activity transaction where supported. WebSocket pushes contain only change metadata; clients catch up with the ordered cursor API after reconnect."
   ],
   "samTargetResourcesDeployed": false,
   "currentConsoleBootstrap": {
@@ -438,5 +440,54 @@
     }
   },
   "thisFileProvisionsAwsResources": false,
-  "fullStackTemplateDeployed": false
+  "fullStackTemplateDeployed": false,
+  "realtimeTransport": {
+    "physicalNameTemplate": "${ResourceNamePrefix}-Realtime",
+    "status": "required for real-time change delivery; not part of the original four-table currentConsoleBootstrap snapshot",
+    "billingMode": "PROVISIONED",
+    "tableClass": "STANDARD",
+    "provisionedThroughput": {
+      "readCapacityUnits": 1,
+      "writeCapacityUnits": 1
+    },
+    "primaryKey": {
+      "partition": "partitionKey",
+      "partitionType": "S",
+      "sort": "sortKey",
+      "sortType": "S"
+    },
+    "globalSecondaryIndexes": [],
+    "ttl": {
+      "attribute": "expiresAt",
+      "enabled": true
+    },
+    "recordTypes": {
+      "changes": {
+        "partitionKey": "CHANGE",
+        "sortKey": "ISO-8601 UTC timestamp + # + changeId",
+        "retentionSeconds": 604800,
+        "description": "Compact item-change metadata, atomically written with item/audit transactions."
+      },
+      "connections": {
+        "partitionKey": "CONNECTION",
+        "sortKey": "API Gateway connectionId",
+        "leaseSeconds": 540,
+        "heartbeatIntervalSeconds": 240
+      },
+      "tickets": {
+        "partitionKey": "TICKET#<SHA-256 token hash>",
+        "sortKey": "TOKEN",
+        "ttlSeconds": 30
+      }
+    },
+    "deployment": {
+      "websocketApi": "RealtimeWebSocketApi",
+      "stage": "prod",
+      "browserBuildVariable": "TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL",
+      "lambdaEnvironmentVariables": [
+        "REALTIME_TABLE",
+        "WEBSOCKET_MANAGEMENT_ENDPOINT"
+      ]
+    }
+  }
 }

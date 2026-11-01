@@ -8,7 +8,7 @@ This runbook documents both the complete target configuration and the current ac
 
 1. Confirm the AWS account and Region.
 2. Create or verify Cognito (pool, custom attribute and public app client).
-3. Create or verify the four DynamoDB tables and five GSIs.
+3. Create or verify the four baseline DynamoDB tables and five GSIs, then create the separate TeamFollowUp-Realtime transport table required for live change notifications.
 4. Create or verify the monthly cost budget.
 5. Create administrator-managed team accounts and seed their DynamoDB profile mappings.
 6. Create Amplify Hosting and record its exact branch HTTPS origin.
@@ -104,8 +104,29 @@ Create the table with partition key **`archiveId` (String)**, no sort key.
 | `GSI_ArchiveIndex` | `archivePK` | `archiveSort` | All | 1 RCU / 1 WCU |
 | `GSI_ArchiveRoot` | `archiveRootPK` | `archiveRootSort` | All | 1 RCU / 1 WCU |
 
-The target total is four base tables and five GSIs: **9 RCUs and 9 WCUs**. This is a provisioned capacity configuration, not a guarantee of free usage or immunity from throttling.
+The four baseline data tables and five GSIs total **9 RCUs and 9 WCUs**. The real-time transport table in Section 3.5 adds 1 RCU / 1 WCU, making the complete target **10 RCUs and 10 WCUs**. These provisioned settings are not a guarantee of free usage or immunity from throttling.
 
+### 3.5 `TeamFollowUp-Realtime` — required for live change notifications
+
+Create a fifth table for the durable change outbox and ephemeral WebSocket session records:
+
+- Partition key: **`partitionKey` (String)**.
+- Sort key: **`sortKey` (String)**.
+- No GSIs.
+- Billing mode: **Provisioned**, 1 RCU / 1 WCU; Standard table class.
+- Enable DynamoDB TTL on **`expiresAt` (Number)**; keep PITR, Streams, auto scaling, and deletion protection off to match the low-cost baseline.
+
+The table is shared by three logical record types:
+
+| Record | Partition key | Sort key | Expiration |
+|---|---|---|---|
+| Durable item-change outbox | `CHANGE` | UTC ISO timestamp + `#` + unique change ID | 7 days |
+| Active WebSocket connection | `CONNECTION` | API Gateway connection ID | 9-minute lease, renewed by 4-minute client heartbeats |
+| Single-use connection ticket | `TICKET#<SHA-256>` | `TOKEN` | 30 seconds |
+
+Change records contain identifiers, assignee/root/parent IDs, item version, change kind, and timestamps only. They do not contain item titles, descriptions, profiles, or other item content. Item create/update/delete/restore writes a change record atomically with the item/audit transaction where applicable. WebSocket delivery is best-effort; the ordered outbox cursor lets a reconnecting browser catch up on missed pushes.
+
+The current-account snapshot records only the original four tables. **Do not deploy the updated Lambda until this fifth table exists, its TTL is enabled, and its name is configured in Lambda.**
 ## 4. AWS Budgets cost monitor — create or verify
 
 In **Billing and Cost Management → Budgets**, create a **monthly cost budget**:
@@ -159,7 +180,7 @@ Review the six standard IDs/names plus `root` and the mapping results. Only then
 
 ### 7.1 Create the execution role
 
-Create an IAM role named **`TeamFollowUp-Api-ExecutionRole`** for the **Lambda** service. This is the same default role name created by the optional full-stack template. Attach the AWS managed policy **`AWSLambdaBasicExecutionRole`** for CloudWatch logging. Add an inline policy based on [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json). Replace the account-ID placeholder in every ARN and replace `REPLACE_WITH_USER_POOL_ID` with the actual Cognito User Pool ID. Keep DynamoDB reads restricted to the four application tables/indexes. Item-level `PutItem`/`UpdateItem`/`DeleteItem`/`ConditionCheckItem` permissions—including Users-table profile and pin writes—must remain conditional on `dynamodb:EnclosingOperation = TransactWriteItems`; `TransactWriteItems` is scoped to Items, Activity, Archive and Users only. Do not grant standalone Users-table writes, broad `cognito-idp:*`, user creation/deletion, or attribute-update permissions. The automation template defines the same least-privilege actions against resource references.
+Create an IAM role named **`TeamFollowUp-Api-ExecutionRole`** for the **Lambda** service. This is the same default role name created by the optional full-stack template. Attach the AWS managed policy **`AWSLambdaBasicExecutionRole`** for CloudWatch logging. Add an inline policy based on [`backend/console-lambda-policy.json`](../backend/console-lambda-policy.json). Replace the account-ID placeholder in every ARN, replace `REPLACE_WITH_USER_POOL_ID` with the actual Cognito User Pool ID, and replace `REPLACE_WITH_REALTIME_WEBSOCKET_API_ID` with the WebSocket API ID created in Step 8.1. Keep DynamoDB reads restricted to the application tables and indexes. Item-level `PutItem`/`UpdateItem`/`DeleteItem`/`ConditionCheckItem` permissions—including Users profile/pin writes and transactional outbox writes—must remain conditional on `dynamodb:EnclosingOperation = TransactWriteItems`. Transaction permissions are scoped to Items, Activity, Archive, Users, and Realtime. The additional statements `ManageRealtimeSessionRecords` and `PostToRealtimeWebSocketConnections` allow only ticket/connection record management on the Realtime table and `execute-api:ManageConnections` on this WebSocket API's `prod` connection resources. Do not grant standalone Users-table writes, broad `cognito-idp:*`, user creation/deletion, or attribute-update permissions. The automation template defines the same scoped actions against resource references.
 
 ### 7.2 Package the handler ZIP
 
@@ -198,6 +219,8 @@ Upload `backend/TeamFollowUp-Lambda.zip` as the function code. Set these environ
 | `ACTIVITY_TABLE` | `TeamFollowUp-Activity` |
 | `USERS_TABLE` | `TeamFollowUp-Users` |
 | `ARCHIVE_TABLE` | `TeamFollowUp-Archive` |
+| `REALTIME_TABLE` | `TeamFollowUp-Realtime` |
+| `WEBSOCKET_MANAGEMENT_ENDPOINT` | `https://<WEBSOCKET_API_ID>.execute-api.us-east-1.amazonaws.com/prod` (management API HTTPS endpoint, not the browser WSS URL) |
 | `COGNITO_USER_POOL_ID` | The actual User Pool ID, e.g. `us-east-1_...` (not the app-client ID) |
 | `COGNITO_CLIENT_ID` | The `Team_FollowUp` public app-client ID |
 | `LOG_LEVEL` | `INFO` (optional; this is the handler default) |
@@ -230,6 +253,31 @@ Enable access logging on the `$default` stage to a log group such as `/TeamFollo
 
 After saving, copy the API's HTTPS invoke URL without a route path. This is the value for `TEAM_FOLLOW_UP_API_BASE_URL`.
 
+### 8.1 Create the WebSocket API for real-time item updates
+
+Create a separate **WebSocket API** in API Gateway, in the same Region and account as the Lambda:
+
+| Setting | Value |
+|---|---|
+| API name | `TeamFollowUp-Realtime` |
+| Protocol type | WebSocket |
+| Route selection expression | `$request.body.action` |
+| Integration | Existing `TeamFollowUp-Api` Lambda, Lambda proxy |
+| Stage | `prod`, auto-deploy enabled |
+
+Create these routes and point each at the same Lambda integration: `$connect`, `$disconnect`, and `$default`.
+
+Do not configure a Cognito JWT authorizer on the WebSocket API. The browser first calls the authenticated HTTP endpoint `POST /realtime/ticket`; Lambda verifies the JWT and enabled team profile and issues a random, single-use ticket that expires in 30 seconds. API Gateway passes the ticket to Lambda in the `$connect` query string. Lambda stores only its SHA-256 hash and atomically consumes the ticket while registering the connection. A client message `{"action":"ping"}` renews its 9-minute connection lease; the client sends this heartbeat every four minutes.
+
+Grant the Lambda permission to be invoked by this WebSocket API. Add the `PostToRealtimeWebSocketConnections` statement from `backend/console-lambda-policy.json`, replacing the account/API-ID placeholders. The `WEBSOCKET_MANAGEMENT_ENDPOINT` Lambda variable is the stage's **HTTPS** management URL:
+
+    https://<WEBSOCKET_API_ID>.execute-api.us-east-1.amazonaws.com/prod
+
+The browser uses the corresponding **WSS** URL with the same stage path:
+
+    wss://<WEBSOCKET_API_ID>.execute-api.us-east-1.amazonaws.com/prod
+
+Use that exact value for the Amplify variable in Step 9. Do not append a ticket to the Amplify variable or store a ticket in configuration; tickets are requested at connection time.
 ## 9. Configure Amplify build variables and publish
 
 In **Amplify → App settings → Environment variables**, set these values for the deployed branch:
@@ -238,7 +286,8 @@ In **Amplify → App settings → Environment variables**, set these values for 
 |---|---|
 | `TEAM_FOLLOW_UP_COGNITO_USER_POOL_ID` | The actual User Pool ID from Step 2 |
 | `TEAM_FOLLOW_UP_COGNITO_CLIENT_ID` | The `Team_FollowUp` public app-client ID |
-| `TEAM_FOLLOW_UP_API_BASE_URL` | API Gateway HTTPS invoke URL from Step 8, origin only |
+| `TEAM_FOLLOW_UP_API_BASE_URL` | API Gateway HTTP API HTTPS invoke URL from Step 8, origin only |
+| `TEAM_FOLLOW_UP_REALTIME_WEBSOCKET_URL` | API Gateway WebSocket API WSS URL from Step 8.1, including /prod |
 | `TEAM_FOLLOW_UP_COGNITO_TEAM_USER_ATTRIBUTE` | `custom:teamUserId` |
 
 Save and trigger a new build. A successful build should publish `dist/index.html`. These frontend values are public browser configuration, not secrets. Do not place AWS access keys, GitHub tokens, Cognito client secrets or real Cognito subject mappings in Amplify variables.
@@ -298,7 +347,8 @@ Use two independent team accounts in separate browsers or sessions:
 9. Repeat Account Search and navigation at 320, 375, 560, 768, and 820 CSS pixel widths in both English LTR and Arabic RTL. Check date controls do not overflow, buttons wrap, text remains readable, and the workspace does not become blank after sidebar expansion.
 10. Send an unauthenticated API request and confirm the JWT authorizer denies it. Check CORS from the exact Amplify origin.
 11. In My Account → Profile, check valid/invalid current-password verification, matching/mismatched new-password checkmarks, and successful Cognito password change. Confirm a wrong password never produces a success checkmark.
-12. Inspect Lambda/API logs, the dashboard and alarm state. Confirm the budget notifications are configured but do not treat the budget as a spending limit.
+12. Open the app in two independently authenticated browser sessions. Assign a new item to the second user, change an existing item's assignee in both directions, then edit status/priority/title and archive/restore items. Confirm the affected user's Assigned Items list updates without reload, other sessions viewing the affected root update their detail, unrelated users do not reload another user's assignment list, and a briefly disconnected session catches up after reconnecting.
+13. Inspect Lambda/API logs, the dashboard and alarm state. Confirm the budget notifications are configured but do not treat the budget as a spending limit.
 
 ## 12. Optional full-stack automation reference (not the primary method)
 

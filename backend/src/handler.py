@@ -943,7 +943,10 @@ def make_realtime_change(item, previous=None, affected_items=None, change_kind='
     item_id = str(primary.get('itemId') or primary.get('id') or '').strip()
     change_id = 'chg_' + uuid.uuid4().hex
     occurred_at = now()
-    sort_key = occurred_at + '#' + change_id
+    # Keep the durable cursor more precise than the display timestamp so
+    # independent writes within the same millisecond sort deterministically.
+    cursor_time = datetime.now(timezone.utc).isoformat(timespec='microseconds').replace('+00:00', 'Z')
+    sort_key = cursor_time + '#' + change_id
     return {
         'partitionKey': 'CHANGE',
         'sortKey': sort_key,

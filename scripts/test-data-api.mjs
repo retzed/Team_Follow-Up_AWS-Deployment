@@ -89,6 +89,10 @@ const window = {
       try { body = init.body ? JSON.parse(init.body) : undefined; } catch { body = init.body; }
       requests.push({ method, path: url.pathname + url.search, body });
 
+      if (method === 'POST' && url.pathname === '/realtime/ticket') return ok({ ticket: 'single-use-test-ticket', expiresIn: 30, cursor: 'cursor-before-test' }, 201);
+      if (method === 'GET' && url.pathname === '/realtime/changes') return ok({ changes: [
+        {"type":"items.changed","changeId":"chg-test-1","cursor":"cursor-test-1","changeKind":"updated","itemId":"task-1","rootParentIds":["project-1"],"topLevelIds":[],"parentIds":["project-1"],"assigneeIds":["u1","u2"],"deleted":false,"version":2,"occurredAt":"2026-11-02T00:00:00.000Z"}
+      ], nextCursor: 'cursor-test-1', hasMore: false });
       if (method === 'GET' && url.pathname === '/users') return versioned(url, 'users', { users: [user] });
       if (method === 'GET' && url.pathname === '/items' && url.searchParams.get('scope') === 'top-level') {
         return versioned(url, 'top-level', { items: [project], count: 1, nextOffset: null });
@@ -120,6 +124,17 @@ vm.runInNewContext(source, { window, localStorage, console, URL, URLSearchParams
 const api = window.TeamFollowUpDataApi;
 assert.ok(api, 'AWS data API must be registered');
 assert.equal(api.mode, undefined, 'the runtime must not expose a local-vs-API mode toggle');
+assert.equal(api.remoteApi, true, 'the AWS adapter advertises its remote transport without a mode toggle');
+const realtimeTicket = await api.createRealtimeTicket();
+assert.equal(realtimeTicket.ticket, 'single-use-test-ticket');
+assert.equal(realtimeTicket.cursor, 'cursor-before-test');
+const realtimeChanges = await api.queryRealtimeChanges('cursor-before-test', { limit: 25 });
+assert.equal(realtimeChanges.changes.length, 1);
+assert.deepEqual(realtimeChanges.changes[0].assigneeIds, ['u1','u2']);
+assert.equal(realtimeChanges.nextCursor, 'cursor-test-1');
+assert.ok(!JSON.stringify(realtimeChanges).includes('Project Alpha'), 'the real-time feed contains change metadata, not item content');
+assert.ok(requests.some(request=>request.method==='POST'&&request.path==='/realtime/ticket'));
+assert.ok(requests.some(request=>request.method==='GET'&&request.path==='/realtime/changes?since=cursor-before-test&limit=25'));
 
 const progress = [];
 const snapshot = await api.bootstrap((partial, meta) => progress.push({ count: partial.parents.length + partial.children.length, stage: meta.stage }));

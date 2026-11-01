@@ -161,6 +161,22 @@ function createContext(overrides = {}) {
 }
 
 {
+  const firstChange = {
+    type: 'items.changed', changeId: 'first-ever-change', cursor: 'cursor-first',
+    itemId: 'task-first', rootParentIds: ['project-1'], topLevelIds: [], parentIds: [],
+    assigneeIds: ['u2'], deleted: false, version: 1
+  };
+  const { context, calls } = createContext({ queryPages: [
+    { changes: [firstChange], nextCursor: 'cursor-first', hasMore: false }
+  ] });
+  vm.runInNewContext('realtimeRunning=true;realtimeCursor="";', context);
+  await context.catchUpRealtimeChanges();
+  assert.deepEqual(calls.queryCursors, [''], 'an empty cursor is a real initial state and must still query the first event');
+  assert.equal(context.getRealtimeState().cursor, 'cursor-first', 'the first-ever event establishes the durable cursor');
+  assert.equal(calls.assigned, 1, 'the first-ever event refreshes its assigned user immediately');
+}
+
+{
   const { context, api } = createContext();
   context.startRealtimeNotifications();
   await new Promise(resolve => setImmediate(resolve));
@@ -181,7 +197,7 @@ assert.ok(managerSource.includes("if(message?.type==='items.changed')scheduleRea
   'WebSocket frames act as hints; clients fetch ordered, durable change records instead of trusting push order.');
 assert.ok(managerSource.includes('realtimeReconnectDelay=Math.min(30000'),
   'connection retries use bounded exponential backoff.');
-assert.ok(managerSource.includes('setInterval(ping,4*60*1000)'),
-  'the client renews its short connection lease with regular heartbeats.');
+assert.ok(managerSource.includes('setInterval(()=>{ping();scheduleRealtimeCatchup(0);},4*60*1000)'),
+  'the heartbeat renews the connection lease and provides a lightweight fallback catch-up for any missed WebSocket push.');
 
 console.log('Real-time client tests passed: targeted assignee refresh, unaffected-user isolation, hierarchy updates, ordered cursor catch-up, authenticated connection, heartbeat and cleanup.');

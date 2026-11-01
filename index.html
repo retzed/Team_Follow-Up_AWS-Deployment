@@ -2682,7 +2682,7 @@ async function loadAccountAssignedItems(){
  if(ui.accountAssignedLoading)return;ui.accountAssignedLoading=true;ui.accountAssignedError='';const hydration=workspaceHydrationGeneration;renderAccountPage();
  try{const api=window.TeamFollowUpDataApi;if(!api?.queryAssigned)throw new Error(tr('assignedLoadFailed'));const rows=[];let offset=0,pages=0;while(true){const result=await api.queryAssigned(ui.actingUserId,{dateMode:'updated',direction:'desc',limit:250,offset});rows.push(...(Array.isArray(result?.items)?result.items:[]));const next=result?.nextOffset;if(next===undefined||next===null)break;const parsed=Number(next);if(!Number.isFinite(parsed)||parsed<=offset||++pages>1000)throw new Error('Assignment pagination did not advance.');offset=parsed;}if(hydration!==workspaceHydrationGeneration)return;const unique=new Map();for(const rawItem of rows){const item={...rawItem,id:String(rawItem.id||rawItem.itemId||'')};if(item.id){unique.set(item.id,item);assignedItemCache.set(item.id,item);}}ui.accountAssignedRows=[...unique.values()];ui.accountAssignedLoaded=true;}
  catch(error){if(hydration===workspaceHydrationGeneration)ui.accountAssignedError=String(error?.message||tr('assignedLoadFailed'));}
- finally{if(hydration===workspaceHydrationGeneration){ui.accountAssignedLoading=false;if(ui.page==='account'&&ui.accountTab==='assigned')renderAccountPage();}}
+ finally{if(hydration===workspaceHydrationGeneration){ui.accountAssignedLoading=false;if(ui.page==='account'&&ui.accountTab==='assigned')renderAccountPage();if(realtimeAssignedRefreshPending&&ui.page==='account'&&ui.accountTab==='assigned'){realtimeAssignedRefreshPending=false;queueMicrotask(()=>void loadAccountAssignedItems());}}}
 }
 async function loadAccountPinnedItems(){
  if(ui.accountPinnedLoading)return;ui.accountPinnedLoading=true;ui.accountPinnedError='';const hydration=workspaceHydrationGeneration;renderAccountPage();
@@ -3308,7 +3308,7 @@ function setSignInState(signedIn){
  if(signedIn)app.removeAttribute('aria-hidden');else app.setAttribute('aria-hidden','true');
  if(!signedIn){$('#signInError').hidden=true;$('#signInPassword').value='';}
 }
-$('#signOutButton').addEventListener('click',async()=>{try{await window.TeamFollowUpAuth?.signOut();}catch(e){console.error('Sign-out failed',e);}});
+$('#signOutButton').addEventListener('click',async()=>{stopRealtimeNotifications();try{await window.TeamFollowUpAuth?.signOut();}catch(e){console.error('Sign-out failed',e);}});
 let workspaceHydrationGeneration=0;
 function mergeRootChildrenRows(existingRows,rootId,incomingRows){
  const belongsToRoot=item=>{
@@ -3357,6 +3357,162 @@ async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
  rootChildrenRequests.set(rootId,promise);
  return promise;
 }
+let realtimeSocket=null,realtimeReconnectTimer=null,realtimeHeartbeatTimer=null,realtimeCatchupTimer=null;
+let realtimeRunning=false,realtimeGeneration=0,realtimeReconnectDelay=1000,realtimeCursor='';
+let realtimeCatchupPromise=null,realtimeCatchupRequested=false,realtimeAssignedRefreshPending=false;
+function clearRealtimeHeartbeat(){if(realtimeHeartbeatTimer){clearInterval(realtimeHeartbeatTimer);realtimeHeartbeatTimer=null;}}
+function stopRealtimeNotifications(){
+ realtimeRunning=false;realtimeGeneration++;realtimeCursor='';realtimeCatchupRequested=false;
+ if(realtimeReconnectTimer){clearTimeout(realtimeReconnectTimer);realtimeReconnectTimer=null;}
+ if(realtimeCatchupTimer){clearTimeout(realtimeCatchupTimer);realtimeCatchupTimer=null;}
+ clearRealtimeHeartbeat();
+ const socket=realtimeSocket;realtimeSocket=null;
+ if(socket){socket.onopen=socket.onmessage=socket.onerror=socket.onclose=null;try{socket.close(1000,'Signed out');}catch(error){}}
+}
+function scheduleRealtimeReconnect(generation){
+ if(!realtimeRunning||generation!==realtimeGeneration||realtimeReconnectTimer||window.navigator?.onLine===false)return;
+ const base=Math.min(30000,realtimeReconnectDelay),delay=Math.round(base*(0.8+Math.random()*0.4));
+ realtimeReconnectDelay=Math.min(30000,Math.max(1000,realtimeReconnectDelay*2));
+ realtimeReconnectTimer=setTimeout(()=>{realtimeReconnectTimer=null;void connectRealtimeNotifications(generation);},delay);
+}
+function scheduleRealtimeCatchup(delay=0){
+ if(!realtimeRunning)return;
+ if(realtimeCatchupTimer)clearTimeout(realtimeCatchupTimer);
+ realtimeCatchupTimer=setTimeout(()=>{realtimeCatchupTimer=null;void catchUpRealtimeChanges();},Math.max(0,delay));
+}
+async function applyRealtimeChangeBatch(changes){
+ const api=window.TeamFollowUpDataApi;if(!api||!Array.isArray(changes)||!changes.length)return;
+ const rootIds=new Set(),topLevelIds=new Set(),assigneeIds=new Set(),itemIds=new Set();
+ for(const change of changes){
+  if(change?.type!=='items.changed')continue;
+  if(change.itemId)itemIds.add(String(change.itemId));
+  for(const id of change.rootParentIds||[])if(id)rootIds.add(String(id));
+  for(const id of change.topLevelIds||[])if(id)topLevelIds.add(String(id));
+  for(const id of change.assigneeIds||[])if(id)assigneeIds.add(String(id));
+ }
+ const currentUserId=String(ui.actingUserId||rawCurrentUser()?.id||'');
+ if(currentUserId&&assigneeIds.has(currentUserId)){
+  ui.accountAssignedLoaded=false;
+  if(ui.page==='account'&&ui.accountTab==='assigned'){
+   if(ui.accountAssignedLoading)realtimeAssignedRefreshPending=true;
+   else void loadAccountAssignedItems();
+  }
+ }
+ if(itemIds.size&&ui.accountPinnedRows?.some(row=>itemIds.has(String(row.id)))){
+  ui.accountPinnedLoaded=false;
+  if(ui.page==='account'&&ui.accountTab==='pinned'&&!ui.accountPinnedLoading)void loadAccountPinnedItems();
+ }
+ if(topLevelIds.size){
+  const ids=[...topLevelIds],resolved=[];
+  for(let start=0;start<ids.length;start+=100){
+   const result=await api.resolveItems(ids.slice(start,start+100));
+   resolved.push(...(result?.items||[]).map(row=>row?.id?row:toAppItem(row)));
+  }
+  const resolvedById=new Map(resolved.map(row=>[String(row.id),row]));
+  data.parents=(data.parents||[]).filter(row=>!topLevelIds.has(String(row.id)));
+  data.parents.push(...resolvedById.values());
+  data.parents.sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
+  if(lastApiSnapshot)lastApiSnapshot.parents=data.parents.map(row=>({...row}));
+  data.children=(data.children||[]).filter(row=>!topLevelIds.has(String(row.rootParentId||rootParent(row)?.id||'')));
+  invalidateHierarchyIndex();
+  if(!data.parents.some(row=>String(row.id)===String(ui.selectedParentId))){
+   ui.selectedParentId=data.parents[0]?.id||'';
+   ui.selectedAssignedItemId=null;
+   dataLoadState.childrenLoaded.delete(String(ui.selectedParentId||''));
+  }
+  renderParentList({skipRemote:true});renderDetail();
+  if(ui.selectedParentId&&!rootIds.has(String(ui.selectedParentId)))void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});
+ }
+ const selectedRootId=String(ui.selectedParentId||'');
+ if(selectedRootId&&rootIds.has(selectedRootId)){
+  await ensureRootChildrenLoaded(selectedRootId,{force:true});
+  if(ui.tab==='activity'||ui.modal?.kind==='history')void refreshActivityFor(selectedRootId,'all');
+ }
+ if(ui.modal?.kind==='global-history')void refreshApplicationHistory(true);
+ else if(ui.modal?.kind==='history'){
+  const modalItem=allItem(ui.modal.itemId);
+  const modalRoot=String(modalItem?.rootParentId||rootParent(modalItem)?.id||ui.modal.itemId||'');
+  if(rootIds.has(modalRoot))void refreshActivityFor(modalRoot,'all');
+ }
+}
+async function catchUpRealtimeChanges(){
+ if(!realtimeRunning||!realtimeCursor)return;
+ if(realtimeCatchupPromise){realtimeCatchupRequested=true;return realtimeCatchupPromise;}
+ realtimeCatchupPromise=(async()=>{
+  do{
+   realtimeCatchupRequested=false;
+   let pages=0;
+   while(realtimeRunning){
+    const result=await window.TeamFollowUpDataApi.queryRealtimeChanges(realtimeCursor,{limit:100});
+    const changes=Array.isArray(result?.changes)?result.changes:[];
+    if(changes.length)await applyRealtimeChangeBatch(changes);
+    const nextCursor=String(result?.nextCursor||realtimeCursor);
+    if(nextCursor!==realtimeCursor)realtimeCursor=nextCursor;
+    if(!result?.hasMore)break;
+    if(++pages>=20){realtimeCatchupRequested=true;break;}
+    if(nextCursor===realtimeCursor&&!changes.length)break;
+   }
+  }while(realtimeRunning&&realtimeCatchupRequested);
+ })().catch(error=>{
+  console.warn('Real-time change catch-up failed; the durable cursor will be retried.',error);
+  if(realtimeRunning)scheduleRealtimeCatchup(4000);
+ }).finally(()=>{
+  realtimeCatchupPromise=null;
+  if(realtimeRunning&&realtimeCatchupRequested)scheduleRealtimeCatchup(0);
+ });
+ return realtimeCatchupPromise;
+}
+async function connectRealtimeNotifications(generation){
+ if(!realtimeRunning||generation!==realtimeGeneration||window.navigator?.onLine===false)return;
+ const api=window.TeamFollowUpDataApi,cfg=window.TEAM_FOLLOW_UP_CONFIG||{};
+ if(!api?.createRealtimeTicket||!api?.queryRealtimeChanges||typeof window.WebSocket!=='function')return;
+ try{
+  const ticketResult=await api.createRealtimeTicket();
+  if(!realtimeRunning||generation!==realtimeGeneration)return;
+  const ticket=String(ticketResult?.ticket||'');
+  if(!ticket)throw new Error('The real-time service did not issue a connection ticket.');
+  if(!realtimeCursor)realtimeCursor=String(ticketResult?.cursor||'');
+  const endpoint=new URL(String(cfg.realtimeWebSocketUrl||''));
+  if(endpoint.protocol!=='wss:')throw new Error('The real-time WebSocket endpoint is not configured.');
+  endpoint.searchParams.set('ticket',ticket);
+  const socket=new WebSocket(endpoint.toString());realtimeSocket=socket;
+  socket.onopen=()=>{
+   if(!realtimeRunning||generation!==realtimeGeneration||realtimeSocket!==socket){try{socket.close(1000,'Stale connection');}catch(error){}return;}
+   realtimeReconnectDelay=1000;
+   const ping=()=>{if(socket.readyState===WebSocket.OPEN){try{socket.send(JSON.stringify({action:'ping'}));}catch(error){try{socket.close();}catch(closeError){}}}};
+   clearRealtimeHeartbeat();ping();realtimeHeartbeatTimer=setInterval(ping,4*60*1000);
+   scheduleRealtimeCatchup(0);
+  };
+  socket.onmessage=event=>{
+   if(!realtimeRunning||generation!==realtimeGeneration)return;
+   try{const message=JSON.parse(String(event.data||'{}'));if(message?.type==='items.changed')scheduleRealtimeCatchup(0);}catch(error){console.warn('Ignored an invalid real-time notification.',error);}
+  };
+  socket.onerror=()=>{try{socket.close();}catch(error){}};
+  socket.onclose=()=>{
+   if(realtimeSocket===socket)realtimeSocket=null;
+   clearRealtimeHeartbeat();scheduleRealtimeReconnect(generation);
+  };
+ }catch(error){
+  console.warn('Could not establish the real-time change channel; reconnect will be attempted.',error);
+  scheduleRealtimeReconnect(generation);
+ }
+}
+function startRealtimeNotifications(){
+ const api=window.TeamFollowUpDataApi;
+ if(realtimeRunning||!api?.remoteApi||!api?.createRealtimeTicket)return;
+ realtimeRunning=true;realtimeReconnectDelay=1000;
+ const generation=++realtimeGeneration;void connectRealtimeNotifications(generation);
+}
+function sendRealtimeHeartbeat(){
+ if(realtimeSocket?.readyState===WebSocket.OPEN){
+  try{realtimeSocket.send(JSON.stringify({action:'ping'}));}catch(error){try{realtimeSocket.close();}catch(closeError){}}
+ }else if(realtimeRunning&&!realtimeReconnectTimer)scheduleRealtimeReconnect(realtimeGeneration);
+}
+window.addEventListener('online',()=>{if(realtimeRunning&&!realtimeSocket&&!realtimeReconnectTimer)scheduleRealtimeReconnect(realtimeGeneration);});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&realtimeRunning)sendRealtimeHeartbeat();});
+window.addEventListener('pagehide',stopRealtimeNotifications);
+window.addEventListener('pageshow',()=>{if(window.TeamFollowUpAuth&&window.__TEAM_FOLLOW_UP_AUTH_CONTEXT)startRealtimeNotifications();});
+
 async function startWorkspaceHydration(){
  let hydratedUserTheme=null;
  ui.page='account';ui.accountTab='assigned';ui.accountLoading=true;ui.accountAssignedRows=[];ui.accountPinnedRows=[];ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedLoading=false;ui.accountPinnedLoading=false;ui.accountAssignedError='';ui.accountPinnedError='';ui.accountError='';ui.accountMessage='';
@@ -3398,9 +3554,10 @@ async function startWorkspaceHydration(){
 if(!data.parents.some(p=>p.id===ui.selectedParentId))ui.selectedParentId=data.parents[0]?.id||'';
 setSignInState(Boolean(sessionUserIdAtLoad));
 render();
-window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;ui.actingUserId=context.teamUserId;ui.page='account';ui.accountTab='assigned';ui.accountLoading=true;ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedRows=[];ui.accountPinnedRows=[];render();void startWorkspaceHydration();};
+window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;stopRealtimeNotifications();ui.actingUserId=context.teamUserId;ui.page='account';ui.accountTab='assigned';ui.accountLoading=true;ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedRows=[];ui.accountPinnedRows=[];render();void startWorkspaceHydration();startRealtimeNotifications();};
 document.documentElement.classList.remove('auth-pending','app-booting');
 void startWorkspaceHydration();
+startRealtimeNotifications();
 } catch(startupError) {
  console.error('Team Follow-Up app startup failed after sign-in.',startupError);
  document.documentElement.classList.remove('auth-pending','app-booting');

@@ -3421,6 +3421,7 @@ async function applyRealtimeChangeBatch(changes){
    dataLoadState.childrenLoaded.delete(String(ui.selectedParentId||''));
   }
   renderParentList({skipRemote:true});renderDetail();
+  if(ui.page==='account'&&ui.accountTab==='search')renderAccountPage();
   if(ui.selectedParentId&&!rootIds.has(String(ui.selectedParentId)))void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});
  }
  const selectedRootId=String(ui.selectedParentId||'');

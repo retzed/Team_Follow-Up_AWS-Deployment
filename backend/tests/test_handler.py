@@ -515,6 +515,21 @@ class RealtimeDeliveryTests(unittest.TestCase):
         self.assertTrue(query["ConsistentRead"])
         self.assertIn("#sortKey > :sortKey", str(query["KeyConditionExpression"]))
 
+    def test_change_query_with_empty_cursor_includes_first_outbox_event(self):
+        rows = [{
+            "sortKey": "2026-11-02T00:00:00.000Z#chg-first",
+            "changeId": "chg-first",
+            "changeType": "items.changed",
+            "itemId": "task-first",
+        }]
+        with patch.object(handler.REALTIME_TABLE, "query", return_value={"Items": rows}) as query_changes:
+            result = handler.query_realtime_changes("", 100)
+        self.assertEqual([row["changeId"] for row in result["changes"]], ["chg-first"])
+        self.assertEqual(result["nextCursor"], rows[0]["sortKey"])
+        self.assertFalse(result["hasMore"])
+        expression = query_changes.call_args.kwargs["ExpressionAttributeValues"]
+        self.assertEqual(expression[":sortKey"], {"S": ""})
+
     def test_ticket_creation_stores_only_hash_and_short_expiry(self):
         profile = {"userId": "u2"}
         with patch.object(handler.REALTIME_TABLE, "put_item") as put_ticket, \

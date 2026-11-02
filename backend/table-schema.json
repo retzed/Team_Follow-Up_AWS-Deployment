@@ -208,7 +208,8 @@
     "DynamoDB data tables use CloudFormation DeletionPolicy/UpdateReplacePolicy Retain in the automation template. Deleting the stack therefore retains table data; the retained tables must be handled before recreating a stack with the same names.",
     "Real-time delivery uses a separate TeamFollowUp-Realtime transport table with partitionKey + sortKey and TTL expiresAt. It is intentionally not included in the four original business-data tables array or the dated four-table currentConsoleBootstrap inventory.",
     "Item changes are written to the Realtime CHANGE partition atomically with the associated item/activity transaction where supported. WebSocket pushes contain only change metadata; clients catch up with the ordered cursor API after reconnect.",
-    "The Realtime table also holds permanent ITEM_NAME#<normalized-name> / NAME reservation rows. These rows omit expiresAt and are not removed by the table TTL; they prevent duplicate names across active and archived item types."
+    "The Realtime table also holds permanent ITEM_NAME#<normalized-name> / NAME reservation rows. These rows omit expiresAt and are not removed by the table TTL; they prevent duplicate names across active and archived item types.",
+    "The ITEM_NAME_REGISTRY / VERSION marker is written by backend/scripts/backfill_item_name_registry.py only after all active and archived item names have been reserved and no duplicate normalized names remain."
   ],
   "samTargetResourcesDeployed": false,
   "currentConsoleBootstrap": {
@@ -485,6 +486,12 @@
         "sortKey": "NAME",
         "expiration": "Permanent; expiresAt is intentionally omitted",
         "description": "Global unique-name reservation shared across Projects, Jobs, Tasks, and Follow-ups. Unicode NFKC, trimmed/collapsed whitespace, case-insensitive normalized names. Written conditionally in the same TransactWriteItems operation as item creation/update; archived names remain reserved."
+      },
+      "nameRegistryMarker": {
+        "partitionKey": "ITEM_NAME_REGISTRY",
+        "sortKey": "VERSION",
+        "expiration": "Permanent; expiresAt is intentionally omitted",
+        "description": "Written only after the one-time active/archive name-reservation backfill completes without conflicts. Its presence allows Lambda to rely on reservation lookups instead of scanning Items and Archive on every write."
       }
     },
     "deployment": {

@@ -1023,8 +1023,6 @@ def make_realtime_change(item, previous=None, affected_items=None, change_kind='
         owner_id = str(row.get('ownerId') or '').strip()
         if owner_id:
             assignee_ids.add(owner_id)
-    primary = dict(item or {})
-    item_id = str(primary.get('itemId') or primary.get('id') or '').strip()
     change_id = 'chg_' + uuid.uuid4().hex
     occurred_at = now()
     # Keep the durable cursor more precise than the display timestamp so

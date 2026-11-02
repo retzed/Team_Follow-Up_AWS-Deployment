@@ -123,8 +123,21 @@ The table is shared by three logical record types:
 | Durable item-change outbox | `CHANGE` | UTC ISO timestamp + `#` + unique change ID | 7 days |
 | Active WebSocket connection | `CONNECTION` | API Gateway connection ID | 9-minute lease, renewed by 4-minute client heartbeats |
 | Single-use connection ticket | `TICKET#<SHA-256>` | `TOKEN` | 30 seconds |
+| Permanent item-name reservation | `ITEM_NAME#<normalized-name>` | `NAME` | No TTL; permanent |
+| Registry completion marker | `ITEM_NAME_REGISTRY` | `VERSION` | No TTL; permanent |
 
-Change records contain identifiers, assignee/root/parent IDs, item version, change kind, and timestamps only. They do not contain item titles, descriptions, profiles, or other item content. Item create/update/delete/restore writes a change record atomically with the item/audit transaction where applicable. Lambda sends the compact event to active WebSocket sessions after the transaction commits; each browser applies the event immediately and refreshes only affected views. WebSocket delivery is best-effort, so the ordered outbox cursor remains the recovery path for missed pushes and reconnects. The first successful WebSocket connection revalidates the current Assigned Items view to close the initial snapshot/ticket race. Each catch-up query overlaps the last processed cursor by one minute to cover delayed transaction commits, and the client deduplicates repeated change IDs in that overlap.
+Change records contain identifiers, assignee/root/parent IDs, item version, change kind, and timestamps only. They do not contain item titles, descriptions, profiles, or other item content. Item create/update/delete/restore writes a change record atomically with the item/audit transaction where applicable. Lambda sends the compact event to active WebSocket sessions after the transaction commits; each browser applies the event immediately and refreshes only affected views. WebSocket delivery is best-effort, so the ordered outbox cursor remains the recovery path for missed pushes and reconnects. Each active browser instance independently polls the authenticated durable feed every five seconds using its own cursor, so a missed push or failed WebSocket delivery cannot leave one instance stale indefinitely. The first successful WebSocket connection revalidates the current Assigned Items view to close the initial snapshot/ticket race. Each catch-up query overlaps the last processed cursor by one minute to cover delayed transaction commits, and the client deduplicates repeated change IDs in that overlap.
+
+The permanent name reservations enforce one global name namespace across Projects, Jobs, Tasks, and Follow-ups. Names are compared after Unicode NFKC normalization, trimming, repeated-whitespace collapse, and case-insensitive lowercase normalization. Archived records retain their names. Reservation rows intentionally omit `expiresAt`; the table TTL only applies to short-lived tickets, connection leases, and change-feed records.
+
+Before deploying the updated Lambda to an environment that already contains work items, pause application writes and run the one-time registry backfill from the repository root:
+
+```bash
+python backend/scripts/backfill_item_name_registry.py
+python backend/scripts/backfill_item_name_registry.py --apply
+```
+
+The first command is a dry run. Resolve every duplicate name it reports before running the second command. The script checks both Items and Archive, validates existing reservations, writes permanent reservations, and finally writes the `ITEM_NAME_REGISTRY` / `VERSION` completion marker. It is safe to rerun after partial progress. Do not deploy the new Lambda or resume application writes until the marker is present. Before the marker exists, the Lambda deliberately scans both business tables as a legacy-data safety fallback; after the marker exists, it checks the permanent reservation directly and avoids recurring full-table scans. The existing Lambda policy already grants the required scoped reads and transactional writes on Items, Archive, and Realtime.
 
 The current-account snapshot records only the original four tables. **Do not deploy the updated Lambda until this fifth table exists, its TTL is enabled, and its name is configured in Lambda.**
 ## 4. AWS Budgets cost monitor — create or verify

@@ -790,5 +790,72 @@ class PinTransactionTests(unittest.TestCase):
         self.assertEqual(update["ConditionExpression"], "attribute_exists(#userId)")
         self.assertEqual(update["ExpressionAttributeValues"][":pins"], {"L": [{"S": "project-1"}]})
 
+
+class ItemNameUniquenessTests(unittest.TestCase):
+    def test_name_normalization_is_case_and_whitespace_insensitive(self):
+        self.assertEqual(
+            handler.normalize_item_name("  Network   Upgrade "),
+            handler.normalize_item_name("network upgrade"),
+        )
+        self.assertEqual(
+            handler.normalize_item_name("ＡＰＩ"),
+            handler.normalize_item_name("api"),
+        )
+
+    def test_active_item_of_another_type_blocks_duplicate_name(self):
+        active = {"itemId": "project-1", "type": "project", "name": "Network Upgrade"}
+        with patch.object(handler, "scan_pages", side_effect=lambda table, **kwargs: [active] if table is handler.WORK else []), \
+             patch.object(handler.REALTIME_TABLE, "get_item", return_value={}):
+            with self.assertRaisesRegex(ValueError, "unique across Projects"):
+                handler.item_name_write_operations({
+                    "itemId": "task-2", "type": "task", "name": " network   upgrade ",
+                })
+
+    def test_archived_item_also_reserves_its_name(self):
+        archived = {"archiveId": "followup-1", "type": "followup", "name": "Prepare Release"}
+        with patch.object(handler, "scan_pages", side_effect=lambda table, **kwargs: [archived] if table is handler.ARCHIVE else []), \
+             patch.object(handler.REALTIME_TABLE, "get_item", return_value={}):
+            with self.assertRaisesRegex(ValueError, "unique across Projects"):
+                handler.item_name_write_operations({
+                    "itemId": "job-2", "type": "job", "name": "prepare release",
+                })
+
+    def test_name_reservation_is_conditional_and_can_be_released_on_rename(self):
+        old = {"itemId": "task-1", "name": "Old Name"}
+        def lookup(**kwargs):
+            key = kwargs["Key"]
+            if key["partitionKey"] == "ITEM_NAME#old name":
+                return {"Item": {"itemId": "task-1"}}
+            return {}
+        with patch.object(handler, "scan_pages", return_value=[]), \
+             patch.object(handler.REALTIME_TABLE, "get_item", side_effect=lookup):
+            writes = handler.item_name_write_operations(
+                {"itemId": "task-1", "name": "New Name"}, previous=old,
+            )
+        self.assertEqual(len(writes), 2)
+        reservation = writes[0]["Put"]
+        self.assertEqual(reservation["TableName"], handler.REALTIME_TABLE.name)
+        self.assertEqual(reservation["Item"]["partitionKey"]["S"], "ITEM_NAME#new name")
+        self.assertIn("attribute_not_exists(#partitionKey)", reservation["ConditionExpression"])
+        self.assertIn("#itemId = :itemId", reservation["ConditionExpression"])
+        self.assertEqual(writes[1]["Delete"]["Key"]["partitionKey"], {"S": "ITEM_NAME#old name"})
+
+    def test_commit_keeps_name_reservation_in_the_same_atomic_transaction(self):
+        name_write = {"Put": {
+            "TableName": handler.REALTIME_TABLE.name,
+            "Item": handler.av_map({"partitionKey": "ITEM_NAME#task", "sortKey": "NAME", "itemId": "task-1"}),
+            "ConditionExpression": "attribute_not_exists(#partitionKey)",
+        }}
+        with patch.object(handler.ddb.meta.client, "transact_write_items") as transact:
+            handler.commit_item_with_events(
+                {"itemId": "task-1", "name": "Task"},
+                [], condition="create", name_writes=[name_write],
+            )
+        writes = transact.call_args.kwargs["TransactItems"]
+        self.assertEqual(len(writes), 2)
+        self.assertEqual(writes[1]["Put"]["TableName"], handler.REALTIME_TABLE.name)
+
+
+
 if __name__ == "__main__":
     unittest.main()

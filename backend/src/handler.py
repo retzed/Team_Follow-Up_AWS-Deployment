@@ -145,7 +145,7 @@ def current_profile(event):
 # ---------------------------------------------------------------------------
 def normalize_item_name(value):
     """Canonical comparison key shared by all item types and archive states."""
-    return " ".join(unicodedata.normalize("NFKC", str(value or "")).split()).casefold()
+    return " ".join(unicodedata.normalize("NFKC", str(value or "")).split()).lower()
 
 
 def item_name_write_operations(item, previous=None):

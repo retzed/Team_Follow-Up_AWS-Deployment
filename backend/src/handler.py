@@ -995,14 +995,17 @@ def make_realtime_change(item, previous=None, affected_items=None, change_kind='
     descendants, so include their assignee IDs in the compact event.
     """
     affected = [dict(row) for row in (affected_items or []) if isinstance(row, dict)]
+    descendant_assignees = []
     primary = dict(item or {})
     item_id = str(primary.get('itemId') or primary.get('id') or '').strip()
     item_type = str(primary.get('type') or '').strip()
     if not affected and change_kind == 'updated' and item_id:
         if item_type in ('project', 'job'):
-            affected = [dict(row) for row in query_descendant_rows(item_id) if isinstance(row, dict) and not row.get('deletedAt')]
+            descendants = query_descendant_rows(item_id)
+            descendant_assignees = [row for row in descendants if isinstance(row, dict) and not row.get('deletedAt')]
         elif item_type == 'task':
-            affected = [dict(row) for row in query_children_rows(item_id) if isinstance(row, dict) and not row.get('deletedAt')]
+            descendants = query_children_rows(item_id)
+            descendant_assignees = [row for row in descendants if isinstance(row, dict) and not row.get('deletedAt')]
     candidates = [row for row in (previous, item, *affected) if isinstance(row, dict)]
     root_ids, top_level_ids, parent_ids, assignee_ids = set(), set(), set(), set()
     for row in candidates:
@@ -1020,6 +1023,10 @@ def make_realtime_change(item, previous=None, affected_items=None, change_kind='
             root_ids.add(root_id)
         if parent_id:
             parent_ids.add(parent_id)
+        owner_id = str(row.get('ownerId') or '').strip()
+        if owner_id:
+            assignee_ids.add(owner_id)
+    for row in descendant_assignees:
         owner_id = str(row.get('ownerId') or '').strip()
         if owner_id:
             assignee_ids.add(owner_id)

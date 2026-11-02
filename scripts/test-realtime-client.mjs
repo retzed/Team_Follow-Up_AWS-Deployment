@@ -28,7 +28,7 @@ class MockWebSocket {
 }
 
 function createContext(overrides = {}) {
-  const calls = { assigned: 0, pinned: 0, roots: [], resolved: [], parentRenders: 0, detailRenders: 0, activity: 0, globalHistory: 0, accountRenders: 0 };
+  const calls = { assigned: 0, pinned: 0, roots: [], resolved: [], parentRenders: 0, detailRenders: 0, activity: 0, globalHistory: 0, accountRenders: 0, intervals: [], clearedIntervals: [] };
   const ui = {
     actingUserId: 'u2', page: 'account', accountTab: 'assigned',
     accountAssignedLoaded: true, accountAssignedLoading: false,
@@ -87,8 +87,8 @@ function createContext(overrides = {}) {
     console: { warn() {}, error() {}, log() {} },
     setTimeout: callback => { const id=nextTimerId++; scheduledTimeouts.set(id,callback); return id; },
     clearTimeout: id => scheduledTimeouts.delete(id),
-    setInterval: callback => { const id=nextTimerId++; scheduledTimeouts.set(id,callback); return id; },
-    clearInterval: id => scheduledTimeouts.delete(id),
+    setInterval: (callback, delay) => { calls.intervals.push(delay); const id=nextTimerId++; scheduledTimeouts.set(id,callback); return id; },
+    clearInterval: id => { calls.clearedIntervals.push(id); scheduledTimeouts.delete(id); },
     Math, URL, URLSearchParams, JSON, Promise, Set, Map, String, Number, WebSocket: MockWebSocket
   };
   vm.runInNewContext(managerSource + '\nthis.applyRealtimeChangeBatch=applyRealtimeChangeBatch;this.queueRealtimeChangeBatch=queueRealtimeChangeBatch;this.catchUpRealtimeChanges=catchUpRealtimeChanges;this.startRealtimeNotifications=startRealtimeNotifications;this.stopRealtimeNotifications=stopRealtimeNotifications;this.getRealtimeState=()=>({running:realtimeRunning,cursor:realtimeCursor});this.getRealtimeCatchupQueryCursor=realtimeCatchupQueryCursor;', context);
@@ -195,6 +195,7 @@ function createContext(overrides = {}) {
   context.startRealtimeNotifications();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(context.getRealtimeState().running, true);
+  assert.ok(calls.intervals.includes(5000), 'each active session polls its own durable cursor every five seconds even if a WebSocket push is missed');
   assert.equal(MockWebSocket.instances.length > 0, true, 'an authenticated ticket opens the configured WebSocket');
   const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
   const url = new URL(socket.url);
@@ -206,6 +207,7 @@ function createContext(overrides = {}) {
   assert.equal(calls.assigned, 1, 'the first successful connection revalidates Assigned Items after the initial snapshot/ticket race');
   context.stopRealtimeNotifications();
   assert.equal(context.getRealtimeState().running, false);
+  assert.ok(calls.clearedIntervals.length >= 2, 'sign-out/page lifecycle cleanup stops both the durable poll and heartbeat timers');
   assert.equal(socket.readyState, MockWebSocket.CLOSED, 'sign-out/page lifecycle cleanup closes the active channel');
 }
 

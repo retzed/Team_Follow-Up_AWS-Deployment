@@ -439,7 +439,8 @@ class RealtimeDeliveryTests(unittest.TestCase):
             "itemId": "task-1", "activityKey": "2026-11-02T00:00:00.000Z#event-1",
             "eventId": "event-1", "userId": "u1", "action": "Updated task",
         }
-        change = handler.make_realtime_change(item, change_kind="updated")
+        with patch.object(handler, "query_children_rows", return_value=[]):
+            change = handler.make_realtime_change(item, change_kind="updated")
         with patch.object(handler.ddb.meta.client, "transact_write_items") as transact:
             handler.commit_item_with_events(item, [activity], condition="version", expected_version=1, change_event=change)
         writes = transact.call_args.kwargs["TransactItems"]
@@ -461,7 +462,8 @@ class RealtimeDeliveryTests(unittest.TestCase):
             "rootParentId": "project-new", "ownerId": "u3", "version": 4,
             "name": "Private new title", "description": "Private new description",
         }
-        change = handler.make_realtime_change(updated, previous=previous, change_kind="updated")
+        with patch.object(handler, "query_children_rows", return_value=[]):
+            change = handler.make_realtime_change(updated, previous=previous, change_kind="updated")
         public = handler.public_realtime_change(change)
 
         self.assertEqual(public["type"], "items.changed")

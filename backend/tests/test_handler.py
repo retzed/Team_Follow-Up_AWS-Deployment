@@ -791,6 +791,33 @@ class PinTransactionTests(unittest.TestCase):
         self.assertEqual(update["ExpressionAttributeValues"][":pins"], {"L": [{"S": "project-1"}]})
 
 
+
+class RealtimeAssigneeCoverageTests(unittest.TestCase):
+    def test_project_metadata_update_targets_all_descendant_assignees(self):
+        previous = {"itemId": "project-1", "type": "project", "name": "Old", "ownerId": "u1"}
+        updated = {"itemId": "project-1", "type": "project", "name": "New", "ownerId": "u2"}
+        descendants = [
+            {"itemId": "task-1", "type": "task", "parentId": "project-1", "rootParentId": "project-1", "ownerId": "u3"},
+            {"itemId": "followup-1", "type": "followup", "parentId": "task-1", "rootParentId": "project-1", "ownerId": "u4"},
+        ]
+        with patch.object(handler, "query_descendant_rows", return_value=descendants) as query:
+            change = handler.make_realtime_change(updated, previous=previous, change_kind="updated")
+        query.assert_called_once_with("project-1")
+        self.assertEqual(set(change["assigneeIds"]), {"u1", "u2", "u3", "u4"})
+        self.assertEqual(change["rootParentIds"], ["project-1"])
+
+    def test_task_metadata_update_targets_assignees_of_its_followups(self):
+        previous = {"itemId": "task-1", "type": "task", "parentId": "project-1", "rootParentId": "project-1", "ownerId": "u2"}
+        updated = {**previous, "ownerId": "u3"}
+        followups = [
+            {"itemId": "followup-1", "type": "followup", "parentId": "task-1", "rootParentId": "project-1", "ownerId": "u4"},
+        ]
+        with patch.object(handler, "query_children_rows", return_value=followups) as query:
+            change = handler.make_realtime_change(updated, previous=previous, change_kind="updated")
+        query.assert_called_once_with("task-1")
+        self.assertEqual(set(change["assigneeIds"]), {"u2", "u3", "u4"})
+
+
 class ItemNameUniquenessTests(unittest.TestCase):
     def test_name_normalization_is_case_and_whitespace_insensitive(self):
         self.assertEqual(

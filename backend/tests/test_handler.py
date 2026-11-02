@@ -840,6 +840,20 @@ class ItemNameUniquenessTests(unittest.TestCase):
         self.assertIn("#itemId = :itemId", reservation["ConditionExpression"])
         self.assertEqual(writes[1]["Delete"]["Key"]["partitionKey"], {"S": "ITEM_NAME#old name"})
 
+    def test_completed_registry_marker_avoids_repeated_full_table_scans(self):
+        def lookup(**kwargs):
+            if kwargs["Key"]["partitionKey"] == "ITEM_NAME_REGISTRY":
+                return {"Item": {"version": 1}}
+            return {}
+        with patch.object(handler, "scan_pages") as scan, \
+             patch.object(handler.REALTIME_TABLE, "get_item", side_effect=lookup):
+            writes = handler.item_name_write_operations({
+                "itemId": "task-1", "name": "Already Registered",
+            })
+        scan.assert_not_called()
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(writes[0]["Put"]["Item"]["partitionKey"]["S"], "ITEM_NAME#already registered")
+
     def test_commit_keeps_name_reservation_in_the_same_atomic_transaction(self):
         name_write = {"Put": {
             "TableName": handler.REALTIME_TABLE.name,

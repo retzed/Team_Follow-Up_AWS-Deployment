@@ -161,13 +161,19 @@ def item_name_write_operations(item, previous=None):
     if not item_id or not normalized:
         raise ValueError("Item name is required.")
 
-    for table in (WORK, ARCHIVE):
-        for row in scan_pages(table, ConsistentRead=True):
-            row_id = str(row.get("itemId") or row.get("archiveId") or row.get("id") or "")
-            if row_id == item_id:
-                continue
-            if normalize_item_name(row.get("name")) == normalized:
-                raise ValueError("An item with this name already exists. Item names must be unique across Projects, Jobs, Tasks, and Follow-ups.")
+    # Before the one-time registry backfill is marked complete, scan legacy
+    # business rows as a fail-safe. Once the marker exists, every item already
+    # has a permanent reservation and writes avoid recurring full-table scans.
+    registry_marker_key = {"partitionKey": "ITEM_NAME_REGISTRY", "sortKey": "VERSION"}
+    registry_marker = REALTIME_TABLE.get_item(Key=registry_marker_key, ConsistentRead=True).get("Item") or {}
+    if not registry_marker:
+        for table in (WORK, ARCHIVE):
+            for row in scan_pages(table, ConsistentRead=True):
+                row_id = str(row.get("itemId") or row.get("archiveId") or row.get("id") or "")
+                if row_id == item_id:
+                    continue
+                if normalize_item_name(row.get("name")) == normalized:
+                    raise ValueError("An item with this name already exists. Item names must be unique across Projects, Jobs, Tasks, and Follow-ups.")
 
     reservation_key = {"partitionKey": "ITEM_NAME#" + normalized, "sortKey": "NAME"}
     reservation = REALTIME_TABLE.get_item(Key=reservation_key, ConsistentRead=True).get("Item") or {}

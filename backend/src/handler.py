@@ -13,6 +13,7 @@ import os
 import re
 import secrets
 import uuid
+import unicodedata
 from datetime import datetime, timezone
 from urllib.parse import unquote
 
@@ -32,7 +33,7 @@ def av_map(item):
     return {str(k): SERIALIZER.serialize(v) for k, v in item.items() if v is not None}
 
 
-def commit_item_with_events(item, events, condition=None, expected_version=None, change_event=None):
+def commit_item_with_events(item, events, condition=None, expected_version=None, change_event=None, name_writes=None):
     writes=[{'Put': {'TableName': WORK.name, 'Item': av_map(item)}}]
     if condition == 'create':
         writes[0]['Put']['ConditionExpression']='attribute_not_exists(#itemId)'
@@ -41,6 +42,7 @@ def commit_item_with_events(item, events, condition=None, expected_version=None,
         writes[0]['Put']['ConditionExpression']='attribute_not_exists(#version) OR #version = :expected'
         writes[0]['Put']['ExpressionAttributeNames']={'#version':'version'}
         writes[0]['Put']['ExpressionAttributeValues']={':expected':SERIALIZER.serialize(expected_version)}
+    writes.extend(name_writes or [])
     for event in events:
         writes.append({'Put': {'TableName': ACTIVITY.name, 'Item': av_map(event), 'ConditionExpression': 'attribute_not_exists(#activityKey)', 'ExpressionAttributeNames': {'#activityKey': 'activityKey'}}})
     if change_event:
@@ -141,6 +143,70 @@ def current_profile(event):
 # ---------------------------------------------------------------------------
 # Work-item and audit-event data contracts
 # ---------------------------------------------------------------------------
+def normalize_item_name(value):
+    """Canonical comparison key shared by all item types and archive states."""
+    return " ".join(unicodedata.normalize("NFKC", str(value or "")).split()).casefold()
+
+
+def item_name_write_operations(item, previous=None):
+    """Validate global name uniqueness and reserve the name in the same item transaction.
+
+    The scans cover legacy records that predate the reservation mechanism. The
+    conditional reservation Put closes the race between concurrent creates/renames.
+    Archived records retain their names and therefore remain part of the namespace.
+    """
+    item_id = str(item.get("itemId") or item.get("id") or "").strip()
+    name = str(item.get("name") or "")
+    normalized = normalize_item_name(name)
+    if not item_id or not normalized:
+        raise ValueError("Item name is required.")
+
+    for table in (WORK, ARCHIVE):
+        for row in scan_pages(table, ConsistentRead=True):
+            row_id = str(row.get("itemId") or row.get("archiveId") or row.get("id") or "")
+            if row_id == item_id:
+                continue
+            if normalize_item_name(row.get("name")) == normalized:
+                raise ValueError("An item with this name already exists. Item names must be unique across Projects, Jobs, Tasks, and Follow-ups.")
+
+    reservation_key = {"partitionKey": "ITEM_NAME#" + normalized, "sortKey": "NAME"}
+    reservation = REALTIME_TABLE.get_item(Key=reservation_key, ConsistentRead=True).get("Item") or {}
+    if reservation and str(reservation.get("itemId") or "") != item_id:
+        raise ValueError("An item with this name already exists. Item names must be unique across Projects, Jobs, Tasks, and Follow-ups.")
+
+    writes = [{
+        "Put": {
+            "TableName": REALTIME_TABLE.name,
+            "Item": av_map({
+                **reservation_key,
+                "itemId": item_id,
+                "name": name,
+                "normalizedName": normalized,
+                "reservedAt": now(),
+            }),
+            "ConditionExpression": "attribute_not_exists(#partitionKey) OR #itemId = :itemId",
+            "ExpressionAttributeNames": {"#partitionKey": "partitionKey", "#itemId": "itemId"},
+            "ExpressionAttributeValues": {":itemId": SERIALIZER.serialize(item_id)},
+        }
+    }]
+
+    previous_name = normalize_item_name((previous or {}).get("name"))
+    if previous_name and previous_name != normalized:
+        previous_key = {"partitionKey": "ITEM_NAME#" + previous_name, "sortKey": "NAME"}
+        old_reservation = REALTIME_TABLE.get_item(Key=previous_key, ConsistentRead=True).get("Item") or {}
+        if str(old_reservation.get("itemId") or "") == item_id:
+            writes.append({
+                "Delete": {
+                    "TableName": REALTIME_TABLE.name,
+                    "Key": av_map(previous_key),
+                    "ConditionExpression": "#itemId = :itemId",
+                    "ExpressionAttributeNames": {"#itemId": "itemId"},
+                    "ExpressionAttributeValues": {":itemId": SERIALIZER.serialize(item_id)},
+                }
+            })
+    return writes
+
+
 def index_work_item(x):
     """Materialize only the secondary-index attributes present on TeamFollowUp-Items."""
     x=dict(x)
@@ -1518,7 +1584,14 @@ def lambda_handler(event, context):
             clean,actor=validate_item(event,item)
             normalized_events=build_audit_events(clean,profile,'create',events,at=clean.get('createdAt'))
             change_event=make_realtime_change(clean,change_kind='created')
-            commit_item_with_events(clean,normalized_events,condition='create',change_event=change_event)
+            name_writes=item_name_write_operations(clean)
+            try:
+                commit_item_with_events(clean,normalized_events,condition='create',change_event=change_event,name_writes=name_writes)
+            except ClientError as exc:
+                code=str(exc.response.get('Error',{}).get('Code') or '')
+                if code in ('ConditionalCheckFailedException','TransactionCanceledException'):
+                    return response(409,{'message':'An item with this name already exists, or the item ID was created concurrently. Refresh and try a different name.'})
+                raise
             publish_realtime_change(change_event)
             return response(201,{'item':public_item(clean),'activityEvents':[public_event(e) for e in normalized_events]})
         m=re.fullmatch(r'/items/([^/]+)',path)
@@ -1536,10 +1609,13 @@ def lambda_handler(event, context):
             normalized_events=build_audit_events(clean,profile,'update',events,previous=old,at=clean.get('updatedAt'))
             try:
                 change_event=make_realtime_change(clean,previous=old,change_kind='updated')
-                commit_item_with_events(clean,normalized_events,condition='version',expected_version=expected,change_event=change_event)
+                name_writes=item_name_write_operations(clean,previous=old)
+                commit_item_with_events(clean,normalized_events,condition='version',expected_version=expected,change_event=change_event,name_writes=name_writes)
+            except ValueError:
+                raise
             except ClientError as e:
                 if e.response['Error']['Code']=='ConditionalCheckFailedException' or e.response.get('Error',{}).get('Code')=='TransactionCanceledException':
-                    return response(409,{'message':'This item changed after you opened it. Refresh before saving.'})
+                    return response(409,{'message':'This item changed after you opened it, or its name is already in use. Refresh before saving.'})
                 raise
             publish_realtime_change(change_event)
             return response(200,{'item':public_item(clean),'activityEvents':[public_event(e) for e in normalized_events]})

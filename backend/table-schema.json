@@ -207,7 +207,8 @@
     "Activity's itemId + activityKey primary key is authoritative; eventId is a regular attribute. The frontend has no local database/demo adapter; application data goes through the Cognito-authenticated API.",
     "DynamoDB data tables use CloudFormation DeletionPolicy/UpdateReplacePolicy Retain in the automation template. Deleting the stack therefore retains table data; the retained tables must be handled before recreating a stack with the same names.",
     "Real-time delivery uses a separate TeamFollowUp-Realtime transport table with partitionKey + sortKey and TTL expiresAt. It is intentionally not included in the four original business-data tables array or the dated four-table currentConsoleBootstrap inventory.",
-    "Item changes are written to the Realtime CHANGE partition atomically with the associated item/activity transaction where supported. WebSocket pushes contain only change metadata; clients catch up with the ordered cursor API after reconnect."
+    "Item changes are written to the Realtime CHANGE partition atomically with the associated item/activity transaction where supported. WebSocket pushes contain only change metadata; clients catch up with the ordered cursor API after reconnect.",
+    "The Realtime table also holds permanent ITEM_NAME#<normalized-name> / NAME reservation rows. These rows omit expiresAt and are not removed by the table TTL; they prevent duplicate names across active and archived item types."
   ],
   "samTargetResourcesDeployed": false,
   "currentConsoleBootstrap": {
@@ -478,6 +479,12 @@
         "partitionKey": "TICKET#<SHA-256 token hash>",
         "sortKey": "TOKEN",
         "ttlSeconds": 30
+      },
+      "nameReservations": {
+        "partitionKey": "ITEM_NAME#<normalized-name>",
+        "sortKey": "NAME",
+        "expiration": "Permanent; expiresAt is intentionally omitted",
+        "description": "Global unique-name reservation shared across Projects, Jobs, Tasks, and Follow-ups. Unicode NFKC, trimmed/collapsed whitespace, case-insensitive normalized names. Written conditionally in the same TransactWriteItems operation as item creation/update; archived names remain reserved."
       }
     },
     "deployment": {

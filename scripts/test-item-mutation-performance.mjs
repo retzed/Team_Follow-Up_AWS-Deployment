@@ -18,7 +18,7 @@ const handlerStart = html.indexOf('function handleItemSubmit(form){');
 const handlerEnd = html.indexOf('function clearParentFilters()', handlerStart);
 assert.ok(handlerStart >= 0 && handlerEnd > handlerStart, 'the item form handler must exist');
 const handler = html.slice(handlerStart, handlerEnd);
-assert.equal((handler.match(/persistItemMutation\\(item,true,\\[event\\]\\)/g) || []).length, 2,
+assert.equal(handler.split('persistItemMutation(item,true,[event])').length - 1, 2,
   'both parent and child creation must use one-item persistence');
 assert.ok(handler.includes('persistItemMutation(item,false,mutationEvents)'), 'edits must persist only the changed item and its new audit events');
 assert.ok(!handler.includes('persist();'), 'ordinary creates and edits must not snapshot and diff the entire workspace');

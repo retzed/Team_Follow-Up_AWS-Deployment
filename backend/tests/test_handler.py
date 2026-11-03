@@ -468,6 +468,9 @@ class RealtimeDeliveryTests(unittest.TestCase):
 
         self.assertEqual(public["type"], "items.changed")
         self.assertEqual(public["itemId"], "task-1")
+        self.assertEqual(public["itemIds"], ["task-1"])
+        self.assertEqual(public["itemType"], "task")
+        self.assertEqual(public["parentId"], "project-new")
         self.assertEqual(set(public["rootParentIds"]), {"project-old", "project-new"})
         self.assertEqual(set(public["parentIds"]), {"project-old", "project-new"})
         self.assertEqual(set(public["assigneeIds"]), {"u2", "u3"})
@@ -489,9 +492,28 @@ class RealtimeDeliveryTests(unittest.TestCase):
             root, affected_items=[root, task, followup], change_kind="deleted", deleted=True,
         ))
         self.assertTrue(change["deleted"])
+        self.assertEqual(change["itemId"], "project-1", "the change must retain the deleted hierarchy root, not the last descendant visited")
+        self.assertEqual(set(change["itemIds"]), {"project-1", "task-1", "followup-1"})
         self.assertEqual(change["rootParentIds"], ["project-1"])
         self.assertEqual(set(change["parentIds"]), {"project-1", "task-1"})
         self.assertEqual(set(change["assigneeIds"]), {"u1", "u2", "u3"})
+
+    def test_task_delete_change_includes_task_and_its_followups(self):
+        task = {
+            "itemId": "task-1", "type": "task", "parentId": "project-1",
+            "rootParentId": "project-1", "ownerId": "u2",
+        }
+        followup = {
+            "itemId": "followup-1", "type": "followup", "parentId": "task-1",
+            "rootParentId": "project-1", "ownerId": "u3",
+        }
+        change = handler.public_realtime_change(handler.make_realtime_change(
+            task, previous=task, affected_items=[followup],
+            change_kind="deleted", deleted=True,
+        ))
+        self.assertEqual(change["itemId"], "task-1")
+        self.assertEqual(set(change["itemIds"]), {"task-1", "followup-1"})
+        self.assertTrue(change["deleted"])
 
     def test_change_outbox_put_uses_durable_change_partition(self):
         change = {

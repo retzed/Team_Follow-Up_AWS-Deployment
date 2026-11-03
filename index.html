@@ -61,7 +61,6 @@ html.auth-pending #app,html.app-booting #app,body.signin-open #app{visibility:hi
 <style>
 :root{color-scheme:light}
 :root[data-theme="dark"]{color-scheme:dark}
-html.theme-switching *,html.theme-switching *::before,html.theme-switching *::after{transition:none!important;animation:none!important}
 select,select option{background-color:var(--panel);color:var(--text)}
 select option:disabled{color:var(--muted);opacity:.5}
 [hidden]{display:none!important}
@@ -2417,16 +2416,10 @@ function countValueMarkup(value,ready,rootId=null,part='children'){if(ready)retu
 function itemCountText(n){return `${n} ${n===1?tr('item'):tr('items')}`;}
 function getItemSummary(parent){const all=allDescendants(parent.id);return {tasks:all.filter(x=>x.type==='task').length,followups:all.filter(x=>x.type==='followup').length,completed:all.filter(x=>x.status==='completed').length,all};}
 function setSelectOptions(el,items,current){el.innerHTML=items.map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');}
-let themeSwitchSequence=0;
 function applyTheme(){
  const theme=ui.theme==='light'?'light':'dark';if(ui.theme!==theme)ui.theme=theme;
  const root=document.documentElement;
- if(root.dataset.theme!==theme){
-  root.classList.add('theme-switching');
-  root.dataset.theme=theme;
-  const sequence=++themeSwitchSequence;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{if(sequence===themeSwitchSequence)root.classList.remove('theme-switching');}));
- }
+ if(root.dataset.theme!==theme)root.dataset.theme=theme;
  const toggle=$('#themeToggle');if(toggle){toggle.innerHTML=icon(theme==='light'?'moon':'sun');const label=theme==='light'?'Switch to dark mode':'Switch to light mode';toggle.title=label;toggle.setAttribute('aria-label',label);}
  const themeSelect=$('#accountTheme');if(themeSelect&&themeSelect.value!==theme)themeSelect.value=theme;
 }
@@ -2819,17 +2812,28 @@ async function saveUserPrivilege(userId){
  try{const result=await window.TeamFollowUpDataApi.updateUserPrivilege(targetId,select.value);if(!result?.user)throw new Error(tr('accountError'));mergeProfileIntoData(result.user);mergeProfileEvents(result.activityEvents||[]);ui.accountMessage=tr('privilegeSaved');ui.accountError='';renderAccountPage();}
  catch(error){toast(String(error?.message||tr('accountError')),true);}
 }
+let preferenceSaveQueue=Promise.resolve(),preferenceChangeSequence=0;
 async function changeUserPreference(key,value){
- const user=rawCurrentUser();if(!user||user.id==='root')return;
- const oldLang=ui.lang,oldTheme=ui.theme,isThemeChange=key==='theme';
- if(key==='lang')ui.lang=value;else if(isThemeChange){ui.theme=value;applyTheme();}
- if(!isThemeChange)render();
+ const user=rawCurrentUser();if(!user||user.id==='root'||!['lang','theme'].includes(key))return;
+ const sequence=++preferenceChangeSequence;
+ const oldLang=ui.lang,oldTheme=ui.theme;
+ const oldPreferences={...(user.preferences||{})};
+ const preferences={...oldPreferences,lang:ui.lang,theme:ui.theme,[key]:value};
+ user.preferences=preferences;
+ if(key==='lang'){ui.lang=value;render();}
+ else{ui.theme=value;applyTheme();}
+ const save=()=>window.TeamFollowUpDataApi.updateMyProfile({preferences});
+ preferenceSaveQueue=preferenceSaveQueue.catch(()=>{}).then(save);
  try{
-  const prefs={...(user.preferences||{}),lang:ui.lang,theme:ui.theme,[key]:value};
-  const result=await window.TeamFollowUpDataApi.updateMyProfile({preferences:prefs});
+  const result=await preferenceSaveQueue;
+  if(sequence!==preferenceChangeSequence)return;
   if(result?.user)mergeProfileIntoData(result.user);
-  if(isThemeChange)applyTheme();else render();
- }catch(error){ui.lang=oldLang;ui.theme=oldTheme;if(isThemeChange)applyTheme();else render();toast(String(error?.message||tr('accountError')),true);}
+ }catch(error){
+  if(sequence!==preferenceChangeSequence)return;
+  user.preferences=oldPreferences;ui.lang=oldLang;ui.theme=oldTheme;
+  if(key==='lang')render();else applyTheme();
+  toast(String(error?.message||tr('accountError')),true);
+ }
 }
 function render(){applyTranslations();if(ui.page==='account'){renderAccountPage();renderModal();return;}renderParentList();renderDetail();renderModal();}
 function userOptions(current,includeNone=true){return `${includeNone?`<option value="" ${!current||String(current)==='root'?'selected':''}>${esc(tr('none'))}</option>`:''}${data.users.filter(raw=>String(raw.id)!=='root').map(raw=>{const u=person(raw.id);return `<option value="${esc(u.id)}" ${u.id===current?'selected':''}>${esc(u.name)} — ${esc(u.role)}</option>`;}).join('')}`;}

@@ -216,7 +216,7 @@ function createContext(overrides = {}) {
   vm.runInNewContext('realtimeRunning=true;realtimeCursor="cursor-0";', context);
   await context.catchUpRealtimeChanges();
   assert.equal(context.getRealtimeState().cursor, 'cursor-b', 'the durable cursor advances after all changed items are applied');
-  assert.deepEqual(calls.queryCursors, ['2026-11-03T00:00:00.000000Z#'], 'durable catch-up queries an overlapping cursor window');
+  assert.deepEqual(calls.queryCursors, ['cursor-0'], 'durable catch-up preserves an opaque cursor when no timestamp can be extracted');
 }
 
 {

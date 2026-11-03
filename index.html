@@ -2548,7 +2548,7 @@ function renderParentList({skipRemote=false}={}){
    const options=sidebarQueryOptions(true);
    const result=await api.queryTopLevel(options);
    if(token!==sidebarQuerySequence||ui.sidebarMode!==modeAtRender)return;
-   renderParentSearchList(filteredParents(result.items||[]));
+   renderParentSearchList(filteredParents(mergeRealtimeItemOverlays(result.items||[],item=>item.type==='project'||item.type==='job')));
   }catch(error){console.warn('Sidebar API query failed; keeping cached workspace results.',error);}
  },120);
 }
@@ -2726,7 +2726,7 @@ async function refreshAccountProfileForForm(){
 async function openAccountTab(tab){const next=['profile','assigned','pinned','search'].includes(tab)?tab:'profile';ui.page='account';ui.accountTab=next;render();if(next==='profile')void refreshAccountProfileForForm();if(next==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();if(next==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();}
 async function loadAccountAssignedItems(){
  if(ui.accountAssignedLoading)return;ui.accountAssignedLoading=true;ui.accountAssignedError='';const hydration=workspaceHydrationGeneration;renderAccountPage();
- try{const api=window.TeamFollowUpDataApi;if(!api?.queryAssigned)throw new Error(tr('assignedLoadFailed'));const rows=[];let offset=0,pages=0;while(true){const result=await api.queryAssigned(ui.actingUserId,{dateMode:'updated',direction:'desc',limit:250,offset});rows.push(...(Array.isArray(result?.items)?result.items:[]));const next=result?.nextOffset;if(next===undefined||next===null)break;const parsed=Number(next);if(!Number.isFinite(parsed)||parsed<=offset||++pages>1000)throw new Error('Assignment pagination did not advance.');offset=parsed;}if(hydration!==workspaceHydrationGeneration)return;const unique=new Map();for(const rawItem of rows){const item={...rawItem,id:String(rawItem.id||rawItem.itemId||'')};if(item.id){unique.set(item.id,item);assignedItemCache.set(item.id,item);}}ui.accountAssignedRows=[...unique.values()];ui.accountAssignedLoaded=true;}
+ try{const api=window.TeamFollowUpDataApi;if(!api?.queryAssigned)throw new Error(tr('assignedLoadFailed'));const rows=[];let offset=0,pages=0;while(true){const result=await api.queryAssigned(ui.actingUserId,{dateMode:'updated',direction:'desc',limit:250,offset});rows.push(...(Array.isArray(result?.items)?result.items:[]));const next=result?.nextOffset;if(next===undefined||next===null)break;const parsed=Number(next);if(!Number.isFinite(parsed)||parsed<=offset||++pages>1000)throw new Error('Assignment pagination did not advance.');offset=parsed;}if(hydration!==workspaceHydrationGeneration)return;const unique=new Map();for(const rawItem of mergeRealtimeItemOverlays(rows,item=>String(item.ownerId||'')===String(ui.actingUserId))){const item={...rawItem,id:String(rawItem.id||rawItem.itemId||'')};if(item.id){unique.set(item.id,item);assignedItemCache.set(item.id,item);}}ui.accountAssignedRows=[...unique.values()];ui.accountAssignedLoaded=true;}
  catch(error){if(hydration===workspaceHydrationGeneration)ui.accountAssignedError=String(error?.message||tr('assignedLoadFailed'));}
  finally{if(hydration===workspaceHydrationGeneration){ui.accountAssignedLoading=false;if(ui.page==='account'&&ui.accountTab==='assigned')renderAccountPage();if(realtimeAssignedRefreshPending&&ui.page==='account'&&ui.accountTab==='assigned'){realtimeAssignedRefreshPending=false;queueMicrotask(()=>void loadAccountAssignedItems());}}}
 }
@@ -3401,7 +3401,8 @@ async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
    // Ignore a delayed child-list response if its parent was deleted while the request was in flight.
    if(!data.parents.some(parent=>String(parent.id)===rootId))return;
    const incoming=(result?.items||[]).map(item=>item?.id?item:toAppItem(item));
-   data.children=mergeRootChildrenRows(data.children,rootId,incoming);
+   const protectedRows=mergeRealtimeItemOverlays(incoming,item=>!['project','job'].includes(item.type)&&String(item.rootParentId||'')===rootId);
+   data.children=mergeRootChildrenRows(data.children,rootId,protectedRows);
    if(lastApiSnapshot)lastApiSnapshot.children=mergeRootChildrenRows(lastApiSnapshot.children,rootId,incoming);
    invalidateHierarchyIndex();
    dataLoadState.childrenLoaded.add(rootId);
@@ -3454,6 +3455,49 @@ function scheduleRealtimeCatchup(delay=0){
  if(realtimeCatchupTimer)clearTimeout(realtimeCatchupTimer);
  realtimeCatchupTimer=setTimeout(()=>{realtimeCatchupTimer=null;void catchUpRealtimeChanges();},Math.max(0,delay));
 }
+const REALTIME_ITEM_OVERLAY_LIMIT=2000;
+const realtimeItemOverlay=new Map();
+const realtimeDeletedItemIds=new Set();
+function rememberRealtimeItem(item){
+ const id=String(item?.id||item?.itemId||'');if(!id)return;
+ realtimeDeletedItemIds.delete(id);
+ realtimeItemOverlay.delete(id);
+ realtimeItemOverlay.set(id,{...item,id});
+ while(realtimeItemOverlay.size>REALTIME_ITEM_OVERLAY_LIMIT)realtimeItemOverlay.delete(realtimeItemOverlay.keys().next().value);
+}
+function forgetRealtimeItem(itemId){
+ const id=String(itemId||'');if(!id)return;
+ realtimeItemOverlay.delete(id);realtimeDeletedItemIds.add(id);
+ while(realtimeDeletedItemIds.size>REALTIME_ITEM_OVERLAY_LIMIT)realtimeDeletedItemIds.delete(realtimeDeletedItemIds.values().next().value);
+}
+function mergeRealtimeItemOverlays(rows,predicate=()=>true){
+ const merged=new Map((rows||[]).map(item=>[String(item.id||item.itemId||''),item]).filter(([id])=>Boolean(id)));
+ for(const id of realtimeDeletedItemIds)merged.delete(id);
+ for(const [id,item] of realtimeItemOverlay){
+  merged.delete(id);
+  if(predicate(item))merged.set(id,item);
+ }
+ return [...merged.values()];
+}
+function upsertRealtimeWorkspaceItem(item){
+ const id=String(item?.id||item?.itemId||'');if(!id)return;
+ const top=['project','job'].includes(item.type),key=top?'parents':'children';
+ data[key]=(data[key]||[]).filter(row=>String(row.id)!==id);
+ data[key].push({...item,id});
+ if(lastApiSnapshot){
+  lastApiSnapshot[key]=(lastApiSnapshot[key]||[]).filter(row=>String(row.id)!==id);
+  lastApiSnapshot[key].push(copyWorkspace({...item,id}));
+ }
+}
+function removeRealtimeWorkspaceItem(itemId){
+ const id=String(itemId||'');if(!id)return;
+ data.parents=(data.parents||[]).filter(row=>String(row.id)!==id);
+ data.children=(data.children||[]).filter(row=>String(row.id)!==id);
+ if(lastApiSnapshot){
+  lastApiSnapshot.parents=(lastApiSnapshot.parents||[]).filter(row=>String(row.id)!==id);
+  lastApiSnapshot.children=(lastApiSnapshot.children||[]).filter(row=>String(row.id)!==id);
+ }
+}
 function rememberRealtimeChange(change){
  const changeId=String(change?.changeId||'');if(!changeId||realtimeAppliedChangeIds.has(changeId))return;
  realtimeAppliedChangeIds.add(changeId);realtimeAppliedChangeOrder.push(changeId);
@@ -3479,62 +3523,74 @@ function realtimeCatchupQueryCursor(){
 }
 async function applyRealtimeChangeBatch(changes){
  const api=window.TeamFollowUpDataApi;if(!api||!Array.isArray(changes)||!changes.length)return;
- const pendingChanges=[];
+ changes=changes.filter(change=>change?.type==='items.changed'&&(!change.changeId||!realtimeAppliedChangeIds.has(String(change.changeId))));
+ if(!changes.length)return;
+ const rootIds=new Set(),topLevelIds=new Set(),assigneeIds=new Set(),updatedIds=new Set(),deletedIds=new Set(),deletedRootIds=new Set();
  for(const change of changes){
-  if(change?.type!=='items.changed')continue;
-  const changeId=String(change.changeId||'');
-  if(changeId&&realtimeAppliedChangeIds.has(changeId))continue;
-  pendingChanges.push(change);
+  const ids=Array.isArray(change.itemIds)&&change.itemIds.length?change.itemIds:[change.itemId];
+  for(const rawId of ids){const id=String(rawId||'');if(!id)continue;(change.deleted?deletedIds:updatedIds).add(id);}
+  for(const rawId of change.rootParentIds||[])if(rawId)rootIds.add(String(rawId));
+  for(const rawId of change.topLevelIds||[]){
+   const id=String(rawId||'');if(!id)continue;topLevelIds.add(id);
+   if(change.deleted)deletedRootIds.add(id);else updatedIds.add(id);
+  }
+  for(const rawId of change.assigneeIds||[])if(rawId)assigneeIds.add(String(rawId));
  }
- if(!pendingChanges.length)return;
- changes=pendingChanges;
- const rootIds=new Set(),topLevelIds=new Set(),assigneeIds=new Set(),itemIds=new Set();
- for(const change of changes){
-  if(change?.type!=='items.changed')continue;
-  if(change.itemId)itemIds.add(String(change.itemId));
-  for(const id of change.rootParentIds||[])if(id)rootIds.add(String(id));
-  for(const id of change.topLevelIds||[])if(id)topLevelIds.add(String(id));
-  for(const id of change.assigneeIds||[])if(id)assigneeIds.add(String(id));
+ // Resolve every changed record directly from the base table. A missing row in
+ // an eventually-consistent GSI must never be interpreted as an item deletion.
+ const resolveIds=[...updatedIds].filter(id=>!deletedIds.has(id));
+ const resolved=[];
+ for(let start=0;start<resolveIds.length;start+=100){
+  const result=await api.resolveItems(resolveIds.slice(start,start+100));
+  resolved.push(...(result?.items||[]).map(row=>row?.id?row:toAppItem(row)));
+ }
+ const resolvedById=new Map(resolved.map(row=>[String(row.id),row]));
+ const missing=resolveIds.filter(id=>!resolvedById.has(id));
+ if(missing.length)throw new Error('A real-time item is not visible in the consistent item read yet: '+missing.join(', '));
+ for(const item of resolvedById.values()){
+  rememberRealtimeItem(item);
+  upsertRealtimeWorkspaceItem(item);
+ }
+ for(const id of deletedIds){
+  forgetRealtimeItem(id);
+  removeRealtimeWorkspaceItem(id);
+ }
+ for(const rootId of deletedRootIds){
+  for(const row of [...(data.children||[])])if(String(row.rootParentId||'')===rootId){forgetRealtimeItem(row.id);removeRealtimeWorkspaceItem(row.id);}
+  for(const [id,row] of [...realtimeItemOverlay])if(String(row.rootParentId||'')===rootId)forgetRealtimeItem(id);
+  forgetRealtimeItem(rootId);removeRealtimeWorkspaceItem(rootId);
+ }
+ invalidateHierarchyIndex();
+ if(deletedRootIds.has(String(ui.selectedParentId||''))){
+  ui.selectedParentId=data.parents[0]?.id||'';
+  ui.selectedAssignedItemId=null;
+  dataLoadState.childrenLoaded.delete([...deletedRootIds][0]);
  }
  const currentUserId=String(ui.actingUserId||rawCurrentUser()?.id||'');
- if(currentUserId&&assigneeIds.has(currentUserId)){
-  ui.accountAssignedLoaded=false;
-  if(ui.page==='account'&&ui.accountTab==='assigned'){
-   if(ui.accountAssignedLoading)realtimeAssignedRefreshPending=true;
-   else void loadAccountAssignedItems();
-  }
+ const assignedViewAffected=Boolean(currentUserId&&assigneeIds.has(currentUserId));
+ if(assignedViewAffected){
+  if(ui.accountAssignedLoading)realtimeAssignedRefreshPending=true;
+  else if(ui.accountAssignedLoaded){
+   const assigned=new Map((ui.accountAssignedRows||[]).map(row=>[String(row.id),row]));
+   for(const id of new Set([...updatedIds,...deletedIds]))assigned.delete(id);
+   for(const item of resolvedById.values())if(String(item.ownerId||'')===currentUserId)assigned.set(String(item.id),item);
+   ui.accountAssignedRows=[...assigned.values()];
+   if(ui.page==='account'&&ui.accountTab==='assigned')renderAccountPage();
+  }else if(ui.page==='account'&&ui.accountTab==='assigned')void loadAccountAssignedItems();
  }
- if((itemIds.size||rootIds.size)&&ui.accountPinnedRows?.some(row=>itemIds.has(String(row.id))||rootIds.has(String(row.rootParentId||rootParent(row)?.id||'')))){
-  ui.accountPinnedLoaded=false;
-  if(ui.page==='account'&&ui.accountTab==='pinned'&&!ui.accountPinnedLoading)void loadAccountPinnedItems();
+ if((updatedIds.size||deletedIds.size||rootIds.size)&&ui.accountPinnedRows?.some(row=>updatedIds.has(String(row.id))||deletedIds.has(String(row.id))||rootIds.has(String(row.rootParentId||rootParent(row)?.id||'')))){
+  const pinned=new Map((ui.accountPinnedRows||[]).map(row=>[String(row.id),row]));
+  for(const id of new Set([...updatedIds,...deletedIds]))pinned.delete(id);
+  for(const item of resolvedById.values())if(pinned.has(String(item.id)))pinned.set(String(item.id),item);
+  ui.accountPinnedRows=[...pinned.values()];
+  if(ui.page==='account'&&ui.accountTab==='pinned')renderAccountPage();
  }
- if(topLevelIds.size){
-  const ids=[...topLevelIds],resolved=[];
-  for(let start=0;start<ids.length;start+=100){
-   const result=await api.resolveItems(ids.slice(start,start+100));
-   resolved.push(...(result?.items||[]).map(row=>row?.id?row:toAppItem(row)));
-  }
-  const resolvedById=new Map(resolved.map(row=>[String(row.id),row]));
-  data.parents=(data.parents||[]).filter(row=>!topLevelIds.has(String(row.id)));
-  data.parents.push(...resolvedById.values());
-  data.parents.sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
-  if(lastApiSnapshot)lastApiSnapshot.parents=data.parents.map(row=>({...row}));
-  data.children=(data.children||[]).filter(row=>!topLevelIds.has(String(row.rootParentId||rootParent(row)?.id||'')));
-  invalidateHierarchyIndex();
-  if(!data.parents.some(row=>String(row.id)===String(ui.selectedParentId))){
-   ui.selectedParentId=data.parents[0]?.id||'';
-   ui.selectedAssignedItemId=null;
-   dataLoadState.childrenLoaded.delete(String(ui.selectedParentId||''));
-  }
-  renderParentList({skipRemote:true});renderDetail();
-  if(ui.page==='account'&&ui.accountTab==='search')renderAccountPage();
-  if(ui.selectedParentId&&!rootIds.has(String(ui.selectedParentId)))void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});
- }
+ const parentListChanged=[...resolvedById.values()].some(item=>item.type==='project'||item.type==='job')||deletedRootIds.size>0;
+ if(parentListChanged)renderParentList({skipRemote:true});
  const selectedRootId=String(ui.selectedParentId||'');
- if(selectedRootId&&rootIds.has(selectedRootId)){
-  await ensureRootChildrenLoaded(selectedRootId,{force:true});
-  if(ui.tab==='activity'||ui.modal?.kind==='history')void refreshActivityFor(selectedRootId,'all');
- }
+ const selectedAffected=Boolean(selectedRootId&&(rootIds.has(selectedRootId)||updatedIds.has(selectedRootId)||deletedIds.has(selectedRootId)));
+ if(ui.page==='workspace'&&(selectedAffected||parentListChanged))renderDetail();
+ if(ui.page==='account'&&ui.accountTab==='search'&&parentListChanged)renderAccountPage();
  if(ui.modal?.kind==='global-history')void refreshApplicationHistory(true);
  else if(ui.modal?.kind==='history'){
   const modalItem=allItem(ui.modal.itemId);

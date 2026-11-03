@@ -1925,7 +1925,7 @@ function restoreWorkspaceViewState(){
 const restoredWorkspaceScrollY=restoreWorkspaceViewState();
 window.addEventListener('pagehide',persistWorkspaceViewState);
 window.addEventListener('beforeunload',persistWorkspaceViewState);
-window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE=()=>{try{sessionStorage.removeItem(workspaceViewStateKey());}catch(error){}};
+window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE=()=>{try{sessionStorage.removeItem(workspaceViewStateKey());}catch(error){}ui.actingUserId='';};
 const activityRefreshRequests=new Map();
 const rootChildrenRequests=new Map();
 const assignedItemCache=new Map();

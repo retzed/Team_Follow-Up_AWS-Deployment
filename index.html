@@ -1424,6 +1424,13 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   const path='/items/'+encodeURIComponent(itemId)+'/activity?'+params.toString();
   return requestCachedGet(path,'activity:'+String(itemId)+':'+scope+':'+queryText);
  }
+ async function queryActivityForItems(itemIds){
+  const ids=[...new Set((itemIds||[]).map(String).filter(Boolean))];
+  if(!ids.length)return {events:[],count:0};
+  if(ids.length>100)throw new Error('Activity reconciliation accepts at most 100 changed item IDs per request.');
+  const params=new URLSearchParams({itemIds:ids.join(',')});
+  return request('GET','/activity?'+params.toString());
+ }
  async function queryGlobalActivity(options={}){const params=new URLSearchParams({scope:'application',limit:String(Math.max(1,Math.min(250,Number(options.limit)||100))),offset:String(Math.max(0,Number(options.offset)||0))});const path='/activity?'+params.toString();return requestCachedGet(path,'activity:application:'+params.toString());}
  async function listArchive(options={},onPage){
   const pageSize=Math.max(1,Math.min(500,Number(options.limit||250)));let offset=Math.max(0,Number(options.offset||0)),all=[],result=null,pages=0;
@@ -1444,7 +1451,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function updateUserPrivilege(userId,privilege){return request('PATCH','/users/'+encodeURIComponent(userId),{privilege});}
  async function updateMyPins(itemIds){return request('PATCH','/users/me/pins',{itemIds:[...new Set((itemIds||[]).map(String))]});}
  async function resolveItems(ids){const params=new URLSearchParams({ids:[...new Set((ids||[]).map(String))].join(',')});return request('GET','/items/resolve?'+params.toString());}
- window.TeamFollowUpDataApi=Object.freeze({remoteApi:true,request,bootstrap,commitSnapshot,commitItemMutation,createRealtimeTicket,queryRealtimeChanges,queryTopLevel,queryChildren,queryRootItems,queryAssigned,queryActivity,queryGlobalActivity,listArchive,restoreArchive,verifyCurrentPassword,getMyProfile,updateMyProfile,updateUserPrivilege,updateMyPins,resolveItems});
+ window.TeamFollowUpDataApi=Object.freeze({remoteApi:true,request,bootstrap,commitSnapshot,commitItemMutation,createRealtimeTicket,queryRealtimeChanges,queryTopLevel,queryChildren,queryRootItems,queryAssigned,queryActivity,queryActivityForItems,queryGlobalActivity,listArchive,restoreArchive,verifyCurrentPassword,getMyProfile,updateMyProfile,updateUserPrivilege,updateMyPins,resolveItems});
 })();
 </script>
 
@@ -3690,6 +3697,20 @@ async function applyRealtimeChangeBatch(changes){
   forgetRealtimeItem(rootId);removeRealtimeWorkspaceItem(rootId);
  }
  invalidateHierarchyIndex();
+ const activityItemIds=[...new Set([...updatedIds,...deletedIds])];
+ const activityRows=[];
+ if(activityItemIds.length&&typeof api.queryActivityForItems==='function'){
+  for(let start=0;start<activityItemIds.length;start+=100){
+   const result=await api.queryActivityForItems(activityItemIds.slice(start,start+100));
+   activityRows.push(...(result?.events||result?.activity||[]));
+  }
+ }
+ const activityEvents=activityRows.map(normalizeActivityEventForUi).filter(event=>event&&event.id);
+ if(activityEvents.length){
+  mergeActivityEventsIntoWorkspace(activityEvents);
+  if(lastApiSnapshot){const merged=mergeActivityRows(lastApiSnapshot.activity||[],activityEvents);lastApiSnapshot.activity=merged.rows;}
+  updateApplicationHistoryFromCommittedEvents(activityEvents);
+ }
  if(deletedRootIds.has(String(ui.selectedParentId||''))){
   ui.selectedParentId=data.parents[0]?.id||'';
   ui.selectedAssignedItemId=null;
@@ -3720,12 +3741,21 @@ async function applyRealtimeChangeBatch(changes){
  const selectedAffected=Boolean(selectedRootId&&(rootIds.has(selectedRootId)||updatedIds.has(selectedRootId)||deletedIds.has(selectedRootId)));
  if(ui.page==='workspace'&&(selectedAffected||parentListChanged))renderDetail();
  if(ui.page==='account'&&ui.accountTab==='search'&&parentListChanged)renderAccountPage();
- if(ui.modal?.kind==='global-history')void refreshApplicationHistory(true);
- else if(ui.modal?.kind==='history'){
-  const modalItem=allItem(ui.modal.itemId);
+ const activityRootsToRefresh=new Set();
+ if(ui.modal?.kind==='history'){
+  const modalItem=allItem(ui.modal.itemId)||ui.modal.itemSnapshot;
   const modalRoot=String(modalItem?.rootParentId||rootParent(modalItem)?.id||ui.modal.itemId||'');
-  if(rootIds.has(modalRoot))void refreshActivityFor(modalRoot,'all');
+  if(rootIds.has(modalRoot))activityRootsToRefresh.add(modalRoot);
  }
+ if(selectedRootId&&rootIds.has(selectedRootId))activityRootsToRefresh.add(selectedRootId);
+ for(const rootId of activityRootsToRefresh){
+  renderAfterActivityRefresh(rootId,'all');
+  const activityLoaded=dataLoadState.activityLoaded?.has(rootId+':all');
+  const historyModalVisible=ui.modal?.kind==='history'&&String(historyRootIdFor(ui.modal.itemId))===rootId;
+  const selectedActivityVisible=ui.page==='workspace'&&ui.tab==='activity'&&selectedRootId===rootId;
+  if(!activityLoaded&&(historyModalVisible||selectedActivityVisible))void refreshActivityFor(rootId,'all');
+ }
+ if(ui.modal?.kind==='global-history'&&applicationHistoryCacheInvalidated)void refreshApplicationHistory(false);
  for(const change of changes)rememberRealtimeChange(change);
 }
 async function catchUpRealtimeChanges(){

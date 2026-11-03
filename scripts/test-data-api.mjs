@@ -221,7 +221,7 @@ assert.equal(post.body.activityEvents[0].id, 'evt-create-task-2');
 
 assert.match(
   backend,
-  /WORK\\.get_item\\(Key=\\{'itemId': item_id\\}, ConsistentRead=True\\)/,
+  /WORK\.get_item\(Key=\{'itemId': item_id\}, ConsistentRead=True\)/,
   'real-time item resolution must strongly read the base DynamoDB table so a newly-created or edited item cannot disappear during GSI propagation'
 );
 

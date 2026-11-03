@@ -1540,6 +1540,17 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  }
  function isConfigured(){if(!(typeof cognito.userPoolId==='string'&&/^[-\\w]+_[A-Za-z0-9]+$/.test(cognito.userPoolId)&&typeof cognito.userPoolClientId==='string'&&cognito.userPoolClientId.length>8&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolClientId)&&!/REPLACE|YOUR_|<|>/i.test(cognito.userPoolId)))return false;try{const api=new URL(String(cfg.apiBaseUrl||'')),ws=new URL(String(cfg.realtimeWebSocketUrl||''));return api.protocol==='https:'&&!api.username&&!api.password&&!api.search&&!api.hash&&['','/'].includes(api.pathname)&&ws.protocol==='wss:'&&!ws.username&&!ws.password&&!ws.search&&!ws.hash&&ws.pathname!=='/';}catch(error){return false;}}
  function resolveTeamUserId(attributes){const customName=String(cognito.teamUserAttribute||'custom:teamUserId');const custom=String(attributes?.[customName]||'').trim();return validIds.includes(custom)?custom:null;}
+ async function getCognitoAccessToken(forceRefresh=false){
+  if(!state.modules)throw new Error('Cognito is not configured');
+  let session=await state.modules.fetchAuthSession(forceRefresh?{forceRefresh:true}:{});
+  let token=session?.tokens?.accessToken?.toString()||'';
+  if(!token&&!forceRefresh){
+   session=await state.modules.fetchAuthSession({forceRefresh:true});
+   token=session?.tokens?.accessToken?.toString()||'';
+  }
+  if(!token)throw new Error('NO_VALID_SESSION');
+  return token;
+ }
  async function ensureAuthenticatedContext(){
   // fetchAuthSession refreshes expired access/ID tokens when the refresh token is valid.
   let session=await state.modules.fetchAuthSession();
@@ -1561,7 +1572,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   }
   const teamUserId=resolveTeamUserId(attributes);
   if(!teamUserId){try{await state.modules.signOut();}catch(e){}throw new Error('TEAM_PROFILE_NOT_MAPPED');}
-  return {teamUserId,authMode:'cognito',cognitoUsername:current.username,cognitoUserId:current.userId,email:attributes.email||'',changePassword:async(oldPassword,newPassword)=>state.modules.updatePassword({oldPassword,newPassword}),verifyPassword:async password=>{const api=window.TeamFollowUpDataApi;if(!api||typeof api.verifyCurrentPassword!=='function')throw new Error('Current-password verification is unavailable.');const result=await api.verifyCurrentPassword(current.username,password);return result?.valid===true;},getAccessToken:async()=>{const fresh=await state.modules.fetchAuthSession();const tok=fresh?.tokens?.accessToken?.toString();if(!tok)throw new Error('Not authenticated');return tok;}};
+  return {teamUserId,authMode:'cognito',cognitoUsername:current.username,cognitoUserId:current.userId,email:attributes.email||'',changePassword:async(oldPassword,newPassword)=>state.modules.updatePassword({oldPassword,newPassword}),verifyPassword:async password=>{const api=window.TeamFollowUpDataApi;if(!api||typeof api.verifyCurrentPassword!=='function')throw new Error('Current-password verification is unavailable.');const result=await api.verifyCurrentPassword(current.username,password);return result?.valid===true;},getAccessToken:async()=>getCognitoAccessToken()};
  }
  async function retrySessionRestoration(){
   if(state.submitting||!state.modules)return;
@@ -1634,12 +1645,20 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
    try{await state.modules?.signOut({global:true});}catch(error){try{await state.modules?.signOut();}catch(_error){}}
    window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;$('signInUsername').focus({preventScroll:true});
   }
-  window.TeamFollowUpAuth={signOut,async getAccessToken(){if(!state.modules)throw new Error('Cognito is not configured');return (await state.modules.fetchAuthSession()).tokens?.accessToken?.toString()||'';},async authenticatedFetch(path,init={}){
+  window.TeamFollowUpAuth={signOut,async getAccessToken(options={}){return getCognitoAccessToken(options?.forceRefresh===true);},async authenticatedFetch(path,init={}){
   
   const base=String(cfg.apiBaseUrl||'');if(!/^https:\/\//i.test(base)||/REPLACE|YOUR_|<|>/i.test(base))throw new Error('API_BASE_URL is not configured for HTTPS.');
   const baseUrl=new URL(base);if(baseUrl.protocol!=='https:'||baseUrl.username||baseUrl.password||baseUrl.search||baseUrl.hash)throw new Error('API_BASE_URL must be a plain HTTPS URL without credentials, query, or fragment.');if(!baseUrl.pathname.endsWith('/'))baseUrl.pathname+='/';
   const relativePath=String(path||'').replace(/^\/+/, '');const url=new URL(relativePath,baseUrl);if(url.origin!==baseUrl.origin||!url.pathname.startsWith(baseUrl.pathname))throw new Error('Only paths beneath the configured API base URL are allowed.');
-  const token=await this.getAccessToken();if(!token)throw new Error('No valid Cognito access token.');const headers=new Headers(init.headers||{});headers.set('Authorization','Bearer '+token);if(init.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');return fetch(url.toString(),{...init,headers});
+  const headers=new Headers(init.headers||{});if(init.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
+  const sendWithToken=token=>{const requestHeaders=new Headers(headers);requestHeaders.set('Authorization','Bearer '+token);return fetch(url.toString(),{...init,headers:requestHeaders});};
+  const token=await this.getAccessToken();if(!token)throw new Error('No valid Cognito access token.');
+  let response=await sendWithToken(token);
+  if(response.status===401){
+   const refreshedToken=await this.getAccessToken({forceRefresh:true});
+   response=await sendWithToken(refreshedToken);
+  }
+  return response;
  }};
  function initializeSignInCopy(){
   $('signInLogoMark').innerHTML='<img class="application-logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNDIwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlRlYW0gRm9sbG93LVVwIj4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg2IC04OSkgc2NhbGUoLjk4KSI+CiAgICA8cGF0aCBmaWxsPSIjZjYzODQwIiBkPSJNMzA2IDExMyBDMzE2IDEzMSAzMjYgMTUxIDMzNCAxNzMgQzMyNCAyMTQgMzA0IDI1NSAyNzkgMjk1IEwxOTkgMjYwIEMyMjQgMjM4IDI1MCAyMTYgMjcwIDE5MiBDMjg1IDE3MyAyOTYgMTQ1IDMwNiAxMTMgWiIvPjxjaXJjbGUgZmlsbD0iI2Y2Mzg0MCIgY3g9IjIyNSIgY3k9IjE3MSIgcj0iMzYiLz4KICAgIDxwYXRoIGZpbGw9IiMzMTk0ZDgiIGQ9Ik0zNTIgMTk4IEMzNzYgMjI0IDM5OSAyNTUgNDMwIDI4MiBDNDQ5IDI5NyA0NzQgMzA2IDQ5OSAzMDkgTDQ0MSAzMzUgQzM5OSAzMjUgMzUyIDMwMiAzMTcgMjc4IEMzMzEgMjU1IDM0NCAyMjQgMzUyIDE5OCBaIi8+PGNpcmNsZSBmaWxsPSIjMzE5NGQ4IiBjeD0iNDQyIiBjeT0iMjI1IiByPSIzNiIvPgogICAgPHBhdGggZmlsbD0iIzViNjJlOCIgZD0iTTE3MSAyNzcgQzIxNCAyODYgMjU3IDMwNiAyOTUgMzM3IEwyNjAgNDE0IEMyNDMgMzkxIDIyMyAzNjkgMTk4IDM1MCBDMTczIDMzMSAxNDQgMzE2IDExNCAzMDQgWiIvPjxjaXJjbGUgZmlsbD0iIzViNjJlOCIgY3g9IjE2OSIgY3k9IjM4NiIgcj0iMzYiLz4KICAgIDxwYXRoIGZpbGw9IiNmZjg1MDAiIGQ9Ik0zMzMgMzE4IEMzNTggMzI4IDM4NiAzMzcgNDEzIDM0NSBDMzg0IDM2NyAzNTkgMzg1IDM0MCA0MDcgQzMyMCA0MzAgMzEwIDQ2OCAzMDQgNDk5IEMyODkgNDc2IDI3OSA0NTcgMjc3IDQzOCBDMjg2IDM5NiAzMDcgMzUwIDMzMyAzMTggWiIvPjxjaXJjbGUgZmlsbD0iI2ZmODUwMCIgY3g9IjM4NSIgY3k9IjQ0MiIgcj0iMzYiLz4KICA8L2c+Cjwvc3ZnPg==" alt="" aria-hidden="true">';
@@ -1658,15 +1677,32 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
      import('https://esm.sh/aws-amplify@'+version+'/utils')
     ]);
     state.modules={...auth};core.Amplify.configure({Auth:{Cognito:{userPoolId:cognito.userPoolId,userPoolClientId:cognito.userPoolClientId,loginWith:{username:true},allowGuestAccess:false}}});
-    let tokenStorage=utils.defaultStorage||utils.sessionStorage;
-    if(utils.defaultStorage&&window.sessionStorage){
-     try{
+    const tokenStorage=utils.defaultStorage||{
+     getItem:async key=>window.localStorage.getItem(key),
+     setItem:async(key,value)=>window.localStorage.setItem(key,String(value)),
+     removeItem:async key=>window.localStorage.removeItem(key)
+    };
+    if(!tokenStorage||typeof tokenStorage.getItem!=='function'||typeof tokenStorage.setItem!=='function'||typeof tokenStorage.removeItem!=='function')throw new Error('Persistent Cognito token storage is unavailable.');
+    try{
+     const legacyStorage=window.sessionStorage;
+     if(legacyStorage){
       const legacyEntries=[];
-      for(let i=0;i<window.sessionStorage.length;i++){const key=window.sessionStorage.key(i);if(key&&key.startsWith('CognitoIdentityServiceProvider.'))legacyEntries.push([key,window.sessionStorage.getItem(key)]);}
-      for(const [key,value] of legacyEntries){const stored=await tokenStorage.getItem(key);if(value!==null&&stored===null)await tokenStorage.setItem(key,value);}
-      for(const [key,value] of legacyEntries)if(value!==null)window.sessionStorage.removeItem(key);
-     }catch(storageMigrationError){console.warn('Could not migrate existing Cognito session storage; retaining tab-scoped authentication storage for this session.',storageMigrationError);tokenStorage=utils.sessionStorage;}
-    }
+      for(let i=0;i<legacyStorage.length;i++){
+       const key=legacyStorage.key(i);
+       if(key&&key.startsWith('CognitoIdentityServiceProvider.'))legacyEntries.push([key,legacyStorage.getItem(key)]);
+      }
+      let migrationVerified=true;
+      for(const [key,value] of legacyEntries){
+       if(value===null)continue;
+       let stored=await tokenStorage.getItem(key);
+       if(stored===null)await tokenStorage.setItem(key,value);
+       stored=await tokenStorage.getItem(key);
+       if(stored!==value){migrationVerified=false;break;}
+      }
+      if(migrationVerified)for(const [key,value] of legacyEntries)if(value!==null)legacyStorage.removeItem(key);
+      else console.warn('Legacy Cognito token migration could not be verified; source tokens were retained and persistent storage remains configured.');
+     }
+    }catch(storageMigrationError){console.warn('Could not migrate legacy Cognito tokens; persistent storage remains configured and a tab-scoped fallback is disabled.',storageMigrationError);}
     cognitoAuth.cognitoUserPoolsTokenProvider.setKeyValueStorage(tokenStorage);$('signInSubmit').disabled=false;setError('');
     try{const context=await ensureAuthenticatedContext();finishVisualAuth(context);}
     catch(error){

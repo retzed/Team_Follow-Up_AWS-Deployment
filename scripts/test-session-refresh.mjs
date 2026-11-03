@@ -8,7 +8,9 @@ const helperEnd = html.indexOf('\nconst activityRefreshRequests=new Map();', hel
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'User-specific view-state helpers must exist.');
 const helperSource = html.slice(helperStart, helperEnd);
 
-assert.match(html, /const tokenStorage=utils\.defaultStorage\|\|\{[\s\S]*?window\.localStorage\.getItem\(key\)/, 'Cognito tokens use persistent browser storage, including a localStorage adapter when Amplify default storage is unavailable.');
+assert.match(html, /const tokenStorage=\{\s*getItem:async key=>window\.localStorage\.getItem\(key\)/, 'Cognito tokens are stored explicitly through the browser localStorage adapter.');
+assert.doesNotMatch(html, /utils\.defaultStorage/, 'The AWS build does not silently inherit an SDK storage fallback that may be process-local.');
+assert.ok(html.includes('tokenStorageProbeKey') && html.includes('tokenStorageProbeValue') && html.includes('Browser localStorage did not retain the Cognito storage probe.'), 'Cognito startup verifies that browser storage can retain and read a value before session restoration.');
 assert.match(html, /CognitoIdentityServiceProvider\./, 'Existing sessionStorage Cognito tokens are migrated to persistent storage.');
 assert.doesNotMatch(html, /tokenStorage=utils\.sessionStorage/, 'A failed legacy-token migration cannot silently downgrade the active session to tab-scoped storage.');
 assert.ok(html.includes('migrationVerified') && html.includes('stored!==value'), 'Legacy Cognito tokens are removed from sessionStorage only after persistent-storage verification.');
@@ -151,4 +153,5 @@ if (html.includes('function initializeLocalAuth(){')) {
     'Explicit demo sign-out removes both session and persistent demo identity keys.');
 }
 
-console.log('Session-refresh tests passed: persistent Cognito storage, transient auth recovery, user-specific page/tab/filter/scroll restoration, and no hydration route reset.');
+assert.ok(html.indexOf('cognitoUserPoolsTokenProvider.setKeyValueStorage(tokenStorage)') < html.indexOf('ensureAuthenticatedContext();finishVisualAuth(context)'), 'The verified persistent provider is installed before Cognito session restoration runs.');
+console.log('Session-refresh tests passed: verified Cognito localStorage, transient auth recovery, user-specific page/tab/filter/scroll restoration, and no hydration route reset.');

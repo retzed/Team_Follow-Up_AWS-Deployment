@@ -20,7 +20,8 @@ assert.ok(authSource.indexOf('fetchAuthSession()') < authSource.indexOf('getCurr
 assert.ok(authSource.includes("fetchAuthSession({forceRefresh:true})"), 'A missing access token triggers an explicit Cognito refresh-token attempt before the session is discarded.');
 assert.ok(authSource.includes('identityErrorName') && authSource.includes('session=await state.modules.fetchAuthSession({forceRefresh:true})'),
   'A Cognito identity lookup rejected by a stale access token gets one forced-refresh retry before sign-in is reset.');
-assert.doesNotMatch(authSource, /fetchUserAttributes\(\);\s*\}catch/, 'Transient profile-attribute failures must not be silently converted to an unmapped user.');
+assert.ok(authSource.includes("if(!/NotAuthorizedException|UserUnAuthenticatedException/.test(identityErrorName))throw identityError;"),
+  'Transient profile-attribute failures are rethrown for session-recovery handling instead of being converted to an unmapped user.');
 assert.ok(html.includes('id="signInRetrySession"') && html.includes('async function retrySessionRestoration()'),
   'A retry path must be available when a temporary auth/network error prevents session restoration.');
 assert.match(html, /else if\(isDefinitiveSessionError\((?:error|e)\)\)enterDefaultMode\(\);\s*else enterSessionRestoreMode\(\)/,

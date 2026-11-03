@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const html = await readFile('index.html', 'utf8');
+const backend = await readFile('backend/src/handler.py', 'utf8');
 const match = html.match(/<script id="team-follow-up-data-api">([\s\S]*?)<\/script>/);
 assert.ok(match, 'the frontend must contain the AWS data API module');
 const source = match[1];
@@ -217,5 +218,11 @@ const post = requests.find(request => request.method === 'POST' && request.path 
 assert.ok(post, 'new work items must be sent to the AWS API');
 assert.equal(post.body.id, 'task-2');
 assert.equal(post.body.activityEvents[0].id, 'evt-create-task-2');
+
+assert.match(
+  backend,
+  /WORK\\.get_item\\(Key=\\{'itemId': item_id\\}, ConsistentRead=True\\)/,
+  'real-time item resolution must strongly read the base DynamoDB table so a newly-created or edited item cannot disappear during GSI propagation'
+);
 
 console.log('AWS-only data API tests passed: remote bootstrap, indexed route queries, archive restore, and API-backed item/audit writes.');

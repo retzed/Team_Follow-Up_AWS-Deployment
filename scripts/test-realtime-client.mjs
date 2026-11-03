@@ -30,7 +30,7 @@ class MockWebSocket {
 }
 
 function createContext(overrides = {}) {
-  const calls = { assigned: 0, pinned: 0, resolved: [], parentRenders: 0, detailRenders: 0, accountRenders: 0, queryCursors: [], intervals: [], clearedIntervals: [] };
+  const calls = { assigned: 0, pinned: 0, resolved: [], activityReads: [], activityMerged: [], activityHistoryUpdates: [], activityRendered: [], activityRefreshes: [], applicationHistoryRefreshes: [], parentRenders: 0, detailRenders: 0, accountRenders: 0, queryCursors: [], intervals: [], clearedIntervals: [] };
   const ui = {
     actingUserId: 'u2', page: 'account', accountTab: 'assigned',
     accountAssignedLoaded: true, accountAssignedLoading: false, accountAssignedRows: [],
@@ -55,6 +55,10 @@ function createContext(overrides = {}) {
         ? overrides.resolvedItems
         : [...data.parents, ...data.children];
       return { items: source.filter(item => ids.includes(String(item.id || item.itemId))) };
+    },
+    queryActivityForItems: async ids => {
+      calls.activityReads.push([...ids]);
+      return { events: overrides.activityEvents || [] };
     }
   };
   const windowEvents = {};
@@ -73,8 +77,8 @@ function createContext(overrides = {}) {
     },
     navigator: { onLine: true },
     WebSocket: MockWebSocket,
-    ui, data, lastApiSnapshot: { parents: data.parents.map(x => ({ ...x })), children: data.children.map(x => ({ ...x })) },
-    dataLoadState: { childrenLoaded: new Set(['project-1']) },
+    ui, data, lastApiSnapshot: { parents: data.parents.map(x => ({ ...x })), children: data.children.map(x => ({ ...x })), activity: [] },
+    dataLoadState: { childrenLoaded: new Set(['project-1']), activityLoaded: new Set() },
     rawCurrentUser: () => ({ id: 'u2' }),
     rootParent: row => row?.rootParentId ? data.parents.find(parent => parent.id === row.rootParentId) || { id: row.rootParentId } : null,
     allItem: id => [...data.parents, ...data.children].find(item => String(item.id) === String(id)) || null,
@@ -83,8 +87,15 @@ function createContext(overrides = {}) {
     renderParentList: () => { calls.parentRenders += 1; },
     renderDetail: () => { calls.detailRenders += 1; },
     renderAccountPage: () => { calls.accountRenders += 1; },
-    refreshActivityFor: async () => {},
-    refreshApplicationHistory: () => {},
+    refreshActivityFor: async (id, scope) => { calls.activityRefreshes.push([id, scope]); },
+    refreshApplicationHistory: silent => { calls.applicationHistoryRefreshes.push(silent); },
+    normalizeActivityEventForUi: event => event,
+    mergeActivityEventsIntoWorkspace: rows => { calls.activityMerged.push(rows); return rows.length > 0; },
+    mergeActivityRows: (existing, incoming) => ({ rows: [...existing, ...incoming] }),
+    updateApplicationHistoryFromCommittedEvents: rows => { calls.activityHistoryUpdates.push(rows); },
+    renderAfterActivityRefresh: (id, scope) => { calls.activityRendered.push([id, scope]); },
+    historyRootIdFor: id => id === 'task-1' ? 'project-1' : id,
+    applicationHistoryCacheInvalidated: false,
     loadAccountAssignedItems: async () => { calls.assigned += 1; ui.accountAssignedLoading = false; ui.accountAssignedLoaded = true; },
     loadAccountPinnedItems: async () => { calls.pinned += 1; },
     toAppItem: row => row,
@@ -324,6 +335,40 @@ function createContext(overrides = {}) {
   assert.equal(staleAfterDelete.children.length, 0, 'A deleted parent does not regain stale descendants during bootstrap.');
 }
 
+
+{
+  const event = { id: 'evt-task-activity', itemId: 'task-1', rootParentId: 'project-1', at: '2026-11-03T10:00:00.000Z', action: 'Updated task' };
+  const item = { id: 'task-1', type: 'task', name: 'Updated task', rootParentId: 'project-1', ownerId: 'u2', version: 2 };
+  const { context, calls, ui, data } = createContext({ resolvedItems: [item], activityEvents: [event] });
+  ui.page = 'workspace';
+  ui.tab = 'activity';
+  context.dataLoadState.activityLoaded.add('project-1:all');
+  await context.applyRealtimeChangeBatch([{
+    type: 'items.changed', changeId: 'activity-realtime',
+    itemId: 'task-1', itemIds: ['task-1'], rootParentIds: ['project-1'],
+    assigneeIds: ['u2'], parentIds: ['project-1'], topLevelIds: [], deleted: false, version: 2
+  }]);
+  assert.deepEqual(calls.activityReads, [['task-1']], 'real-time item notifications fetch Activity only for changed item IDs');
+  assert.equal(calls.activityMerged[0][0].id, 'evt-task-activity', 'the newly-read event is merged into workspace Activity');
+  assert.equal(calls.activityHistoryUpdates[0][0].id, 'evt-task-activity', 'the application-wide history cache receives the committed event');
+  assert.deepEqual(calls.activityRendered, [['project-1', 'all']], 'the selected workspace Activity timeline is refreshed immediately');
+  assert.equal(data.activity?.[0]?.id, 'evt-task-activity', 'the event is retained in the active workspace model');
+}
+
+{
+  const event = { id: 'evt-global-history', itemId: 'task-1', rootParentId: 'project-1', at: '2026-11-03T10:00:00.000Z', action: 'Updated task' };
+  const item = { id: 'task-1', type: 'task', rootParentId: 'project-1', ownerId: 'u2', version: 2 };
+  const { context, calls, ui } = createContext({ resolvedItems: [item], activityEvents: [event] });
+  ui.modal = { kind: 'global-history' };
+  context.applicationHistoryCacheInvalidated = true;
+  await context.applyRealtimeChangeBatch([{
+    type: 'items.changed', changeId: 'global-activity-realtime',
+    itemId: 'task-1', itemIds: ['task-1'], rootParentIds: ['project-1'],
+    assigneeIds: ['u2'], deleted: false
+  }]);
+  assert.deepEqual(calls.applicationHistoryRefreshes, [false], 'an open application-wide Activity view is visibly refreshed after its cache is invalidated');
+}
+
 {
   const { context, calls } = createContext();
   vm.runInNewContext('realtimeRunning=true;realtimeCursor="2026-11-02T12:30:00.123456Z#latest";', context);
@@ -342,6 +387,13 @@ assert.ok(managerSource.includes('for(const item of resolvedById.values())') && 
   'Assigned Items is updated from the exact changed record without waiting for its eventually-consistent GSI');
 assert.ok(managerSource.includes('rememberRealtimeChange(change)'),
   'successfully applied changes are deduplicated after their item data is merged');
+assert.ok(managerSource.includes('api.queryActivityForItems') && managerSource.includes('mergeActivityEventsIntoWorkspace(activityEvents)'),
+  'real-time item changes reconcile targeted Activity event partitions into the workspace and history cache');
+assert.ok(managerSource.includes("renderAfterActivityRefresh(rootId,'all')"),
+  'the selected workspace Activity timeline is refreshed for changes in its current root');
+const backendHandler = await readFile('backend/src/handler.py', 'utf8');
+assert.match(backendHandler, /elif qs\.get\('itemIds'\):[\s\S]*?query_events_for_items\(item_ids\)/,
+  'the AWS API exposes strongly keyed targeted Activity reads independent of parent-index propagation');
 const hydrationStart = html.indexOf('async function startWorkspaceHydration(){');
 const hydrationEnd = html.indexOf('\n}', hydrationStart);
 assert.ok(hydrationStart >= 0 && hydrationEnd > hydrationStart, 'Workspace bootstrap helper must exist.');

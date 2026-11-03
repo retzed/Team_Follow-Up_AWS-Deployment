@@ -1678,18 +1678,26 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
    setError(copy.loading);
    try{
     const version='6.20.0';
-    const [core,auth,cognitoAuth,utils]=await Promise.all([
+    const [core,auth,cognitoAuth]=await Promise.all([
      import('https://esm.sh/aws-amplify@'+version),
      import('https://esm.sh/aws-amplify@'+version+'/auth'),
-     import('https://esm.sh/aws-amplify@'+version+'/auth/cognito'),
-     import('https://esm.sh/aws-amplify@'+version+'/utils')
+     import('https://esm.sh/aws-amplify@'+version+'/auth/cognito')
     ]);
     state.modules={...auth};core.Amplify.configure({Auth:{Cognito:{userPoolId:cognito.userPoolId,userPoolClientId:cognito.userPoolClientId,loginWith:{username:true},allowGuestAccess:false}}});
-    const tokenStorage=utils.defaultStorage||{
+    // Bind Cognito tokens directly to browser localStorage. Amplify's implicit
+    // default storage can fall back to process memory when browser storage is
+    // unavailable; that would authenticate only until the page is reloaded.
+    const tokenStorage={
      getItem:async key=>window.localStorage.getItem(key),
      setItem:async(key,value)=>window.localStorage.setItem(key,String(value)),
      removeItem:async key=>window.localStorage.removeItem(key)
     };
+    const tokenStorageProbeKey='team-follow-up-cognito-storage-probe-v1';
+    const tokenStorageProbeValue=String(Date.now())+'-'+Math.random().toString(36).slice(2);
+    try{
+     window.localStorage.setItem(tokenStorageProbeKey,tokenStorageProbeValue);
+     if(window.localStorage.getItem(tokenStorageProbeKey)!==tokenStorageProbeValue)throw new Error('Browser localStorage did not retain the Cognito storage probe.');
+    }finally{try{window.localStorage.removeItem(tokenStorageProbeKey);}catch(error){}}
     if(!tokenStorage||typeof tokenStorage.getItem!=='function'||typeof tokenStorage.setItem!=='function'||typeof tokenStorage.removeItem!=='function')throw new Error('Persistent Cognito token storage is unavailable.');
     try{
      const legacyStorage=window.sessionStorage;

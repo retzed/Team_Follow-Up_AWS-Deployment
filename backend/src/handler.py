@@ -1528,7 +1528,7 @@ def lambda_handler(event, context):
                 raise ValueError('Resolve at most 100 item IDs at a time.')
             rows = []
             for item_id in requested:
-                row = WORK.get_item(Key={'itemId': item_id}).get('Item')
+                row = WORK.get_item(Key={'itemId': item_id}, ConsistentRead=True).get('Item')
                 if row and not row.get('deletedAt'):
                     rows.append(public_item(row))
             return response(200, {'items': rows, 'count': len(rows)})

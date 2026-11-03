@@ -394,6 +394,8 @@ assert.ok(managerSource.includes("renderAfterActivityRefresh(rootId,'all')"),
 const backendHandler = await readFile('backend/src/handler.py', 'utf8');
 assert.match(backendHandler, /elif qs\.get\('itemIds'\):[\s\S]*?query_events_for_items\(item_ids\)/,
   'the AWS API exposes strongly keyed targeted Activity reads independent of parent-index propagation');
+assert.match(backendHandler, /def query_events_for_item\(item_id\):[\s\S]*?ConsistentRead=True/,
+  'targeted Activity reconciliation uses strongly consistent reads from the Activity table primary key.');
 const hydrationStart = html.indexOf('async function startWorkspaceHydration(){');
 const hydrationEnd = html.indexOf('\n}', hydrationStart);
 assert.ok(hydrationStart >= 0 && hydrationEnd > hydrationStart, 'Workspace bootstrap helper must exist.');

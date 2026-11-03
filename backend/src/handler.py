@@ -1759,8 +1759,13 @@ def lambda_handler(event, context):
                     str(row.get('itemId') or '')
                     for row in query_children_rows(qs['parentId'])
                 ])
+            elif qs.get('itemIds'):
+                item_ids=list(dict.fromkeys(value.strip() for value in str(qs.get('itemIds') or '').split(',') if value.strip()))
+                if not item_ids or len(item_ids)>100:
+                    return response(400,{'message':'Provide between 1 and 100 changed item IDs for an Activity reconciliation query.'})
+                rows=query_events_for_items(item_ids)
             else:
-                return response(400,{'message':'Provide scope=application, itemId, rootParentId, or parentId for an activity query.'})
+                return response(400,{'message':'Provide scope=application, itemId, rootParentId, parentId, or itemIds for an activity query.'})
             search=str(qs.get('q') or '').strip().lower()
             if search:
                 rows=[row for row in rows if search in json.dumps(row,ensure_ascii=False,default=str).lower()]

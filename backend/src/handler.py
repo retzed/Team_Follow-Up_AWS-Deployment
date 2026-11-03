@@ -606,11 +606,12 @@ def query_archived_history_rows(root_id=None, parent_id=None):
 
 
 def query_events_for_item(item_id):
-    """Read one item's audit timeline from Activity's actual composite primary key."""
+    """Read one item's audit timeline with strong consistency from Activity's primary key."""
     return all_pages(
         ACTIVITY,
         KeyConditionExpression=Key('itemId').eq(str(item_id)),
         ScanIndexForward=False,
+        ConsistentRead=True,
     )
 
 

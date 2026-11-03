@@ -8,9 +8,12 @@ const helperEnd = html.indexOf('\nconst activityRefreshRequests=new Map();', hel
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'User-specific view-state helpers must exist.');
 const helperSource = html.slice(helperStart, helperEnd);
 
-assert.match(html, /utils\.defaultStorage\|\|utils\.sessionStorage/, 'Cognito tokens use persistent browser storage when available.');
+assert.match(html, /const tokenStorage=utils\.defaultStorage\|\|\{[\s\S]*?window\.localStorage\.getItem\(key\)/, 'Cognito tokens use persistent browser storage, including a localStorage adapter when Amplify default storage is unavailable.');
 assert.match(html, /CognitoIdentityServiceProvider\./, 'Existing sessionStorage Cognito tokens are migrated to persistent storage.');
-assert.ok(html.includes('window.sessionStorage.removeItem(key)'), 'Legacy Cognito tokens are removed from sessionStorage after migration so explicit sign-out cannot re-import them.');
+assert.doesNotMatch(html, /tokenStorage=utils\.sessionStorage/, 'A failed legacy-token migration cannot silently downgrade the active session to tab-scoped storage.');
+assert.ok(html.includes('migrationVerified') && html.includes('stored!==value'), 'Legacy Cognito tokens are removed from sessionStorage only after persistent-storage verification.');
+assert.ok(html.includes('getCognitoAccessToken(forceRefresh=false)'), 'The authenticated session can explicitly refresh an access token without restarting the application.');
+assert.ok(html.includes('this.getAccessToken({forceRefresh:true})'), 'An API 401 retries once with a forced-refreshed access token instead of immediately dropping the signed-in session.');
 const authStart = html.indexOf('async function ensureAuthenticatedContext(){');
 const authEnd = html.indexOf('\n function finishVisualAuth(context){', authStart);
 assert.ok(authStart >= 0 && authEnd > authStart, 'Authenticated session restoration helper must exist.');

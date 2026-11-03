@@ -1538,8 +1538,20 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   let session=await state.modules.fetchAuthSession();
   if(!session?.tokens?.accessToken)session=await state.modules.fetchAuthSession({forceRefresh:true});
   if(!session?.tokens?.accessToken)throw new Error('NO_VALID_SESSION');
-  const current=await state.modules.getCurrentUser();
-  const attributes=await state.modules.fetchUserAttributes();
+  let current,attributes;
+  try{
+   current=await state.modules.getCurrentUser();
+   attributes=await state.modules.fetchUserAttributes();
+  }catch(identityError){
+   const identityErrorName=String(identityError?.name||'');
+   if(!/NotAuthorizedException|UserUnAuthenticatedException/.test(identityErrorName))throw identityError;
+   // A still-cached access token can be rejected by Cognito before its
+   // expiration time. Refresh it once before treating the login as invalid.
+   session=await state.modules.fetchAuthSession({forceRefresh:true});
+   if(!session?.tokens?.accessToken)throw identityError;
+   current=await state.modules.getCurrentUser();
+   attributes=await state.modules.fetchUserAttributes();
+  }
   const teamUserId=resolveTeamUserId(attributes);
   if(!teamUserId){try{await state.modules.signOut();}catch(e){}throw new Error('TEAM_PROFILE_NOT_MAPPED');}
   return {teamUserId,authMode:'cognito',cognitoUsername:current.username,cognitoUserId:current.userId,email:attributes.email||'',changePassword:async(oldPassword,newPassword)=>state.modules.updatePassword({oldPassword,newPassword}),verifyPassword:async password=>{const api=window.TeamFollowUpDataApi;if(!api||typeof api.verifyCurrentPassword!=='function')throw new Error('Current-password verification is unavailable.');const result=await api.verifyCurrentPassword(current.username,password);return result?.valid===true;},getAccessToken:async()=>{const fresh=await state.modules.fetchAuthSession();const tok=fresh?.tokens?.accessToken?.toString();if(!tok)throw new Error('Not authenticated');return tok;}};

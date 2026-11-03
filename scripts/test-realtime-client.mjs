@@ -99,6 +99,7 @@ function createContext(overrides = {}) {
   vm.runInNewContext(
     managerSource + '\n' +
     'this.applyRealtimeChangeBatch=applyRealtimeChangeBatch;' +
+    'this.mergeRealtimeWorkspaceSnapshot=mergeRealtimeWorkspaceSnapshot;' +
     'this.queueRealtimeChangeBatch=queueRealtimeChangeBatch;' +
     'this.catchUpRealtimeChanges=catchUpRealtimeChanges;' +
     'this.startRealtimeNotifications=startRealtimeNotifications;' +
@@ -287,6 +288,43 @@ function createContext(overrides = {}) {
 }
 
 {
+  const parent = { id: 'project-during-bootstrap', type: 'project', name: 'Created during bootstrap', ownerId: 'u2', version: 1, updatedAt: '2026-11-03T10:01:00.000Z' };
+  const child = { id: 'task-during-bootstrap', type: 'task', name: 'Child created during bootstrap', rootParentId: parent.id, parentId: parent.id, ownerId: 'u3', version: 1, updatedAt: '2026-11-03T10:01:00.000Z' };
+  const { context, data } = createContext({ resolvedItems: [parent, child] });
+  await context.applyRealtimeChangeBatch([{
+    type: 'items.changed', changeId: 'bootstrap-race-create',
+    itemId: parent.id, itemIds: [parent.id, child.id],
+    rootParentIds: [parent.id], topLevelIds: [parent.id], parentIds: [parent.id],
+    assigneeIds: ['u2', 'u3'], deleted: false
+  }]);
+  const staleBootstrap = context.mergeRealtimeWorkspaceSnapshot({
+    schema: 4, users: [], parents: [], children: [], activity: []
+  });
+  assert.ok(staleBootstrap.parents.some(row => row.id === parent.id),
+    'A parent notification received during bootstrap survives a later stale bootstrap page.');
+  assert.ok(staleBootstrap.children.some(row => row.id === child.id),
+    'A child notification received during bootstrap survives a later stale bootstrap page.');
+
+  const newerParent = { ...parent, name: 'Newer bootstrap version', version: 2, updatedAt: '2026-11-03T10:02:00.000Z' };
+  const newerBootstrap = context.mergeRealtimeWorkspaceSnapshot({
+    schema: 4, users: [], parents: [newerParent], children: [], activity: []
+  });
+  assert.equal(newerBootstrap.parents[0].name, 'Newer bootstrap version',
+    'An older real-time overlay cannot overwrite a newer bootstrap item version.');
+
+  await context.applyRealtimeChangeBatch([{
+    type: 'items.changed', changeId: 'bootstrap-race-delete',
+    itemId: parent.id, itemIds: [parent.id, child.id], rootParentIds: [parent.id],
+    topLevelIds: [parent.id], parentIds: [parent.id], assigneeIds: [], deleted: true
+  }]);
+  const staleAfterDelete = context.mergeRealtimeWorkspaceSnapshot({
+    schema: 4, users: [], parents: [parent], children: [child], activity: []
+  });
+  assert.equal(staleAfterDelete.parents.length, 0, 'A deletion received during bootstrap remains deleted in the final snapshot.');
+  assert.equal(staleAfterDelete.children.length, 0, 'A deleted parent does not regain stale descendants during bootstrap.');
+}
+
+{
   const { context, calls } = createContext();
   vm.runInNewContext('realtimeRunning=true;realtimeCursor="2026-11-02T12:30:00.123456Z#latest";', context);
   await context.catchUpRealtimeChanges();
@@ -304,5 +342,12 @@ assert.ok(managerSource.includes('for(const item of resolvedById.values())') && 
   'Assigned Items is updated from the exact changed record without waiting for its eventually-consistent GSI');
 assert.ok(managerSource.includes('rememberRealtimeChange(change)'),
   'successfully applied changes are deduplicated after their item data is merged');
+const hydrationStart = html.indexOf('async function startWorkspaceHydration(){');
+const hydrationEnd = html.indexOf('\n}', hydrationStart);
+assert.ok(hydrationStart >= 0 && hydrationEnd > hydrationStart, 'Workspace bootstrap helper must exist.');
+const hydrationSource = html.slice(hydrationStart, hydrationEnd);
+assert.ok(hydrationSource.includes('data=mergeRealtimeWorkspaceSnapshot(partial)') &&
+          hydrationSource.includes('data=mergeRealtimeWorkspaceSnapshot(loaded)'),
+  'Both progressive and final bootstrap snapshots merge active real-time item overlays before replacing workspace data.');
 
 console.log('Real-time client tests passed: strongly-read item merges, create-then-edit ordering, safe missing-row retry, immediate assignment delivery, GSI overlays and durable catch-up.');

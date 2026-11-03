@@ -112,51 +112,35 @@ assert.ok(html.includes('theme:resolvePreferredTheme(incomingPreferences.theme,o
 
 
 
-// Theme changes are a root-level style update. They must not rebuild the
-// workspace or account DOM while the browser is repainting the new palette.
-const themeHelperStart = html.indexOf('let themeSwitchSequence=0;');
+// Theme changes should update one root attribute without forcing a
+// descendant-wide transition/animation recalculation.
+const themeHelperStart = html.indexOf('function applyTheme(){');
 const applyTranslationsStart = html.indexOf('function applyTranslations(){', themeHelperStart);
 assert.ok(themeHelperStart >= 0 && applyTranslationsStart > themeHelperStart,
-  'The complete dedicated applyTheme helper and its sequence counter must exist before translation rendering.');
+  'The dedicated lightweight applyTheme helper must precede translation rendering.');
 const applyThemeSource = html.slice(themeHelperStart, applyTranslationsStart);
 function verifyApplyTheme(theme) {
   const button = { innerHTML: '', title: '', attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
   const themeSelect = { value: theme === 'light' ? 'dark' : 'light' };
-  const classes = new Set();
-  const frameCallbacks = [];
   const context = {
     ui: { theme },
-    document: { documentElement: {
-      dataset: { theme: theme === 'light' ? 'dark' : 'light' },
-      classList: {
-        add(value) { classes.add(value); },
-        remove(value) { classes.delete(value); }
-      }
-    } },
-    requestAnimationFrame: callback => frameCallbacks.push(callback),
+    document: { documentElement: { dataset: { theme: theme === 'light' ? 'dark' : 'light' } } },
     $: selector => selector === '#themeToggle' ? button : selector === '#accountTheme' ? themeSelect : null,
-    icon: name => `icon:${name}`
+    icon: name => \`icon:\${name}\`
   };
   vm.runInNewContext(applyThemeSource + '\nthis.applyTheme = applyTheme;', context);
   context.applyTheme();
   assert.equal(context.document.documentElement.dataset.theme, theme);
-  assert.ok(classes.has('theme-switching'), 'Theme transitions stay suppressed during the palette repaint.');
-  assert.equal(frameCallbacks.length, 1, 'The suppression cleanup waits for an animation frame.');
   assert.equal(button.innerHTML, theme === 'light' ? 'icon:moon' : 'icon:sun');
   assert.equal(button.title, theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
   assert.equal(button.attributes['aria-label'], button.title);
   assert.equal(themeSelect.value, theme, 'The account theme selector stays synchronized.');
-  frameCallbacks.shift()();
-  assert.ok(classes.has('theme-switching'), 'Suppression remains active through the next frame.');
-  assert.equal(frameCallbacks.length, 1, 'Cleanup waits one additional frame so the new palette can paint.');
-  frameCallbacks.shift()();
-  assert.ok(!classes.has('theme-switching'), 'Normal interactions regain their transitions after the theme repaint.');
 }
 verifyApplyTheme('light');
 verifyApplyTheme('dark');
+assert.doesNotMatch(html, /theme-switching/,
+  'Theme changes must not apply a universal descendant selector that forces a full style recalculation.');
 
-assert.ok(html.includes('html.theme-switching *,html.theme-switching *::before,html.theme-switching *::after{transition:none!important;animation:none!important}'),
-  'Theme changes must suppress all descendant and pseudo-element transitions while the palette is repainted.');
 const preferenceHandlerStart = html.indexOf('async function changeUserPreference(key,value){');
 const renderFunctionStart = html.indexOf('function render(){', preferenceHandlerStart);
 assert.ok(preferenceHandlerStart >= 0 && renderFunctionStart > preferenceHandlerStart,
@@ -166,9 +150,12 @@ async function simulatePreferenceChange({ key, value, fail = false }) {
   let renderCalls = 0;
   let applyThemeCalls = 0;
   let savedPreferences = null;
+  const user = { id: 'u1', preferences: { lang: 'en', theme: 'dark' } };
   const context = {
     ui: { lang: 'en', theme: 'dark' },
-    rawCurrentUser: () => ({ id: 'u1', preferences: { lang: 'en', theme: 'dark' } }),
+    preferenceSaveQueue: Promise.resolve(),
+    preferenceChangeSequence: 0,
+    rawCurrentUser: () => user,
     render: () => { renderCalls += 1; },
     applyTheme: () => { applyThemeCalls += 1; },
     window: {
@@ -176,36 +163,48 @@ async function simulatePreferenceChange({ key, value, fail = false }) {
         updateMyProfile: async fields => {
           savedPreferences = fields.preferences;
           if (fail) throw new Error('simulated save failure');
-          return { user: { id: 'u1' } };
+          return { user: { id: 'u1', preferences: fields.preferences } };
         }
       }
     },
     mergeProfileIntoData: () => {},
     toast: () => {},
-    tr: () => 'Account error'
+    tr: () => 'Account error',
+    Promise
   };
   vm.runInNewContext(preferenceHandlerSource + '\nthis.changeUserPreference = changeUserPreference;', context);
   await context.changeUserPreference(key, value);
-  return { context, renderCalls, applyThemeCalls, savedPreferences };
+  return { context, user, renderCalls, applyThemeCalls, savedPreferences };
 }
 {
   const result = await simulatePreferenceChange({ key: 'theme', value: 'light' });
   assert.equal(result.context.ui.theme, 'light');
   assert.equal(result.renderCalls, 0, 'A successful theme change must not run the full renderer.');
-  assert.equal(result.applyThemeCalls, 2, 'Apply the theme immediately and resynchronize after the save.');
-  assert.equal(result.savedPreferences.theme, 'light', 'The selected theme is still persisted to the signed-in user profile.');
+  assert.equal(result.applyThemeCalls, 1, 'A successful theme change applies the palette only once.');
+  assert.equal(result.savedPreferences.theme, 'light', 'The selected theme is persisted to the signed-in user profile.');
+  assert.equal(result.user.preferences.theme, 'light', 'The profile preference is updated optimistically for the account form.');
 }
 {
   const result = await simulatePreferenceChange({ key: 'theme', value: 'light', fail: true });
   assert.equal(result.context.ui.theme, 'dark', 'A failed theme save restores the previous theme.');
   assert.equal(result.renderCalls, 0, 'Theme rollback must not run the full renderer.');
-  assert.equal(result.applyThemeCalls, 2, 'Theme rollback is applied directly.');
+  assert.equal(result.applyThemeCalls, 2, 'Theme rollback reapplies only the previous palette.');
+  assert.equal(result.user.preferences.theme, 'dark', 'A failed write restores the previous profile preference.');
 }
 {
   const result = await simulatePreferenceChange({ key: 'lang', value: 'ar' });
   assert.equal(result.context.ui.lang, 'ar');
-  assert.equal(result.renderCalls, 2, 'Language changes still render the translated interface.');
-  assert.equal(result.applyThemeCalls, 0, 'The theme-only path does not alter language updates.');
+  assert.equal(result.renderCalls, 1, 'A successful language change performs one translated render, not a second render after the API response.');
+  assert.equal(result.applyThemeCalls, 0, 'The language path does not alter the theme.');
+  assert.equal(result.savedPreferences.lang, 'ar');
+  assert.equal(result.user.preferences.lang, 'ar', 'The account language selector reads the optimistic preference.');
+}
+{
+  const result = await simulatePreferenceChange({ key: 'lang', value: 'ar', fail: true });
+  assert.equal(result.context.ui.lang, 'en', 'A failed language save restores the previous language.');
+  assert.equal(result.renderCalls, 2, 'Language rollback performs one render to restore the prior labels.');
+  assert.equal(result.applyThemeCalls, 0);
+  assert.equal(result.user.preferences.lang, 'en', 'A failed write restores the previous profile preference.');
 }
 
 // During API hydration, capture the persisted theme and apply it only after

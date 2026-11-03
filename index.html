@@ -1684,9 +1684,8 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
      import('https://esm.sh/aws-amplify@'+version+'/auth/cognito')
     ]);
     state.modules={...auth};core.Amplify.configure({Auth:{Cognito:{userPoolId:cognito.userPoolId,userPoolClientId:cognito.userPoolClientId,loginWith:{username:true},allowGuestAccess:false}}});
-    // Bind Cognito tokens directly to browser localStorage. Amplify's implicit
-    // default storage can fall back to process memory when browser storage is
-    // unavailable; that would authenticate only until the page is reloaded.
+    // Use an explicit browser localStorage adapter so the Cognito session's
+    // persistence scope is unambiguous. Verify browser storage before restoring it.
     const tokenStorage={
      getItem:async key=>window.localStorage.getItem(key),
      setItem:async(key,value)=>window.localStorage.setItem(key,String(value)),

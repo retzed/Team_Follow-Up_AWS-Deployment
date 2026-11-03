@@ -2509,10 +2509,24 @@ function renderAssignedList(listOverride=null){
  const pending=!dataLoadState.initialComplete?spinnerMarkup(tr('loadingItems'),true):'';
  $('#parentList').innerHTML=cards+(pending||(!cards?`<div class="empty-state">${esc(dataLoadState.initialError||tr('noAssignedItems'))}${dataLoadState.initialError?`<div>${loadErrorMarkup(dataLoadState.initialError)}</div>`:''}</div>`:''));
 }
+let loadedRootItemCountsCache={source:null,length:-1,revision:-1,counts:new Map()};
+function loadedRootItemCounts(){
+ const rows=Array.isArray(data.children)?data.children:[];
+ if(loadedRootItemCountsCache.source===rows&&loadedRootItemCountsCache.length===rows.length&&loadedRootItemCountsCache.revision===hierarchyIndexRevision)return loadedRootItemCountsCache.counts;
+ const counts=new Map();
+ for(const item of rows){
+  let rootId=String(item.rootParentId||'');
+  if(!rootId)rootId=String(rootParent(item)?.id||'');
+  if(rootId)counts.set(rootId,(counts.get(rootId)||0)+1);
+ }
+ loadedRootItemCountsCache={source:rows,length:rows.length,revision:hierarchyIndexRevision,counts};
+ return counts;
+}
 function renderParentSearchList(list){
+ const rootCounts=loadedRootItemCounts();
  const isPending=!dataLoadState.parentsReady&&!dataLoadState.initialError;
  $('#parentCount').innerHTML=`${list.length} ${esc(tr('items'))}${isPending?` ${inlineSpinnerMarkup()}`:''}`;
- const cards=list.map(p=>{const selected=p.id===ui.selectedParentId;const childReady=rootChildrenReady(p.id);const itemCount=childReady?getItemSummary(p).all.length:0;return `<article class="parent-card ${selected?'selected':''}" data-action="select-parent" data-id="${esc(p.id)}" tabindex="0" aria-current="${selected?'true':'false'}"><span class="card-topline"><span class="type-icon">${typeIcon(p.type)}</span><span class="parent-card-copy"><span class="parent-card-title" dir="auto">${esc(p.name)}</span><span class="parent-card-type parent-card-meta"><span>${esc(typeName(p.type))}</span><span class="meta-dot">·</span>${childReady?`<span>${esc(itemCount+' '+tr('items'))}</span>`:(dataLoadState.initialError||dataLoadState.rootErrors.has(`children:${p.id}`))?countValueMarkup(itemCount,false,p.id,'children'):(selected||rootChildrenRequests.has(String(p.id)))?inlineSpinnerMarkup():''}</span></span></span><span class="parent-card-bottom">${statusPill(p.status)}${pinActionMarkup(p.id)}</span><button class="mini-updated" data-action="history" data-item-id="${esc(p.id)}" type="button" aria-label="${esc(tr('activityHistory'))}" title="${esc(`${tr('lastUpdatedLabel')}: ${fmtDateTime(p.updatedAt)} · ${person(p.updatedBy).name}`)}">${icon('clock',11)} <span>${esc(tr('lastUpdatedLabel'))}: ${esc(fmtDateTime(p.updatedAt))} · ${esc(person(p.updatedBy).name)}</span></button></article>`;}).join('');
+ const cards=list.map(p=>{const selected=p.id===ui.selectedParentId;const childReady=rootChildrenReady(p.id);const itemCount=childReady?(rootCounts.get(String(p.id))||0):0;return `<article class="parent-card ${selected?'selected':''}" data-action="select-parent" data-id="${esc(p.id)}" tabindex="0" aria-current="${selected?'true':'false'}"><span class="card-topline"><span class="type-icon">${typeIcon(p.type)}</span><span class="parent-card-copy"><span class="parent-card-title" dir="auto">${esc(p.name)}</span><span class="parent-card-type parent-card-meta"><span>${esc(typeName(p.type))}</span><span class="meta-dot">·</span>${childReady?`<span>${esc(itemCount+' '+tr('items'))}</span>`:(dataLoadState.initialError||dataLoadState.rootErrors.has(`children:${p.id}`))?countValueMarkup(itemCount,false,p.id,'children'):(selected||rootChildrenRequests.has(String(p.id)))?inlineSpinnerMarkup():''}</span></span></span><span class="parent-card-bottom">${statusPill(p.status)}${pinActionMarkup(p.id)}</span><button class="mini-updated" data-action="history" data-item-id="${esc(p.id)}" type="button" aria-label="${esc(tr('activityHistory'))}" title="${esc(`${tr('lastUpdatedLabel')}: ${fmtDateTime(p.updatedAt)} · ${person(p.updatedBy).name}`)}">${icon('clock',11)} <span>${esc(tr('lastUpdatedLabel'))}: ${esc(fmtDateTime(p.updatedAt))} · ${esc(person(p.updatedBy).name)}</span></button></article>`;}).join('');
  const pending=isPending?spinnerMarkup(tr('loadingItems'),true):'';
  const error=dataLoadState.initialError?loadErrorMarkup(dataLoadState.initialError):'';
  $('#parentList').innerHTML=cards+(pending||error||(!cards?`<div class="empty-state">${esc(tr('noFilterResults'))}</div>`:''));
@@ -2877,7 +2891,7 @@ async function changeUserPreference(key,value){
 function render(){applyTranslations();if(ui.page==='account'){renderAccountPage();renderModal();return;}renderParentList();renderDetail();renderModal();}
 function renderItemMutationView({refreshSidebar=true}={}){
  if(ui.page==='account'){renderAccountPage();renderModal();return;}
- if(refreshSidebar)renderParentList();
+ if(refreshSidebar)renderParentList({skipRemote:true});
  renderDetail();
  renderModal();
 }

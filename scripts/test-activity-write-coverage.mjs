@@ -21,7 +21,7 @@ assert.match(html, /result\?\.activityEvents\|\|\[\]/, 'Archive restore response
 
 const createEdit = fn('handleItemSubmit', 'clearParentFilters');
 assert.ok(createEdit.includes("const event=activityRecord(item,`Created ${type}: ${name}`,'create',at);data.activity.push(event)"), 'Creating a project/job must record a create event.');
-assert.ok(createEdit.includes("const updateEvent=activityRecord(item,`Updated ${changed.join(', ')} for ${item.type}: ${item.name}.`,'update',item.updatedAt);data.activity.push(updateEvent);mutationEvents.push(updateEvent)"), 'Editing name/description/assignee/priority/due date/type must record an update event.');
+assert.ok(createEdit.includes("const updateEvent=activityRecord(item,action,'update',item.updatedAt);data.activity.push(updateEvent);mutationEvents.push(updateEvent)"), 'Editing name/description/assignee/priority/due date/type must record an update event.');
 assert.match(createEdit, /Status changed from \$\{statusName\(oldStatus,'en'\)\} to \$\{statusName\(item\.status,'en'\)\}/, 'Status changes must record a dedicated status event.');
 const deletion = fn('deleteItem', 'handleItemSubmit');
 assert.match(deletion, /const event=activityRecord\(item,`Deleted \$\{item\.type\}: \$\{item\.name\}`,'delete',deletedAt[\s\S]*?event\.affectedCount=doomedItems\.length;event\.affectedDescendantCount=affectedDescendantCount;[\s\S]*?data\.activity\.push\(event\)/, 'Deleting a hierarchy must record one summary event with item/descendant counts.');

@@ -124,7 +124,7 @@ function createContext(overrides = {}) {
   assert.equal(ui.accountAssignedRows[0].name, 'Assigned just now');
   assert.equal(data.children.find(row => row.id === 'task-1').version, 2, 'the exact item is merged into the workspace model');
   assert.equal(calls.parentRenders, 0, 'child updates do not rebuild the parent sidebar');
-  assert.equal(calls.detailRenders, 1, 'the selected root detail is refreshed without re-querying its GSI');
+  assert.equal(calls.detailRenders, 0, 'an inactive workspace detail is not needlessly rebuilt while the user is on the profile page');
 }
 
 {
@@ -149,12 +149,13 @@ function createContext(overrides = {}) {
   await context.applyRealtimeChangeBatch([
     {
       type: 'items.changed', changeId: 'delete-old',
-      itemId: 'project-old', rootParentIds: ['project-old'], assigneeIds: [],
+      itemId: 'project-old', itemIds: ['project-old', 'task-old'],
+      rootParentIds: ['project-old'], assigneeIds: [],
       parentIds: [], topLevelIds: ['project-old'], deleted: true, version: 3
     },
     {
       type: 'items.changed', changeId: 'create-and-edit-new',
-      itemId: 'project-new', rootParentIds: ['project-new'], assigneeIds: ['u2'],
+      itemId: 'project-new', itemIds: ['project-new'], rootParentIds: ['project-new'], assigneeIds: ['u2'],
       parentIds: [], topLevelIds: ['project-new'], deleted: false, version: 2
     }
   ]);

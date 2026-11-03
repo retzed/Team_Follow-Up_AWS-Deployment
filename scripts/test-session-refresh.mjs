@@ -153,5 +153,8 @@ if (html.includes('function initializeLocalAuth(){')) {
     'Explicit demo sign-out removes both session and persistent demo identity keys.');
 }
 
-assert.ok(html.indexOf('cognitoUserPoolsTokenProvider.setKeyValueStorage(tokenStorage)') < html.indexOf('ensureAuthenticatedContext();finishVisualAuth(context)'), 'The verified persistent provider is installed before Cognito session restoration runs.');
+const initializeAuthStart = html.indexOf('async function initialize(){');
+const tokenProviderSetup = html.indexOf('cognitoUserPoolsTokenProvider.setKeyValueStorage(tokenStorage)', initializeAuthStart);
+const startupSessionRestore = html.indexOf('ensureAuthenticatedContext();finishVisualAuth(context)', initializeAuthStart);
+assert.ok(initializeAuthStart >= 0 && tokenProviderSetup > initializeAuthStart && startupSessionRestore > tokenProviderSetup, 'The verified persistent provider is installed before the startup Cognito session restoration call.');
 console.log('Session-refresh tests passed: verified Cognito localStorage, transient auth recovery, user-specific page/tab/filter/scroll restoration, and no hydration route reset.');

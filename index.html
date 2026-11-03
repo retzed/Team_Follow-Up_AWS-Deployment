@@ -1643,7 +1643,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
      try{
       const legacyKeys=[];
       for(let i=0;i<window.sessionStorage.length;i++){const key=window.sessionStorage.key(i);if(key&&key.startsWith('CognitoIdentityServiceProvider.'))legacyKeys.push(key);}
-      for(const key of legacyKeys){const value=window.sessionStorage.getItem(key);if(value!==null&&await tokenStorage.getItem(key)===null)await tokenStorage.setItem(key,value);}
+      for(const key of legacyKeys){const value=window.sessionStorage.getItem(key);const stored=await tokenStorage.getItem(key);if(value!==null&&stored===null)await tokenStorage.setItem(key,value);if(value!==null)window.sessionStorage.removeItem(key);}
      }catch(storageMigrationError){console.warn('Could not migrate existing Cognito session storage; continuing with persistent token storage.',storageMigrationError);}
     }
     cognitoAuth.cognitoUserPoolsTokenProvider.setKeyValueStorage(tokenStorage);$('signInSubmit').disabled=false;setError('');

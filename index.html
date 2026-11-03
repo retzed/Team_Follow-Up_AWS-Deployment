@@ -1609,6 +1609,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   }
  }
  async function signOut(){
+  window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE?.();
    const app=$('app');root.classList.add('auth-pending');document.body.classList.add('signin-open');app.inert=true;app.setAttribute('aria-hidden','true');screen.hidden=false;enterDefaultMode();$('signInUsername').value='';$('signInPassword').value='';
    try{await state.modules?.signOut({global:true});}catch(error){try{await state.modules?.signOut();}catch(_error){}}
    window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;$('signInUsername').focus({preventScroll:true});

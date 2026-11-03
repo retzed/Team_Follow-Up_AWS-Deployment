@@ -117,7 +117,7 @@ const fallbackContext = {
   ui: fallbackUi, sessionStorage: fallbackSessionStorage, localStorage: persistentStorage,
   window: { scrollY: 0, addEventListener() {} }, Set, Number, Math, JSON, String
 };
-vm.runInNewContext(helperSource + '\\nthis.restoredWorkspaceScrollY=restoredWorkspaceScrollY;', fallbackContext);
+vm.runInNewContext(helperSource + '\nthis.restoredWorkspaceScrollY=restoredWorkspaceScrollY;', fallbackContext);
 assert.equal(fallbackUi.page, 'workspace', 'Persistent view state restores the last opened application page when tab-scoped state is unavailable.');
 assert.equal(fallbackUi.selectedParentId, 'project-42', 'Persistent view state restores the selected parent.');
 assert.equal(fallbackUi.tab, 'activity', 'Persistent view state restores the open detail tab.');

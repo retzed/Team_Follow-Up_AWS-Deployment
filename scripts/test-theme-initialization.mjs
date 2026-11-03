@@ -126,7 +126,7 @@ function verifyApplyTheme(theme) {
     ui: { theme },
     document: { documentElement: { dataset: { theme: theme === 'light' ? 'dark' : 'light' } } },
     $: selector => selector === '#themeToggle' ? button : selector === '#accountTheme' ? themeSelect : null,
-    icon: name => \`icon:\${name}\`
+    icon: name => 'icon:' + name
   };
   vm.runInNewContext(applyThemeSource + '\nthis.applyTheme = applyTheme;', context);
   context.applyTheme();

@@ -85,7 +85,7 @@ function createContext(overrides = {}) {
     renderAccountPage: () => { calls.accountRenders += 1; },
     refreshActivityFor: async () => {},
     refreshApplicationHistory: () => {},
-    loadAccountAssignedItems: async () => { calls.assigned += 1; },
+    loadAccountAssignedItems: async () => { calls.assigned += 1; ui.accountAssignedLoading = false; ui.accountAssignedLoaded = true; },
     loadAccountPinnedItems: async () => { calls.pinned += 1; },
     toAppItem: row => row,
     assignedItemCache: new Map(),

@@ -963,7 +963,7 @@ The Lambda receives the proxy path and dispatches based on HTTP method and route
 | **POST /items** | Create a project, job, task, or follow-up. | JSON work-item fields; a child needs parentId. | HTTP 201; canonical item and associated activity events. |
 | **PATCH /items/{itemId}** | Update a live work item. | JSON fields to update, with current item data as used by the frontend. | HTTP 200; canonical item and activity events. |
 | **DELETE /items/{itemId}** | Archive the item and its descendants; this is not a hard-delete API. | Optional event details supplied by the client; server normalizes audit data. | HTTP 200; archived IDs and activity events. |
-| **GET /activity** | Query application or item-related history. | One of scope=application/global, itemId, rootParentId, or parentId; optional q. | events, count. |
+| **GET /activity** | Query application, item-related, or real-time changed-item history. | One of scope=application/global, itemId, rootParentId, parentId, or itemIds (1–100 comma-separated item IDs); optional q. | events, count. |
 | **GET /archive** | List/filter archived records. | Optional type, rootParentId, q, offset, limit. | items, count, nextOffset. |
 | **POST /archive/restore** | Restore selected archived items. | JSON object with **itemIds** array; at most 500 selected IDs per request. | restoredIds, restoredItems, activityEvents. |
 | **POST /activity** | Direct event creation is not supported. | — | HTTP 405. Activity writes must be part of work-item transactions. |
@@ -1011,6 +1011,7 @@ The handler currently filters and sorts after retrieving the selected index part
 - **itemId=<id>**: one item's history.
 - **rootParentId=<id>**: history for the root and relevant descendant records.
 - **parentId=<id>**: history for direct children of the parent.
+- **itemIds=<id1,id2,...>**: targeted reconciliation for 1–100 changed items. The handler queries the Activity table's `itemId` partition key for each ID and merges the resulting events; it does not need to discover those items through an eventually-consistent workspace GSI. This selector is used by the authenticated real-time client after it receives a compact change notification.
 - **q**: case-insensitive search across event fields.
 
 Application-wide history has no dedicated GSI and is not paginated at the public response level in the current handler. Its cost and latency increase as the Activity table grows. This is a deliberate fit for the current small lab, not an unlimited-scale timeline design.

@@ -1011,7 +1011,7 @@ The handler currently filters and sorts after retrieving the selected index part
 - **itemId=<id>**: one item's history.
 - **rootParentId=<id>**: history for the root and relevant descendant records.
 - **parentId=<id>**: history for direct children of the parent.
-- **itemIds=<id1,id2,...>**: targeted reconciliation for 1–100 changed items. The handler queries the Activity table's `itemId` partition key for each ID and merges the resulting events; it does not need to discover those items through an eventually-consistent workspace GSI. This selector is used by the authenticated real-time client after it receives a compact change notification.
+- **itemIds=<id1,id2,...>**: targeted reconciliation for 1–100 changed items. The handler performs a strongly consistent query of the Activity table's `itemId` partition key for each ID and merges the resulting events; it does not need to discover those items through an eventually-consistent workspace GSI. This selector is used by the authenticated real-time client after it receives a compact change notification.
 - **q**: case-insensitive search across event fields.
 
 Application-wide history has no dedicated GSI and is not paginated at the public response level in the current handler. Its cost and latency increase as the Activity table grows. This is a deliberate fit for the current small lab, not an unlimited-scale timeline design.

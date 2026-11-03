@@ -3403,7 +3403,7 @@ async function ensureRootChildrenLoaded(rootParentId,{force=false}={}){
    const incoming=(result?.items||[]).map(item=>item?.id?item:toAppItem(item));
    const protectedRows=mergeRealtimeItemOverlays(incoming,item=>!['project','job'].includes(item.type)&&String(item.rootParentId||'')===rootId);
    data.children=mergeRootChildrenRows(data.children,rootId,protectedRows);
-   if(lastApiSnapshot)lastApiSnapshot.children=mergeRootChildrenRows(lastApiSnapshot.children,rootId,incoming);
+   if(lastApiSnapshot)lastApiSnapshot.children=mergeRootChildrenRows(lastApiSnapshot.children,rootId,protectedRows);
    invalidateHierarchyIndex();
    dataLoadState.childrenLoaded.add(rootId);
    dataLoadState.rootErrors.delete(`children:${rootId}`);

@@ -8,9 +8,9 @@ const helperEnd = html.indexOf('\nconst activityRefreshRequests=new Map();', hel
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'User-specific view-state helpers must exist.');
 const helperSource = html.slice(helperStart, helperEnd);
 
-assert.match(html, /const tokenStorage=\{\s*getItem:async key=>window\.localStorage\.getItem\(key\)/, 'Cognito tokens are stored explicitly through the browser localStorage adapter.');
-assert.doesNotMatch(html, /utils\.defaultStorage/, 'The AWS build does not silently inherit an SDK storage fallback that may be process-local.');
-assert.ok(html.includes('tokenStorageProbeKey') && html.includes('tokenStorageProbeValue') && html.includes('Browser localStorage did not retain the Cognito storage probe.'), 'Cognito startup verifies that browser storage can retain and read a value before session restoration.');
+assert.match(html, /const tokenStorage=utils\.defaultStorage/, 'Cognito uses Amplify’s documented persistent browser defaultStorage.');
+assert.ok(html.includes("typeof tokenStorage.clear!=='function'"), 'The supported Amplify storage interface is checked, including its clear operation.');
+assert.ok(html.includes('tokenStorageProbeKey') && html.includes('browserStorageProbe') && html.includes('Amplify defaultStorage is not backed by browser localStorage.'), 'Startup verifies the Amplify storage provider writes to browser localStorage before restoring a session.');
 assert.match(html, /CognitoIdentityServiceProvider\./, 'Existing sessionStorage Cognito tokens are migrated to persistent storage.');
 assert.doesNotMatch(html, /tokenStorage=utils\.sessionStorage/, 'A failed legacy-token migration cannot silently downgrade the active session to tab-scoped storage.');
 assert.ok(html.includes('migrationVerified') && html.includes('stored!==value'), 'Legacy Cognito tokens are removed from sessionStorage only after persistent-storage verification.');

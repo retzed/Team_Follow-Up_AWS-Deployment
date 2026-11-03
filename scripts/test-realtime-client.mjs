@@ -90,7 +90,7 @@ function createContext(overrides = {}) {
     refreshActivityFor: async (id, scope) => { calls.activityRefreshes.push([id, scope]); },
     refreshApplicationHistory: silent => { calls.applicationHistoryRefreshes.push(silent); },
     normalizeActivityEventForUi: event => event,
-    mergeActivityEventsIntoWorkspace: rows => { calls.activityMerged.push(rows); return rows.length > 0; },
+    mergeActivityEventsIntoWorkspace: rows => { calls.activityMerged.push(rows); data.activity = [...(data.activity || []), ...rows]; return rows.length > 0; },
     mergeActivityRows: (existing, incoming) => ({ rows: [...existing, ...incoming] }),
     updateApplicationHistoryFromCommittedEvents: rows => { calls.activityHistoryUpdates.push(rows); },
     renderAfterActivityRefresh: (id, scope) => { calls.activityRendered.push([id, scope]); },

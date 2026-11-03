@@ -17,6 +17,7 @@ assert.ok(authStart >= 0 && authEnd > authStart, 'Authenticated session restorat
 const authSource = html.slice(authStart, authEnd);
 assert.ok(authSource.indexOf('fetchAuthSession()') < authSource.indexOf('getCurrentUser()'),
   'Token refresh/session validation must run before reading the Cognito user.');
+assert.ok(authSource.includes("fetchAuthSession({forceRefresh:true})"), 'A missing access token triggers an explicit Cognito refresh-token attempt before the session is discarded.');
 assert.doesNotMatch(authSource, /fetchUserAttributes\(\);\s*\}catch/, 'Transient profile-attribute failures must not be silently converted to an unmapped user.');
 assert.ok(html.includes('id="signInRetrySession"') && html.includes('async function retrySessionRestoration()'),
   'A retry path must be available when a temporary auth/network error prevents session restoration.');
@@ -62,16 +63,20 @@ const initialUi = {
   accountSearchUser: 'all', expanded: new Set(['task-9', 'task-10']), modal: null
 };
 const storage = createMemoryStorage();
+const persistentStorage = createMemoryStorage();
 const listeners = {};
 const firstContext = {
   ui: initialUi,
   sessionStorage: storage,
+  localStorage: persistentStorage,
   window: { scrollY: 584, addEventListener: (name, callback) => { listeners[name] = callback; } },
   Set, Number, Math, JSON, String
 };
 vm.runInNewContext(helperSource + '\nthis.persistWorkspaceViewState=persistWorkspaceViewState;', firstContext);
 firstContext.persistWorkspaceViewState();
 assert.ok(storage.getItem('team-follow-up-view-state-v1:u2'), 'The page state is stored in the current browser tab session.');
+assert.ok(persistentStorage.getItem('team-follow-up-view-state-v1:u2'), 'A persistent per-user backup is stored as each view change is saved.');
+assert.ok(s.includes("for(const eventName of ['click','change','input'])window.addEventListener(eventName,scheduleWorkspaceViewStateSave,true);"), 'Normal navigation, filtering and search interactions schedule a view-state save before browser unload.');
 assert.equal(typeof listeners.pagehide, 'function', 'A pagehide save is registered for browser refresh/unload.');
 
 const refreshedUi = {
@@ -91,6 +96,7 @@ const refreshedUi = {
 const secondContext = {
   ui: refreshedUi,
   sessionStorage: storage,
+  localStorage: persistentStorage,
   window: { scrollY: 0, addEventListener() {} },
   Set, Number, Math, JSON, String
 };
@@ -107,7 +113,7 @@ assert.equal(refreshedUi.modal, null, 'A browser refresh does not reopen an unfi
 assert.equal(secondContext.restoredWorkspaceScrollY, 584);
 const otherUserUi = { ...refreshedUi, actingUserId: 'u3', page: 'account', selectedParentId: '' };
 const thirdContext = {
-  ui: otherUserUi, sessionStorage: storage,
+  ui: otherUserUi, sessionStorage: storage, localStorage: persistentStorage,
   window: { scrollY: 0, addEventListener() {} }, Set, Number, Math, JSON, String
 };
 vm.runInNewContext(helperSource + '\nthis.restoredWorkspaceScrollY=restoredWorkspaceScrollY;', thirdContext);
@@ -117,7 +123,8 @@ assert.equal(otherUserUi.selectedParentId, '');
 const clearContext = { ...secondContext, ui: refreshedUi };
 vm.runInNewContext(helperSource + '\nthis.clearView=window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE;', clearContext);
 clearContext.clearView();
-assert.equal(storage.getItem('team-follow-up-view-state-v1:u2'), null, 'Explicit sign-out can clear only the current user view state.');
+assert.equal(storage.getItem('team-follow-up-view-state-v1:u2'), null, 'Explicit sign-out clears the tab-scoped view state.');
+assert.equal(persistentStorage.getItem('team-follow-up-view-state-v1:u2'), null, 'Explicit sign-out also clears the persistent view-state backup.');
 
 if (html.includes('function initializeLocalAuth(){')) {
   assert.match(html, /sessionStorage\.getItem\(LOCAL_SESSION_KEY\)\|\|localStorage\.getItem\(LOCAL_SESSION_KEY\)/,

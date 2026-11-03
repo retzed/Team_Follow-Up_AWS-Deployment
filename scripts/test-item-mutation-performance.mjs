@@ -41,7 +41,7 @@ const data = { children: Array.from({ length: 40000 }, (_, index) => ({
   id: 'child-' + index, rootParentId: 'root-' + (index % 200)
 })) };
 const countContext = { data, hierarchyIndexRevision: 1, rootParent: () => null, Map, String };
-vm.runInNewContext(countSource + '\\nthis.loadedRootItemCounts=loadedRootItemCounts;', countContext);
+vm.runInNewContext(countSource + '\nthis.loadedRootItemCounts=loadedRootItemCounts;', countContext);
 const counts = countContext.loadedRootItemCounts();
 assert.equal(counts.size, 200);
 assert.equal(counts.get('root-0'), 200, 'the shared count index includes every loaded descendant for its root');

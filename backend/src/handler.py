@@ -997,28 +997,30 @@ def make_realtime_change(item, previous=None, affected_items=None, change_kind='
     affected = [dict(row) for row in (affected_items or []) if isinstance(row, dict)]
     descendant_assignees = []
     primary = dict(item or {})
-    item_id = str(primary.get('itemId') or primary.get('id') or '').strip()
-    item_type = str(primary.get('type') or '').strip()
-    if not affected and change_kind == 'updated' and item_id:
-        if item_type in ('project', 'job'):
-            descendants = query_descendant_rows(item_id)
+    primary_item_id = str(primary.get('itemId') or primary.get('id') or '').strip()
+    primary_item_type = str(primary.get('type') or '').strip()
+    if not affected and change_kind == 'updated' and primary_item_id:
+        if primary_item_type in ('project', 'job'):
+            descendants = query_descendant_rows(primary_item_id)
             descendant_assignees = [row for row in descendants if isinstance(row, dict) and not row.get('deletedAt')]
-        elif item_type == 'task':
-            descendants = query_children_rows(item_id)
+        elif primary_item_type == 'task':
+            descendants = query_children_rows(primary_item_id)
             descendant_assignees = [row for row in descendants if isinstance(row, dict) and not row.get('deletedAt')]
     candidates = [row for row in (previous, item, *affected) if isinstance(row, dict)]
-    root_ids, top_level_ids, parent_ids, assignee_ids = set(), set(), set(), set()
+    changed_item_ids, root_ids, top_level_ids, parent_ids, assignee_ids = set(), set(), set(), set(), set()
     for row in candidates:
-        item_id = str(row.get('itemId') or row.get('id') or '').strip()
-        item_type = str(row.get('type') or '').strip()
+        row_item_id = str(row.get('itemId') or row.get('id') or '').strip()
+        row_item_type = str(row.get('type') or '').strip()
         parent_id = str(row.get('parentId') or '').strip()
         root_id = str(row.get('rootParentId') or '').strip()
-        if item_type in ('project', 'job'):
-            root_id = root_id or item_id
-            if item_id:
-                top_level_ids.add(item_id)
-        if not root_id and item_id and item_type in ('project', 'job'):
-            root_id = item_id
+        if row_item_id:
+            changed_item_ids.add(row_item_id)
+        if row_item_type in ('project', 'job'):
+            root_id = root_id or row_item_id
+            if row_item_id:
+                top_level_ids.add(row_item_id)
+        if not root_id and row_item_id and row_item_type in ('project', 'job'):
+            root_id = row_item_id
         if root_id:
             root_ids.add(root_id)
         if parent_id:
@@ -1043,7 +1045,10 @@ def make_realtime_change(item, previous=None, affected_items=None, change_kind='
         'changeId': change_id,
         'changeType': 'items.changed',
         'changeKind': str(change_kind),
-        'itemId': item_id,
+        'itemId': primary_item_id,
+        'itemIds': sorted(changed_item_ids),
+        'itemType': primary_item_type,
+        'parentId': str(primary.get('parentId') or ''),
         'rootParentIds': sorted(root_ids),
         'topLevelIds': sorted(top_level_ids),
         'parentIds': sorted(parent_ids),
@@ -1072,6 +1077,9 @@ def public_realtime_change(row):
         'cursor': str(row.get('sortKey') or ''),
         'changeKind': str(row.get('changeKind') or 'updated'),
         'itemId': str(row.get('itemId') or ''),
+        'itemIds': list(row.get('itemIds') or ([str(row.get('itemId'))] if row.get('itemId') else [])),
+        'itemType': str(row.get('itemType') or ''),
+        'parentId': str(row.get('parentId') or ''),
         'rootParentIds': list(row.get('rootParentIds') or []),
         'topLevelIds': list(row.get('topLevelIds') or []),
         'parentIds': list(row.get('parentIds') or []),

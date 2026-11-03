@@ -1678,25 +1678,24 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
    setError(copy.loading);
    try{
     const version='6.20.0';
-    const [core,auth,cognitoAuth]=await Promise.all([
+    const [core,auth,cognitoAuth,utils]=await Promise.all([
      import('https://esm.sh/aws-amplify@'+version),
      import('https://esm.sh/aws-amplify@'+version+'/auth'),
-     import('https://esm.sh/aws-amplify@'+version+'/auth/cognito')
+     import('https://esm.sh/aws-amplify@'+version+'/auth/cognito'),
+     import('https://esm.sh/aws-amplify@'+version+'/utils')
     ]);
     state.modules={...auth};core.Amplify.configure({Auth:{Cognito:{userPoolId:cognito.userPoolId,userPoolClientId:cognito.userPoolClientId,loginWith:{username:true},allowGuestAccess:false}}});
-    // Use an explicit browser localStorage adapter so the Cognito session's
-    // persistence scope is unambiguous. Verify browser storage before restoring it.
-    const tokenStorage={
-     getItem:async key=>window.localStorage.getItem(key),
-     setItem:async(key,value)=>window.localStorage.setItem(key,String(value)),
-     removeItem:async key=>window.localStorage.removeItem(key)
-    };
+        // Amplify's documented defaultStorage is browser localStorage in web browsers.
+    // Keep the SDK implementation so the complete KeyValueStorage contract is retained.
+    const tokenStorage=utils.defaultStorage;
+    if(!tokenStorage||typeof tokenStorage.getItem!=='function'||typeof tokenStorage.setItem!=='function'||typeof tokenStorage.removeItem!=='function'||typeof tokenStorage.clear!=='function')throw new Error('Amplify persistent defaultStorage is unavailable.');
     const tokenStorageProbeKey='team-follow-up-cognito-storage-probe-v1';
     const tokenStorageProbeValue=String(Date.now())+'-'+Math.random().toString(36).slice(2);
-    try{
-     window.localStorage.setItem(tokenStorageProbeKey,tokenStorageProbeValue);
-     if(window.localStorage.getItem(tokenStorageProbeKey)!==tokenStorageProbeValue)throw new Error('Browser localStorage did not retain the Cognito storage probe.');
-    }finally{try{window.localStorage.removeItem(tokenStorageProbeKey);}catch(error){}}
+    await tokenStorage.setItem(tokenStorageProbeKey,tokenStorageProbeValue);
+    const tokenStorageProbe=await tokenStorage.getItem(tokenStorageProbeKey);
+    const browserStorageProbe=window.localStorage.getItem(tokenStorageProbeKey);
+    await tokenStorage.removeItem(tokenStorageProbeKey);
+    if(tokenStorageProbe!==tokenStorageProbeValue||browserStorageProbe!==tokenStorageProbeValue)throw new Error('Amplify defaultStorage is not backed by browser localStorage.');
     if(!tokenStorage||typeof tokenStorage.getItem!=='function'||typeof tokenStorage.setItem!=='function'||typeof tokenStorage.removeItem!=='function')throw new Error('Persistent Cognito token storage is unavailable.');
     try{
      const legacyStorage=window.sessionStorage;

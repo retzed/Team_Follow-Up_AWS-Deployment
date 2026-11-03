@@ -20,8 +20,8 @@ assert.ok(html.includes("case 'detail-tab':ui.tab=actionEl.dataset.tab;renderDet
 assert.match(html, /result\?\.activityEvents\|\|\[\]/, 'Archive restore response events must be retained even while a DynamoDB GSI is catching up.');
 
 const createEdit = fn('handleItemSubmit', 'clearParentFilters');
-assert.match(createEdit, /data\.activity\.push\(activityRecord\(item,`Created \$\{type\}: \$\{name\}`,'create',at\)\)/, 'Creating a project/job must record a create event.');
-assert.ok(createEdit.includes("action=`Updated ${changed.join(', ')} for ${item.type}: ${item.name}.`;data.activity.push(activityRecord(item,action,'update',item.updatedAt))"), 'Editing name/description/assignee/priority/due date/type must record an update event.');
+assert.match(createEdit, /const event=activityRecord\\(item,`Created \\$\\{type\\}: \\$\\{name\\}`,'create',at\\);data\\.activity\\.push\\(event\\)/, 'Creating a project/job must record a create event.');
+assert.ok(createEdit.includes("const updateEvent=activityRecord(item,`Updated ${changed.join(', ')} for ${item.type}: ${item.name}.`,'update',item.updatedAt);data.activity.push(updateEvent);mutationEvents.push(updateEvent)"), 'Editing name/description/assignee/priority/due date/type must record an update event.');
 assert.match(createEdit, /Status changed from \$\{statusName\(oldStatus,'en'\)\} to \$\{statusName\(item\.status,'en'\)\}/, 'Status changes must record a dedicated status event.');
 const deletion = fn('deleteItem', 'handleItemSubmit');
 assert.match(deletion, /const event=activityRecord\(item,`Deleted \$\{item\.type\}: \$\{item\.name\}`,'delete',deletedAt[\s\S]*?event\.affectedCount=doomedItems\.length;event\.affectedDescendantCount=affectedDescendantCount;[\s\S]*?data\.activity\.push\(event\)/, 'Deleting a hierarchy must record one summary event with item/descendant counts.');

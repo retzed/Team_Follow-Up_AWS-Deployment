@@ -2096,7 +2096,7 @@ function invalidateApplicationHistoryCache(){
  applicationHistoryEvents=[];applicationHistoryNextOffset=0;applicationHistoryTotal=0;
  applicationHistoryHasLoaded=false;applicationHistoryReady=false;applicationHistoryLoading=false;applicationHistoryError='';applicationHistorySearchFillActive=false;
  try{localStorage.setItem(APPLICATION_HISTORY_CACHE_KEY,JSON.stringify({version:1,invalidated:true,updatedAt:Date.now()}));}catch(error){console.warn('Could not invalidate application-wide Activity history.',error);}
- if(ui.modal?.kind==='global-history')setTimeout(()=>{if(ui.modal?.kind==='global-history')void refreshApplicationHistory(true);},0);
+ if(ui.modal?.kind==='global-history')setTimeout(()=>{if(ui.modal?.kind==='global-history'&&!applicationHistoryLoading&&!applicationHistoryPagePromise)void refreshApplicationHistory(false);},0);
 }
 function updateApplicationHistoryFromCommittedEvents(rows){
  const incoming=(rows||[]).map(normalizeActivityEventForUi).filter(event=>event&&event.id&&Number.isFinite(Date.parse(event.at))&&Date.parse(event.at)<=Date.now());

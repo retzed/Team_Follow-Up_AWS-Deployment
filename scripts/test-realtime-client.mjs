@@ -253,6 +253,40 @@ function createContext(overrides = {}) {
 }
 
 {
+  // This is the startup race: another user creates a Project after this
+  // client's bootstrap snapshot but just before its one-time ticket is issued.
+  // The ticket cursor is therefore newer than the create event; the one-minute
+  // durable-feed overlap must still deliver and insert the new parent.
+  const createdParent = {
+    id: 'project-created-during-bootstrap', type: 'project',
+    name: 'Created while another session loaded', ownerId: 'u2', version: 1
+  };
+  const changeCursor = '2026-11-03T10:00:10.000000Z#created-before-ticket';
+  const ticketCursor = '2026-11-03T10:00:15.000000Z#ticket-issued';
+  const { context, calls, data, ui } = createContext({
+    queryPages: [{
+      changes: [{
+        type: 'items.changed', changeId: 'parent-created-before-ticket',
+        cursor: changeCursor, itemId: createdParent.id, itemIds: [createdParent.id],
+        itemType: 'project', rootParentIds: [createdParent.id], topLevelIds: [createdParent.id],
+        parentIds: [], assigneeIds: ['u2'], deleted: false, version: 1
+      }],
+      nextCursor: changeCursor, hasMore: false
+    }],
+    resolvedItems: [createdParent]
+  });
+  vm.runInNewContext('realtimeRunning=true;realtimeCursor=' + JSON.stringify(ticketCursor) + ';', context);
+  await context.catchUpRealtimeChanges();
+  assert.ok(calls.queryCursors[0].startsWith('2026-11-03T09:59:15.000000Z#'),
+    'initial catch-up overlaps the ticket cursor so a parent created during bootstrap is not skipped');
+  assert.ok(data.parents.some(row => row.id === createdParent.id),
+    'a parent created between bootstrap and ticket issuance is merged into the active workspace');
+  assert.ok(ui.accountAssignedRows.some(row => row.id === createdParent.id),
+    'the concurrently-created parent also appears in Assigned Items for its assignee');
+  assert.ok(calls.parentRenders > 0, 'the created parent refreshes the open parent list');
+}
+
+{
   const { context, calls } = createContext();
   vm.runInNewContext('realtimeRunning=true;realtimeCursor="2026-11-02T12:30:00.123456Z#latest";', context);
   await context.catchUpRealtimeChanges();

@@ -19,7 +19,7 @@ assert.ok(authSource.indexOf('fetchAuthSession()') < authSource.indexOf('getCurr
 assert.doesNotMatch(authSource, /fetchUserAttributes\(\);\s*\}catch/, 'Transient profile-attribute failures must not be silently converted to an unmapped user.');
 assert.ok(html.includes('id="signInRetrySession"') && html.includes('async function retrySessionRestoration()'),
   'A retry path must be available when a temporary auth/network error prevents session restoration.');
-assert.match(html, /else if\(isDefinitiveSessionError\(error\)\)enterDefaultMode\(\);\s*else enterSessionRestoreMode\(\)/,
+assert.match(html, /else if\(isDefinitiveSessionError\((?:error|e)\)\)enterDefaultMode\(\);\s*else enterSessionRestoreMode\(\)/,
   'Only definitive expired/absent sessions return to the sign-in form; transient errors retain the session and expose retry.');
 
 const hydrationStart = html.indexOf('async function startWorkspaceHydration(){');

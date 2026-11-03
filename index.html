@@ -3800,8 +3800,8 @@ async function startWorkspaceHydration(){
   dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;
   if(!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0]?.id||'';
   invalidateActivityIndexes();skipNextSidebarApiRefresh=true;render();
-  if(restoredWorkspaceScrollY>0&&typeof requestAnimationFrame==='function')requestAnimationFrame(()=>window.scrollTo({top:restoredWorkspaceScrollY,left:0,behavior:'instant'}));
   if(hydratedUserTheme){ui.theme=hydratedUserTheme;applyTheme();}
+  if(restoredWorkspaceScrollY>0&&typeof requestAnimationFrame==='function')requestAnimationFrame(()=>window.scrollTo({top:restoredWorkspaceScrollY,left:0,behavior:'instant'}));
   if(ui.page==='account'){
    if(ui.accountTab==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();
    else if(ui.accountTab==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();

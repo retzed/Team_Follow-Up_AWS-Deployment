@@ -10,6 +10,7 @@ const helperSource = html.slice(helperStart, helperEnd);
 
 assert.match(html, /utils\.defaultStorage\|\|utils\.sessionStorage/, 'Cognito tokens use persistent browser storage when available.');
 assert.match(html, /CognitoIdentityServiceProvider\./, 'Existing sessionStorage Cognito tokens are migrated to persistent storage.');
+assert.ok(html.includes('window.sessionStorage.removeItem(key)'), 'Legacy Cognito tokens are removed from sessionStorage after migration so explicit sign-out cannot re-import them.');
 const authStart = html.indexOf('async function ensureAuthenticatedContext(){');
 const authEnd = html.indexOf('\n function finishVisualAuth(context){', authStart);
 assert.ok(authStart >= 0 && authEnd > authStart, 'Authenticated session restoration helper must exist.');
@@ -21,6 +22,8 @@ assert.ok(html.includes('id="signInRetrySession"') && html.includes('async funct
   'A retry path must be available when a temporary auth/network error prevents session restoration.');
 assert.match(html, /else if\(isDefinitiveSessionError\((?:error|e)\)\)enterDefaultMode\(\);\s*else enterSessionRestoreMode\(\)/,
   'Only definitive expired/absent sessions return to the sign-in form; transient errors retain the session and expose retry.');
+
+assert.ok(html.includes('window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE?.();'), 'Explicit sign-out clears the saved page state for the current team profile.');
 
 const hydrationStart = html.indexOf('async function startWorkspaceHydration(){');
 const hydrationEnd = html.indexOf('\n}', hydrationStart);

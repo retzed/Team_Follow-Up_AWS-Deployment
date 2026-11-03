@@ -1542,9 +1542,15 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  function resolveTeamUserId(attributes){const customName=String(cognito.teamUserAttribute||'custom:teamUserId');const custom=String(attributes?.[customName]||'').trim();return validIds.includes(custom)?custom:null;}
  async function getCognitoAccessToken(forceRefresh=false){
   if(!state.modules)throw new Error('Cognito is not configured');
-  let session=await state.modules.fetchAuthSession(forceRefresh?{forceRefresh:true}:{});
+  let session,refreshAttempted=forceRefresh;
+  try{session=await state.modules.fetchAuthSession(forceRefresh?{forceRefresh:true}:{});}
+  catch(error){
+   if(forceRefresh)throw error;
+   refreshAttempted=true;
+   session=await state.modules.fetchAuthSession({forceRefresh:true});
+  }
   let token=session?.tokens?.accessToken?.toString()||'';
-  if(!token&&!forceRefresh){
+  if(!token&&!refreshAttempted){
    session=await state.modules.fetchAuthSession({forceRefresh:true});
    token=session?.tokens?.accessToken?.toString()||'';
   }
@@ -1553,7 +1559,9 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  }
  async function ensureAuthenticatedContext(){
   // fetchAuthSession refreshes expired access/ID tokens when the refresh token is valid.
-  let session=await state.modules.fetchAuthSession();
+  let session;
+  try{session=await state.modules.fetchAuthSession();}
+  catch(error){session=await state.modules.fetchAuthSession({forceRefresh:true});}
   if(!session?.tokens?.accessToken)session=await state.modules.fetchAuthSession({forceRefresh:true});
   if(!session?.tokens?.accessToken)throw new Error('NO_VALID_SESSION');
   let current,attributes;
@@ -1699,7 +1707,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
        stored=await tokenStorage.getItem(key);
        if(stored!==value){migrationVerified=false;break;}
       }
-      if(migrationVerified)for(const [key,value] of legacyEntries)if(value!==null)legacyStorage.removeItem(key);
+      if(migrationVerified){for(const [key,value] of legacyEntries)if(value!==null)legacyStorage.removeItem(key);}
       else console.warn('Legacy Cognito token migration could not be verified; source tokens were retained and persistent storage remains configured.');
      }
     }catch(storageMigrationError){console.warn('Could not migrate legacy Cognito tokens; persistent storage remains configured and a tab-scoped fallback is disabled.',storageMigrationError);}

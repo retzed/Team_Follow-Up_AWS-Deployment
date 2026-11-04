@@ -3420,7 +3420,7 @@ async function reconcileWorkspaceAfterRestore(extraRootIds=[]){
  if(!Array.isArray(data.activity))data.activity=[];
  invalidateHierarchyIndex();invalidateActivityIndexes();
  dataLoadState.childrenLoaded.clear();dataLoadState.activityLoaded.clear();dataLoadState.rootErrors.clear();
- if(!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0]?.id||'';
+ // Selection was reconciled by exact ID after the complete bootstrap; do not override it here.
  const activeRoots=new Set([...previouslyLoadedChildren,String(ui.selectedParentId||'')].filter(id=>id&&data.parents.some(parent=>String(parent.id)===String(id))));
  const activityRoots=new Set([...previouslyLoadedActivity,String(ui.selectedParentId||'')].filter(id=>id&&data.parents.some(parent=>String(parent.id)===String(id))));
  lastApiSnapshot=copyWorkspace(data);

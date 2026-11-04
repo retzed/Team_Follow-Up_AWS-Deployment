@@ -18,13 +18,16 @@ const selectionHelperStart=html.indexOf('async function reconcileSelectedWorkspa
 const selectionHelperEnd=html.indexOf('async function startWorkspaceHydration(){',selectionHelperStart);
 check(selectionHelperStart>=0&&selectionHelperEnd>selectionHelperStart,'Restored parent reconciliation must exist before startup hydration.');
 const selectionHelper=html.slice(selectionHelperStart,selectionHelperEnd);
-const makeSelectionContext=(resolveItems)=>({
+const makeSelectionContext=(resolveItems)=>{
+ const context={
   ui:{selectedParentId:'project-page-two'},
   data:{parents:[{id:'newest-parent',type:'project'}]},
   window:{TeamFollowUpDataApi:{resolveItems}},
-  invalidateHierarchyIndex(){this.invalidated=true;},
   console:{warn(){}}
-});
+ };
+ context.invalidateHierarchyIndex=()=>{context.invalidated=true;};
+ return context;
+};
 const offPageSelection=makeSelectionContext(async ids=>({items:[{id:ids[0],type:'job',name:'Saved parent'}]}));
 vm.runInNewContext(selectionHelper+'\\nthis.reconcile=reconcileSelectedWorkspaceParent;',offPageSelection);
 assert.equal(await offPageSelection.reconcile(),'present','A saved parent omitted from the list is resolved by ID before any fallback is allowed.');

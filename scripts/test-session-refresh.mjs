@@ -58,8 +58,8 @@ assert.ok(html.includes("else if(ui.accountTab==='pinned'&&!ui.accountPinnedLoad
 assert.ok(html.includes('restoredWorkspaceScrollY>0') && html.includes('window.scrollTo({top:restoredWorkspaceScrollY'),
   'The current scroll position is restored after the data refresh.');
 
-const createMemoryStorage = () => {
-  const map = new Map();
+const createMemoryStorage = (initial = []) => {
+  const map = new Map(initial);
   return {
     map,
     getItem: key => map.has(String(key)) ? map.get(String(key)) : null,
@@ -67,93 +67,152 @@ const createMemoryStorage = () => {
     removeItem: key => map.delete(String(key))
   };
 };
-const initialUi = {
-  actingUserId: 'u2', page: 'workspace', sidebarCollapsed: false, sidebarMode: 'search',
-  selectedParentId: 'project-42', selectedAssignedItemId: 'task-9', tab: 'activity',
-  parentQuery: 'network', parentType: 'project', parentStatus: 'in-progress',
-  parentDateMode: 'updated', parentDateFrom: '2026-10-01', parentDateTo: '2026-11-03',
-  childQuery: 'review', childType: 'task', childStatus: 'all', childPriority: 'high',
-  childDateMode: 'created', childDateFrom: '', childDateTo: '', childScope: 'all',
-  childSearchExpanded: true, accountTab: 'pinned', accountAssignedQuery: '',
-  accountAssignedType: 'all', accountAssignedStatus: 'all', accountAssignedPriority: 'all',
-  accountAssignedDateMode: 'updated', accountAssignedDateFrom: '', accountAssignedDateTo: '',
-  accountSearchQuery: '', accountSearchType: 'all', accountSearchStatus: 'all',
-  accountSearchDateMode: 'updated', accountSearchDateFrom: '', accountSearchDateTo: '',
-  accountSearchUser: 'all', expanded: new Set(['task-9', 'task-10']), modal: null
-};
-const storage = createMemoryStorage();
-const persistentStorage = createMemoryStorage();
-const listeners = {};
-const firstContext = {
-  ui: initialUi,
-  sessionStorage: storage,
-  localStorage: persistentStorage,
-  window: { scrollY: 584, addEventListener: (name, callback) => { listeners[name] = callback; } },
-  Set, Number, Math, JSON, String
-};
-vm.runInNewContext(helperSource + '\nthis.persistWorkspaceViewState=persistWorkspaceViewState;', firstContext);
+function createUi(overrides = {}) {
+  return {
+    actingUserId: 'u2', page: 'account', sidebarCollapsed: true, sidebarMode: 'search',
+    selectedParentId: '', selectedAssignedItemId: null, tab: 'overview',
+    parentQuery: '', parentType: 'all', parentStatus: 'all', parentDateMode: 'updated',
+    parentDateFrom: '', parentDateTo: '', childQuery: '', childType: 'all', childStatus: 'all',
+    childPriority: 'all', childDateMode: 'updated', childDateFrom: '', childDateTo: '',
+    childScope: 'all', childSearchExpanded: false, accountTab: 'assigned',
+    accountAssignedQuery: '', accountAssignedType: 'all', accountAssignedStatus: 'all',
+    accountAssignedPriority: 'all', accountAssignedDateMode: 'updated',
+    accountAssignedDateFrom: '', accountAssignedDateTo: '', accountSearchQuery: '',
+    accountSearchType: 'all', accountSearchStatus: 'all', accountSearchDateMode: 'updated',
+    accountSearchDateFrom: '', accountSearchDateTo: '', accountSearchUser: 'all',
+    expanded: new Set(), modal: { kind: 'edit' }, ...overrides
+  };
+}
+function createViewContext(ui, tabStorage, browserStorage, scrollY = 0) {
+  const listeners = {};
+  const context = {
+    ui, sessionStorage: tabStorage, localStorage: browserStorage,
+    window: { scrollY, addEventListener: (name, callback) => { listeners[name] = callback; } },
+    Set, Number, Math, JSON, String, encodeURIComponent, console
+  };
+  vm.runInNewContext(
+    helperSource + '\nthis.persistWorkspaceViewState=persistWorkspaceViewState;this.clearView=window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE;',
+    context
+  );
+  return { ...context, listeners };
+}
+const browserStorage = createMemoryStorage();
+// This is the stale shared view written by older releases. It must never be a
+// fallback when a newly opened tab has no sessionStorage snapshot of its own.
+const staleSharedView = JSON.stringify({
+  version: 1, page: 'workspace',
+  values: { selectedParentId: 'old-shared-project', tab: 'activity', parentQuery: 'stale shared tab' },
+  expanded: ['old-shared-task'], scrollY: 999
+});
+browserStorage.setItem('team-follow-up-view-state-v1:u2', staleSharedView);
+const tabAStorage = createMemoryStorage();
+const tabAUi = createUi({
+  page: 'workspace', sidebarCollapsed: false, selectedParentId: 'project-42',
+  selectedAssignedItemId: 'task-9', tab: 'activity', parentQuery: 'network',
+  parentType: 'project', parentStatus: 'in-progress', parentDateMode: 'updated',
+  parentDateFrom: '2026-10-01', parentDateTo: '2026-11-03', childQuery: 'review',
+  childType: 'task', childPriority: 'high', childDateMode: 'created',
+  childSearchExpanded: true, accountTab: 'pinned',
+  expanded: new Set(['task-9', 'task-10']), modal: null
+});
+const firstContext = createViewContext(tabAUi, tabAStorage, browserStorage, 584);
 firstContext.persistWorkspaceViewState();
-assert.ok(storage.getItem('team-follow-up-view-state-v1:u2'), 'The page state is stored in the current browser tab session.');
-assert.ok(persistentStorage.getItem('team-follow-up-view-state-v1:u2'), 'A persistent per-user backup is stored as each view change is saved.');
-assert.ok(html.includes("for(const eventName of ['click','change','input'])window.addEventListener(eventName,scheduleWorkspaceViewStateSave,true);"), 'Normal navigation, filtering and search interactions schedule a view-state save before browser unload.');
-assert.equal(typeof listeners.pagehide, 'function', 'A pagehide save is registered for browser refresh/unload.');
+const tabAKey = 'team-follow-up-tab-view-state-v2:u2';
+assert.ok(tabAStorage.getItem(tabAKey), 'The active view is stored in this tab session. New tab view state uses the v2 namespace.');
+assert.equal(browserStorage.getItem(tabAKey), null, 'View state is never written to browser-wide localStorage.');
+assert.equal(browserStorage.getItem('team-follow-up-view-state-v1:u2'), staleSharedView,
+  'Saving one tab does not overwrite or remove another tab’s legacy shared-storage data.');
+assert.equal(typeof firstContext.listeners.pagehide, 'function', 'A pagehide save is registered for hard refresh/unload.');
+assert.ok(helperSource.includes('sessionStorage.setItem') && helperSource.includes('sessionStorage.getItem'),
+  'The tab view store uses sessionStorage for both save and restore.');
+assert.doesNotMatch(helperSource, /localStorage/,
+  'The view-state helper does not read, write, or clear browser-wide localStorage.');
+assert.ok(html.includes("for(const eventName of ['click','change','input'])window.addEventListener(eventName,scheduleWorkspaceViewStateSave,true);"),
+  'Normal navigation, filtering and search interactions schedule a view-state save before browser unload.');
 
-const refreshedUi = {
-  actingUserId: 'u2', page: 'account', sidebarCollapsed: true, sidebarMode: 'search',
-  selectedParentId: '', selectedAssignedItemId: null, tab: 'overview',
-  parentQuery: '', parentType: 'all', parentStatus: 'all', parentDateMode: 'updated',
-  parentDateFrom: '', parentDateTo: '', childQuery: '', childType: 'all', childStatus: 'all',
-  childPriority: 'all', childDateMode: 'updated', childDateFrom: '', childDateTo: '',
-  childScope: 'all', childSearchExpanded: false, accountTab: 'assigned',
-  accountAssignedQuery: '', accountAssignedType: 'all', accountAssignedStatus: 'all',
-  accountAssignedPriority: 'all', accountAssignedDateMode: 'updated',
-  accountAssignedDateFrom: '', accountAssignedDateTo: '', accountSearchQuery: '',
-  accountSearchType: 'all', accountSearchStatus: 'all', accountSearchDateMode: 'updated',
-  accountSearchDateFrom: '', accountSearchDateTo: '', accountSearchUser: 'all',
-  expanded: new Set(), modal: { kind: 'edit' }
-};
-const secondContext = {
-  ui: refreshedUi,
-  sessionStorage: storage,
-  localStorage: persistentStorage,
-  window: { scrollY: 0, addEventListener() {} },
-  Set, Number, Math, JSON, String
-};
-vm.runInNewContext(helperSource + '\nthis.restoredWorkspaceScrollY=restoredWorkspaceScrollY;', secondContext);
-assert.equal(refreshedUi.page, 'workspace');
-assert.equal(refreshedUi.selectedParentId, 'project-42');
-assert.equal(refreshedUi.selectedAssignedItemId, 'task-9');
-assert.equal(refreshedUi.tab, 'activity');
-assert.equal(refreshedUi.parentQuery, 'network');
-assert.equal(refreshedUi.childPriority, 'high');
-assert.equal(refreshedUi.accountTab, 'pinned');
-assert.deepEqual([...refreshedUi.expanded], ['task-9', 'task-10']);
-assert.equal(refreshedUi.modal, null, 'A browser refresh does not reopen an unfinished modal.');
-assert.equal(secondContext.restoredWorkspaceScrollY, 584);
-const fallbackSessionStorage = createMemoryStorage();
-const fallbackUi = { ...refreshedUi, page: 'account', selectedParentId: '', selectedAssignedItemId: null, tab: 'overview', expanded: new Set() };
-const fallbackContext = {
-  ui: fallbackUi, sessionStorage: fallbackSessionStorage, localStorage: persistentStorage,
-  window: { scrollY: 0, addEventListener() {} }, Set, Number, Math, JSON, String
-};
-vm.runInNewContext(helperSource + '\nthis.restoredWorkspaceScrollY=restoredWorkspaceScrollY;', fallbackContext);
-assert.equal(fallbackUi.page, 'workspace', 'Persistent view state restores the last opened application page when tab-scoped state is unavailable.');
-assert.equal(fallbackUi.selectedParentId, 'project-42', 'Persistent view state restores the selected parent.');
-assert.equal(fallbackUi.tab, 'activity', 'Persistent view state restores the open detail tab.');
-const otherUserUi = { ...refreshedUi, actingUserId: 'u3', page: 'account', selectedParentId: '' };
-const thirdContext = {
-  ui: otherUserUi, sessionStorage: storage, localStorage: persistentStorage,
-  window: { scrollY: 0, addEventListener() {} }, Set, Number, Math, JSON, String
-};
-vm.runInNewContext(helperSource + '\nthis.restoredWorkspaceScrollY=restoredWorkspaceScrollY;', thirdContext);
-assert.equal(otherUserUi.page, 'account', 'View state is isolated per signed-in team profile.');
+// A second tab in the same browser profile has a separate sessionStorage area.
+// Its missing snapshot must leave the default view intact instead of inheriting
+// the old localStorage snapshot saved by another tab.
+const tabBStorage = createMemoryStorage();
+const tabBUi = createUi();
+const tabBContext = createViewContext(tabBUi, tabBStorage, browserStorage);
+assert.equal(tabBUi.page, 'account', 'A new tab starts on its own default page.');
+assert.equal(tabBUi.selectedParentId, '', 'A new tab does not inherit another tab’s selected item.');
+assert.equal(tabBUi.parentQuery, '', 'A new tab does not inherit another tab’s filters.');
+assert.equal(tabBUi.tab, 'overview');
+tabBUi.page = 'workspace';
+tabBUi.selectedParentId = 'project-88';
+tabBUi.tab = 'overview';
+tabBUi.parentQuery = 'firewall';
+tabBUi.childPriority = 'urgent';
+tabBUi.expanded = new Set(['task-88']);
+tabBContext.persistWorkspaceViewState();
+assert.ok(tabBStorage.getItem(tabAKey), 'Tab B saves its view to its own sessionStorage.');
+assert.notEqual(tabAStorage.getItem(tabAKey), null, 'Tab A’s saved state remains intact after Tab B saves.');
+assert.equal(browserStorage.getItem(tabAKey), null, 'Tab B also avoids browser-wide view storage.');
+
+// A hard refresh of Tab A restores Tab A’s complete view, despite Tab B having
+// a different current view in the same browser profile.
+const refreshedTabAUi = createUi();
+const refreshedTabAContext = createViewContext(refreshedTabAUi, tabAStorage, browserStorage);
+assert.equal(refreshedTabAUi.page, 'workspace');
+assert.equal(refreshedTabAUi.selectedParentId, 'project-42');
+assert.equal(refreshedTabAUi.selectedAssignedItemId, 'task-9');
+assert.equal(refreshedTabAUi.tab, 'activity');
+assert.equal(refreshedTabAUi.parentQuery, 'network');
+assert.equal(refreshedTabAUi.parentStatus, 'in-progress');
+assert.equal(refreshedTabAUi.childPriority, 'high');
+assert.equal(refreshedTabAUi.accountTab, 'pinned');
+assert.deepEqual([...refreshedTabAUi.expanded], ['task-9', 'task-10']);
+assert.equal(refreshedTabAUi.modal, null, 'A browser refresh does not reopen an unfinished modal.');
+assert.equal(refreshedTabAUi.parentQuery, 'network');
+assert.notEqual(tabBStorage.getItem(tabAKey), null,
+  'Tab B retains its separate snapshot while Tab A is refreshed.');
+
+// A hard refresh of Tab B restores only its own independently saved view.
+const refreshedTabBUi = createUi();
+createViewContext(refreshedTabBUi, tabBStorage, browserStorage);
+assert.equal(refreshedTabBUi.page, 'workspace');
+assert.equal(refreshedTabBUi.selectedParentId, 'project-88');
+assert.equal(refreshedTabBUi.tab, 'overview');
+assert.equal(refreshedTabBUi.parentQuery, 'firewall');
+assert.equal(refreshedTabBUi.childPriority, 'urgent');
+assert.deepEqual([...refreshedTabBUi.expanded], ['task-88']);
+
+// Existing per-tab v1 snapshots remain usable, but old browser-wide snapshots
+// are deliberately ignored. The next successful save migrates this tab only.
+const legacyTabStorage = createMemoryStorage([[
+  'team-follow-up-view-state-v1:u2',
+  JSON.stringify({
+    version: 1, page: 'workspace',
+    values: { selectedParentId: 'legacy-tab-project', tab: 'activity', parentQuery: 'legacy tab only' },
+    expanded: ['legacy-task'], scrollY: 246
+  })
+]]);
+const legacyTabUi = createUi();
+const legacyTabContext = createViewContext(legacyTabUi, legacyTabStorage, browserStorage);
+assert.equal(legacyTabUi.selectedParentId, 'legacy-tab-project');
+assert.equal(legacyTabUi.parentQuery, 'legacy tab only');
+legacyTabContext.persistWorkspaceViewState();
+assert.ok(legacyTabStorage.getItem(tabAKey), 'A legacy tab snapshot is migrated to the new session-only key after saving.');
+assert.equal(legacyTabStorage.getItem('team-follow-up-view-state-v1:u2'), null,
+  'The migrated legacy snapshot is removed from this tab only.');
+
+// A different team identity in this tab has a separate view key and must not
+// restore the previous identity's filters or selection.
+browserStorage.setItem('team-follow-up-view-state-v1:u3', staleSharedView);
+const otherUserUi = createUi({ actingUserId: 'u3' });
+createViewContext(otherUserUi, createMemoryStorage(), browserStorage);
+assert.equal(otherUserUi.page, 'account');
 assert.equal(otherUserUi.selectedParentId, '');
 
-const clearContext = { ...secondContext, ui: refreshedUi };
-vm.runInNewContext(helperSource + '\nthis.clearView=window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE;', clearContext);
-clearContext.clearView();
-assert.equal(storage.getItem('team-follow-up-view-state-v1:u2'), null, 'Explicit sign-out clears the tab-scoped view state.');
-assert.equal(persistentStorage.getItem('team-follow-up-view-state-v1:u2'), null, 'Explicit sign-out also clears the persistent view-state backup.');
+// Explicit sign-out clears only this tab’s view snapshot; another tab's state
+// and browser-wide authentication/data storage are not modified.
+refreshedTabAContext.clearView();
+assert.equal(tabAStorage.getItem(tabAKey), null, 'Sign-out clears the current tab’s v2 view snapshot.');
+assert.notEqual(tabBStorage.getItem(tabAKey), null, 'Sign-out in Tab A does not clear Tab B’s view snapshot.');
+assert.equal(browserStorage.getItem('team-follow-up-view-state-v1:u2'), staleSharedView,
+  'Clearing a tab view does not mutate browser-wide localStorage.');
 
 if (html.includes('function initializeLocalAuth(){')) {
   assert.match(html, /sessionStorage\.getItem\(LOCAL_SESSION_KEY\)\|\|localStorage\.getItem\(LOCAL_SESSION_KEY\)/,

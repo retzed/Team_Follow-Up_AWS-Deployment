@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const html = await readFile('index.html', 'utf8');
-const helperStart = html.indexOf("const WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-view-state-v1:';");
+const helperStart = html.indexOf("const WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-view-state-v2:';");
 const helperEnd = html.indexOf('\nconst activityRefreshRequests=new Map();', helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'User-specific view-state helpers must exist.');
 const helperSource = html.slice(helperStart, helperEnd);

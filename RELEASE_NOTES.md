@@ -1,5 +1,12 @@
 # Release notes
 
+## 4 November 2026 — Preserve selected workspace item on refresh
+
+- Removed the startup check that compared the restored selection with the intentionally empty pre-hydration AWS data set.
+- Retain the selected Project or Job during bootstrap; validate it after parent records finish loading and use a fallback only when the saved item is genuinely absent.
+- Added a regression assertion preventing empty-startup data from clearing the saved selection.
+- Frontend-only change. No API, Lambda, DynamoDB, IAM, Cognito, or Amplify configuration changes are required.
+
 ## 4 November 2026 — Cognito browser session with isolated per-tab views
 
 - Cognito tokens remain in verified browser-profile `localStorage`; all same-origin tabs continue to share the browser session and synchronize account changes/sign-out.

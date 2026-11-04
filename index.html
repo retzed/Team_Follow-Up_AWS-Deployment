@@ -1514,6 +1514,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   }catch(error){console.warn('Could not clear the current browser profile Cognito tokens.',error);}
  }
  function showBrowserSessionSignIn(message=''){
+  if(typeof window.__TEAM_FOLLOW_UP_APP_AUTH_SIGNED_OUT==='function')window.__TEAM_FOLLOW_UP_APP_AUTH_SIGNED_OUT();
   if(window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE)window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE();
   window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;
   state.submitting=false;
@@ -4020,6 +4021,7 @@ if(!data.parents.some(p=>p.id===ui.selectedParentId))ui.selectedParentId=data.pa
 setSignInState(Boolean(sessionUserIdAtLoad));
 render();
 window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;stopRealtimeNotifications();ui.actingUserId=context.teamUserId;ui.page='account';ui.accountTab='assigned';ui.accountLoading=true;ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedRows=[];ui.accountPinnedRows=[];render();void startWorkspaceHydration();startRealtimeNotifications();};
+window.__TEAM_FOLLOW_UP_APP_AUTH_SIGNED_OUT=()=>{stopRealtimeNotifications();};
 document.documentElement.classList.remove('auth-pending','app-booting');
 void startWorkspaceHydration();
 startRealtimeNotifications();

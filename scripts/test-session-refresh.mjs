@@ -51,8 +51,15 @@ assert.ok(hydrationStart >= 0 && hydrationEnd > hydrationStart, 'Workspace data 
 const hydrationHeader = html.slice(hydrationStart, hydrationStart + 900);
 assert.doesNotMatch(hydrationHeader, /ui\.page='account';\s*ui\.accountTab='assigned'/,
   'Data refresh must not force the user back to Profile > Assigned Items.');
-assert.match(html, /if\(!ui\.selectedParentId&&data\.parents\.length\)[\s\S]*?meta\.done===true/,
-  'Progressive bootstrap must preserve a selected parent until the complete parent set has been checked.');
+assert.ok(html.includes("if(!ui.selectedParentId&&data.parents.length)ui.selectedParentId=data.parents[0].id;"),
+  'Only an empty selection may take the first available parent during progressive bootstrap.');
+assert.ok(html.includes("const restoredParentState=await reconcileSelectedWorkspaceParent();") &&
+          html.includes("restoredParentState==='missing'"),
+  'The saved parent is verified by exact ID after bootstrap; only a confirmed missing item may use the fallback.');
+assert.doesNotMatch(html, /if\(!data\.parents\.some\(parent=>String\(parent\.id\)===String\(ui\.selectedParentId\)\)\)ui\.selectedParentId=data\.parents\[0\]\?\.id\|\|'';/,
+  'No final hydration block may override an unresolved or successfully restored parent selection.');
+assert.ok(html.includes("const selectedParentId=String(ui.selectedParentId||'');const parent=data.parents.find(p=>String(p.id)===selectedParentId);"),
+  'Detail rendering must compare normalized parent IDs and must not silently select the first item for a non-empty saved ID.');
 assert.doesNotMatch(html, /if\(!data\.parents\.some\(p=>p\.id===ui\.selectedParentId\)\)ui\.selectedParentId=data\.parents\[0\]\?\.id\|\|'';/,
   'AWS startup must not clear the restored selection against its intentionally empty initial data set.');
 assert.ok(html.includes("if(!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0]?.id||'';"),

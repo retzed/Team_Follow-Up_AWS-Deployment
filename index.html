@@ -4042,7 +4042,7 @@ async function startWorkspaceHydration(){
   try{const meResponse=await window.TeamFollowUpDataApi.getMyProfile();if(hydrationRun!==workspaceHydrationGeneration)return;if(meResponse?.user){const profile=mergeProfileIntoData(meResponse.user,{preserveExistingTranslations:true});if(profile?.preferences){if(['en','ar'].includes(profile.preferences.lang))ui.lang=profile.preferences.lang;if(['light','dark'].includes(profile.preferences.theme))hydratedUserTheme=profile.preferences.theme;}}}catch(profileError){ui.accountError=String(profileError?.message||tr('accountError'));}
   ui.accountLoading=false;lastApiSnapshot=copyWorkspace(data);
   dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;
-  if(!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0]?.id||'';
+  // The restored parent was already reconciled by exact ID; preserve it through final rendering.
   invalidateActivityIndexes();skipNextSidebarApiRefresh=true;render();
   if(hydratedUserTheme){ui.theme=hydratedUserTheme;applyTheme();}
   if(restoredWorkspaceScrollY>0&&typeof requestAnimationFrame==='function')requestAnimationFrame(()=>window.scrollTo({top:restoredWorkspaceScrollY,left:0,behavior:'instant'}));

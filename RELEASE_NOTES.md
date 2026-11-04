@@ -1,5 +1,12 @@
 # Release notes
 
+## 4 November 2026 — Default to the most recently updated Project/Job
+
+- A new tab with no saved selection now opens the top-level Project/Job with the greatest `updatedAt` timestamp, independently of API response order or item creation order.
+- A valid selection already saved in the current tab remains unchanged on refresh. A confirmed-deleted parent uses the same most-recently-updated fallback.
+- Added a regression case where the last-created item is not the last-updated item and where a newer Task must not be selected as the workspace root.
+- Frontend-only change; no API, Lambda, DynamoDB, IAM, Cognito, or Amplify configuration changes.
+
 ## 4 November 2026 — Retain the selected parent through refresh reconciliation
 
 - Parent and Assigned/Pinned child navigation now writes the current tab snapshot immediately.

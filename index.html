@@ -1464,7 +1464,8 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  const cfg=window.TEAM_FOLLOW_UP_CONFIG||{};
  const cognito=cfg.cognito||{};
  const validIds=['u1','u2','u3','u4','u5','u6','root'];
- const state={modules:null,mode:'signIn',pendingUser:'',nextStep:null,appStarted:false,submitting:false};
+ const state={modules:null,mode:'signIn',pendingUser:'',nextStep:null,appStarted:false,submitting:false,browserSessionSyncTimer:null,browserSessionSyncRunning:false,browserSessionSyncPending:false};
+ const COGNITO_STORAGE_PREFIX='CognitoIdentityServiceProvider.'+String(cognito.userPoolClientId||'')+'.';
 
  screen.hidden=false;screen.lang=root.lang;screen.dir=root.dir;
  const ar=root.lang==='ar';
@@ -1501,6 +1502,70 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  function isDefinitiveSessionError(error){
   const name=String(error?.name||''),message=String(error?.message||'');
   return message==='NO_VALID_SESSION'||/UserUnAuthenticatedException|InvalidRefreshTokenException|RefreshTokenReuseException|NotAuthorizedException/.test(name);
+ }
+ function clearCurrentBrowserCognitoTokens(){
+  try{
+   const storage=window.localStorage,keys=[];
+   for(let i=0;i<storage.length;i++){
+    const key=storage.key(i);
+    if(typeof key==='string'&&key.startsWith(COGNITO_STORAGE_PREFIX))keys.push(key);
+   }
+   for(const key of keys)storage.removeItem(key);
+  }catch(error){console.warn('Could not clear the current browser profile Cognito tokens.',error);}
+ }
+ function showBrowserSessionSignIn(message=''){
+  if(window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE)window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE();
+  window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;
+  state.submitting=false;
+  const app=$('app');
+  root.classList.add('auth-pending');
+  document.body.classList.add('signin-open');
+  if(app){app.inert=true;app.setAttribute('aria-hidden','true');}
+  screen.hidden=false;enterDefaultMode();
+  $('signInUsername').value='';$('signInPassword').value='';
+  if(message)setError(message);
+  $('signInUsername').focus({preventScroll:true});
+ }
+ function isCognitoStorageEvent(event){
+  if(!event)return false;
+  if(event.storageArea&&event.storageArea!==window.localStorage)return false;
+  if(event.key===null)return event.newValue===null;
+  return typeof event.key==='string'&&event.key.startsWith(COGNITO_STORAGE_PREFIX);
+ }
+ async function synchronizeBrowserSession(){
+  if(!state.modules)return;
+  if(state.browserSessionSyncRunning){state.browserSessionSyncPending=true;return;}
+  state.browserSessionSyncRunning=true;
+  try{
+   const context=await ensureAuthenticatedContext();
+   const activeUserId=String(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||'');
+   if(activeUserId!==String(context.teamUserId||''))finishVisualAuth(context);
+   else window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=context;
+  }catch(error){
+   if(error?.message==='TEAM_PROFILE_NOT_MAPPED'){
+    try{await state.modules.signOut();}catch(_error){clearCurrentBrowserCognitoTokens();}
+    showBrowserSessionSignIn(copy.notLinked);
+   }else if(isDefinitiveSessionError(error))showBrowserSessionSignIn();
+   else{
+    console.warn('Could not synchronize the Cognito session from another browser tab; the current authenticated view was retained.',error);
+    if(!window.__TEAM_FOLLOW_UP_AUTH_CONTEXT)enterSessionRestoreMode();
+   }
+  }finally{
+   state.browserSessionSyncRunning=false;
+   if(state.browserSessionSyncPending){state.browserSessionSyncPending=false;queueBrowserSessionSync();}
+  }
+ }
+ function queueBrowserSessionSync(){
+  if(!state.modules)return;
+  if(state.browserSessionSyncTimer!==null)clearTimeout(state.browserSessionSyncTimer);
+  state.browserSessionSyncTimer=setTimeout(()=>{
+   state.browserSessionSyncTimer=null;
+   void synchronizeBrowserSession();
+  },120);
+ }
+ function handleBrowserSessionStorageEvent(event){
+  if(!isCognitoStorageEvent(event))return;
+  queueBrowserSessionSync();
  }
  function setChallengeField(label,placeholder,opts={}){
   const input=$('signInChallengeInput');$('signInChallengeField').hidden=false;$('signInChallengeLabel').textContent=label;input.placeholder=placeholder;input.type=opts.type||'text';input.autocomplete=opts.autocomplete||'one-time-code';input.inputMode=opts.inputMode||'text';input.required=true;input.value='';
@@ -1648,11 +1713,14 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   }
  }
  async function signOut(){
-  window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE?.();
-   const app=$('app');root.classList.add('auth-pending');document.body.classList.add('signin-open');app.inert=true;app.setAttribute('aria-hidden','true');screen.hidden=false;enterDefaultMode();$('signInUsername').value='';$('signInPassword').value='';
-   try{await state.modules?.signOut({global:true});}catch(error){try{await state.modules?.signOut();}catch(_error){}}
-   window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;$('signInUsername').focus({preventScroll:true});
+  showBrowserSessionSignIn();
+  try{await state.modules?.signOut();}
+  catch(error){
+   console.warn('Cognito local sign-out did not complete cleanly; clearing only this browser app-client session.',error);
+   clearCurrentBrowserCognitoTokens();
   }
+  window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;
+ }
   window.TeamFollowUpAuth={signOut,async getAccessToken(options={}){return getCognitoAccessToken(options?.forceRefresh===true);},async authenticatedFetch(path,init={}){
   
   const base=String(cfg.apiBaseUrl||'');if(!/^https:\/\//i.test(base)||/REPLACE|YOUR_|<|>/i.test(base))throw new Error('API_BASE_URL is not configured for HTTPS.');
@@ -1717,7 +1785,11 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
       else console.warn('Legacy Cognito token migration could not be verified; source tokens were retained and persistent storage remains configured.');
      }
     }catch(storageMigrationError){console.warn('Could not migrate legacy Cognito tokens; persistent storage remains configured and a tab-scoped fallback is disabled.',storageMigrationError);}
-    cognitoAuth.cognitoUserPoolsTokenProvider.setKeyValueStorage(tokenStorage);$('signInSubmit').disabled=false;setError('');
+    cognitoAuth.cognitoUserPoolsTokenProvider.setKeyValueStorage(tokenStorage);
+    // Cognito's localStorage token namespace is the browser-profile session.
+    // Other same-origin tabs revalidate after that namespace changes.
+    window.addEventListener('storage',handleBrowserSessionStorageEvent);
+    $('signInSubmit').disabled=false;setError('');
     try{const context=await ensureAuthenticatedContext();finishVisualAuth(context);}
     catch(error){
      if(error?.message==='TEAM_PROFILE_NOT_MAPPED'){try{await state.modules.signOut();}catch(_){}enterDefaultMode();setError(copy.notLinked);}

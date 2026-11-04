@@ -100,7 +100,8 @@ vm.runInNewContext(
   `const COGNITO_STORAGE_PREFIX = 'CognitoIdentityServiceProvider.test-client.';
    ${syncSource}
    this.handleStorage = handleBrowserSessionStorageEvent;
-   this.flushSession = synchronizeBrowserSession;`,
+   this.flushSession = synchronizeBrowserSession;
+   this.clearBrowserTokens = clearCurrentBrowserCognitoTokens;`,
   sandbox,
   { timeout: 10000 }
 );

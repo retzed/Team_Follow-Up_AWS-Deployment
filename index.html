@@ -1515,7 +1515,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  }
  function showBrowserSessionSignIn(message=''){
   if(typeof window.__TEAM_FOLLOW_UP_APP_AUTH_SIGNED_OUT==='function')window.__TEAM_FOLLOW_UP_APP_AUTH_SIGNED_OUT();
-  if(window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE)window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE();
+  window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE?.();
   window.__TEAM_FOLLOW_UP_AUTH_CONTEXT=null;
   state.submitting=false;
   const app=$('app');

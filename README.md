@@ -4,6 +4,8 @@ An English/Arabic workspace for a team to manage projects, temporary jobs, tasks
 
 **Browser session behavior:** Amplify's Cognito token provider uses browser `localStorage`, not tab-scoped `sessionStorage`. A valid Cognito session is restored after refresh, tab closure, or browser restart in the same browser profile and is shared by tabs on the same Amplify origin while the Cognito refresh token remains valid. Signing in as another account or signing out in one tab is propagated to other open tabs through client-scoped Cognito storage events. Sign-out is local to this browser app-client session; it does not globally sign out the same Cognito account on other devices. Clearing this site's website data, revoking the session, or reaching the Cognito refresh-token expiry ends the session.
 
+**Per-tab view behavior:** the active page, selected item, workspace/account tab, filters, expanded rows, and scroll position are stored in that tab's `sessionStorage`, never in browser-wide `localStorage`. Refreshing a tab restores only its own view. Other tabs continue to use their independent view snapshots while sharing the same Cognito browser session. A newly opened tab starts with the default view.
+
 > **Current account checkpoint (15 October 2026):** The Cognito pool/client, four DynamoDB tables (Items, Activity, Users and Archive), and monthly cost budget were reported as created manually in `us-east-1`. Amplify Hosting, API Gateway/Lambda and CloudWatch operational resources remained pending in the dated implementation snapshot. See the [implementation record](docs/IMPLEMENTATION.md) for current-account details. This status is a snapshot, not a prerequisite assumed by the architecture or automation template.
 
 ## Deployment approach

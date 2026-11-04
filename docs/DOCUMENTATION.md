@@ -1359,6 +1359,8 @@ Every Search result offers separate **Open in workspace**, **Activity history**,
 
 ### Workspace, lazy loading and history behavior
 
+When a tab has no saved Project/Job selection, startup selects the top-level item with the greatest `updatedAt` timestamp; it does not rely on the API response or array order. `createdAt` is used only when an item has no valid update timestamp, and as a deterministic tie-breaker. A valid selection already saved for this tab is preserved across refresh. If a saved parent is confirmed deleted, the replacement is chosen using the same most-recently-updated rule.
+
 Opening a Project/Job from account Search switches the UI out of the account page, selects that root, and starts its child-item query. Opening an assigned or pinned item resolves its root Project/Job, switches to the workspace, loads the root's descendants, recalculates its Task-ancestor expansion after hydration, and scrolls the selected item into view. This post-load expansion is necessary when the selected child's Task ancestor was not in the user's initial assignment cache.
 
 Expanding the workspace Search sidebar retains the selection and re-renders the selected root. The selected root is rehydrated as needed; a selected child is brought back into view once the load resolves. Errors are caught and logged while the app retains its normal retry behavior.

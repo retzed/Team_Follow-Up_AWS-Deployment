@@ -347,10 +347,13 @@ The dashboard `TeamFollowUp-Operations` should include three time-series widgets
 
 ## 11. Acceptance checklist
 
-Use two independent team accounts in separate browsers or sessions:
+Use two independent team accounts in the same browser profile plus a separate browser profile/device:
 
 1. A mapped, enabled user can sign in. Unknown, duplicate or disabled profile mappings are denied.
-2. Create a Project and Job, then verify both appear after a refresh and in the second session.
+2. Open a second tab on the same Amplify origin. Verify both tabs use the same Cognito identity, refresh restores the session, and closing/reopening the tab does not require another sign-in while the Cognito refresh token remains valid.
+3. Sign in as a different mapped user in one tab. Verify the other open tab revalidates and switches to that user without a manual refresh. Sign out in one tab and verify the other tab returns to sign-in and stops its realtime WebSocket/polling lifecycle.
+4. Sign in to the same Cognito account in a separate browser profile or device. Verify signing out in the first browser profile does not sign out that independent device. Confirm behavior after the configured Cognito refresh-token expiry/revocation and after clearing this site's website data.
+5. Create a Project and Job, then verify both appear after a refresh and in the second session.
 3. Add Tasks and Follow-ups only under allowed parent types; attempt invalid parent-child combinations through the API and confirm the backend rejects them.
 4. Edit title, description, priority, status, due date and assignee; verify activity events identify the authenticated actor.
 5. Archive an item with descendants, confirm active items disappear and archive rows remain, then restore and verify relationships.

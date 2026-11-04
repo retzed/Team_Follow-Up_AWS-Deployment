@@ -2,6 +2,8 @@
 
 An English/Arabic workspace for a team to manage projects, temporary jobs, tasks, and follow-ups. **This repository is AWS-only:** users sign in with Amazon Cognito and authoritative application data is read from and written to DynamoDB through an authenticated API. There is no local authentication, demo database, or offline-first work-data store. The browser may retain a versioned cache of successful API responses for performance; the authenticated API and DynamoDB remain authoritative.
 
+**Browser session behavior:** Amplify's Cognito token provider uses browser `localStorage`, not tab-scoped `sessionStorage`. A valid Cognito session is restored after refresh, tab closure, or browser restart in the same browser profile and is shared by tabs on the same Amplify origin while the Cognito refresh token remains valid. Signing in as another account or signing out in one tab is propagated to other open tabs through client-scoped Cognito storage events. Sign-out is local to this browser app-client session; it does not globally sign out the same Cognito account on other devices. Clearing this site's website data, revoking the session, or reaching the Cognito refresh-token expiry ends the session.
+
 > **Current account checkpoint (15 October 2026):** The Cognito pool/client, four DynamoDB tables (Items, Activity, Users and Archive), and monthly cost budget were reported as created manually in `us-east-1`. Amplify Hosting, API Gateway/Lambda and CloudWatch operational resources remained pending in the dated implementation snapshot. See the [implementation record](docs/IMPLEMENTATION.md) for current-account details. This status is a snapshot, not a prerequisite assumed by the architecture or automation template.
 
 ## Deployment approach

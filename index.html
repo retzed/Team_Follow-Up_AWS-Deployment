@@ -2867,7 +2867,27 @@ function timelineEvents(parent,limit=8){
  return `<div class="timeline">${events.map(e=>{const u=person(e.userId);return `<div class="timeline-row"><span class="timeline-dot"></span><div class="timeline-copy"><div class="timeline-title">${esc(activityText(e,parent.id))}</div><div class="timeline-meta">${userAvatar(e.userId)} <span>${esc(u.name)}</span><span>·</span><span>${esc(fmtDateTime(e.at))}</span></div></div></div>`;}).join('')}</div>${error?loadErrorMarkup(error):''}`;
 }
 function renderActivity(parent){return `<div class="content-body"><div class="activity-layout"><section class="panel-section"><div class="panel-section-head"><div><h3>${esc(tr('relatedItems'))}</h3></div></div><div class="panel-section-body">${treeActivity(parent)}</div></section><section class="panel-section"><div class="panel-section-head"><div><h3>${esc(tr('recentActivity'))}</h3></div><button class="subtle-btn" data-action="history" data-item-id="${esc(parent.id)}" type="button">${esc(tr('viewAllHistory'))} ${icon('arrow',12)}</button></div><div class="panel-section-body">${timelineEvents(parent,12)}</div></section></div><div class="detail-footer"><button class="btn btn-small" data-action="history" data-item-id="${esc(parent.id)}" type="button">${icon('activity',13)} ${esc(tr('viewAllHistory'))}</button></div></div>`;}
-function renderDetail(){const selectedParentId=String(ui.selectedParentId||'');const parent=data.parents.find(p=>String(p.id)===selectedParentId);if(!parent){if(!dataLoadState.parentsReady&&!dataLoadState.initialError){$('#mainContent').innerHTML=spinnerMarkup(tr('loadingData'));return;}if(dataLoadState.initialError&&!data.parents.length){$('#mainContent').innerHTML=loadErrorMarkup(dataLoadState.initialError);return;}if(data.parents.length&&!selectedParentId){ui.selectedParentId=data.parents[0].id;return renderDetail();}if(data.parents.length&&selectedParentId){$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('loadFailed'))}</strong></div>`;return;}$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('noFilterResults'))}</strong><button class="btn btn-primary" data-action="new-parent" type="button">${icon('plus',14)} ${esc(tr('newParent'))}</button></div>`;return;}
+function mostRecentlyUpdatedParent(items){
+ const parents=(Array.isArray(items)?items:[]).filter(parent=>parent&&['project','job'].includes(String(parent.type)));
+ const timestamp=value=>{const parsed=Date.parse(String(value||''));return Number.isFinite(parsed)?parsed:0;};
+ let newest=null;
+ for(const parent of parents){
+  if(!newest){newest=parent;continue;}
+  const updated=timestamp(parent.updatedAt)||timestamp(parent.createdAt);
+  const newestUpdated=timestamp(newest.updatedAt)||timestamp(newest.createdAt);
+  if(updated>newestUpdated){newest=parent;continue;}
+  if(updated===newestUpdated){
+   const created=timestamp(parent.createdAt),newestCreated=timestamp(newest.createdAt);
+   if(created>newestCreated||(created===newestCreated&&String(parent.id||'')>String(newest.id||'')))newest=parent;
+  }
+ }
+ return newest;
+}
+function defaultWorkspaceParentId(items=data.parents){
+ const parent=mostRecentlyUpdatedParent(items);
+ return parent?String(parent.id||''):'';
+}
+function renderDetail(){const selectedParentId=String(ui.selectedParentId||'');const parent=data.parents.find(p=>String(p.id)===selectedParentId);if(!parent){if(!dataLoadState.parentsReady&&!dataLoadState.initialError){$('#mainContent').innerHTML=spinnerMarkup(tr('loadingData'));return;}if(dataLoadState.initialError&&!data.parents.length){$('#mainContent').innerHTML=loadErrorMarkup(dataLoadState.initialError);return;}if(data.parents.length&&!selectedParentId){ui.selectedParentId=defaultWorkspaceParentId(data.parents);return renderDetail();}if(data.parents.length&&selectedParentId){$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('loadFailed'))}</strong></div>`;return;}$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('noFilterResults'))}</strong><button class="btn btn-primary" data-action="new-parent" type="button">${icon('plus',14)} ${esc(tr('newParent'))}</button></div>`;return;}
  const s=getItemSummary(parent);const creator=person(parent.createdBy);$('#mainContent').innerHTML=`<div class="main-head"><div class="breadcrumb">${icon('grid',12)} <span>${esc(tr('workspaceTitle'))}</span>${icon('chevron',11)}<strong>${esc(typeName(parent.type))}</strong></div><div class="head-actions"><button class="btn" data-action="history" data-item-id="${esc(parent.id)}" type="button">${icon('activity',14)} ${esc(tr('activityHistory'))}</button><button class="btn btn-primary" data-action="edit-item" data-id="${esc(parent.id)}" type="button">${icon('edit',14)} ${esc(tr('edit'))}</button>${pinActionMarkup(parent.id)}</div></div><section class="detail-card"><div class="detail-banner"><div class="detail-top"><div class="detail-nameblock"><div class="detail-type-icon">${typeIcon(parent.type)}</div><div class="detail-title-wrap"><div class="parent-detail-title-row"><div class="detail-title" dir="auto">${esc(parent.name)}</div><span class="type-pill">${esc(typeName(parent.type))}</span><span class="type-pill">${esc(s.all.length+' '+tr('items'))}</span></div><div class="created-label parent-detail-created">${creatorLabel(parent)}</div><div class="detail-description" dir="auto">${esc(parent.description||tr('noDescription'))}</div></div></div><div class="detail-controls">${statusPill(parent.status)}</div></div><div class="detail-meta"><div class="metadata-group"><span class="owner-pill assigned-owner">${icon('user',14)}<span class="assigned-label">${esc(tr('assignedTo'))}:</span>${parent.ownerId?userAvatar(parent.ownerId):''}<span class="assigned-person">${roleLabel(parent.ownerId)}</span></span><span class="meta-piece due-date-piece">${icon('calendar',14)} <span>${esc(tr('dueDate'))}:</span><strong>${esc(parent.dueDate?fmtDate(parent.dueDate,{month:'short',day:'numeric',year:'numeric'}):tr('noDueDate'))}</strong></span></div><div class="audit-line">${auditLabel(parent)}</div></div></div><div class="tabs" role="tablist"><button class="tab ${ui.tab==='overview'?'active':''}" role="tab" aria-selected="${ui.tab==='overview'}" data-action="detail-tab" data-tab="overview" type="button">${icon('grid',15)} ${esc(tr(parent.type==='job'?'jobOverview':'projectOverview'))}</button><button class="tab ${ui.tab==='activity'?'active':''}" role="tab" aria-selected="${ui.tab==='activity'}" data-action="detail-tab" data-tab="activity" type="button">${icon('activity',15)} ${esc(tr('activityHistory'))}<span class="tab-count">${rootActivityReady(parent.id)?activitiesFor(parent.id).length:(dataLoadState.parentsReady?0:'—')}</span></button></div>${ui.tab==='overview'?renderOverview(parent,s):renderActivity(parent)}</section>`;}
 
 const ACCOUNT_ICONS=[
@@ -3452,7 +3472,7 @@ async function restoreSelectedArchive(){
   const restoredIds=new Set((result?.restoredIds||restoredRows.map(x=>x.id||x.itemId)||selected).map(String));
   const remainingArchive=(modal.archiveItems||[]).filter(x=>!restoredIds.has(String(x.id||x.archiveId||x.itemId)));
   ui.modal={kind:'archive',loading:false,archiveItems:remainingArchive,selectedIds:[],error:''};
-  if(!data.parents.some(p=>p.id===ui.selectedParentId)){const restoredParent=restoredRows.find(x=>x.type==='project'||x.type==='job');ui.selectedParentId=restoredParent?.id||data.parents[0]?.id||'';}
+  if(!data.parents.some(p=>p.id===ui.selectedParentId)){const restoredParent=restoredRows.find(x=>x.type==='project'||x.type==='job');ui.selectedParentId=restoredParent?.id||defaultWorkspaceParentId(data.parents);}
   render();toast(tr('archiveRestored'));
  }catch(error){
   const rawMessage=String(error?.message||'');
@@ -3489,7 +3509,7 @@ function deleteItem(id){
  // A child deletion is represented by its single activity event. Do not PATCH the parent
  // just to bump its timestamp; the DELETE endpoint can archive a lone follow-up in one request.
  data.children=data.children.filter(c=>!doomed.has(c.id));data.parents=data.parents.filter(p=>!doomed.has(p.id));invalidateHierarchyIndex();
- if(isRoot){ui.selectedParentId=data.parents[0]?.id||'';ui.tab='overview';}
+ if(isRoot){ui.selectedParentId=defaultWorkspaceParentId(data.parents);ui.tab='overview';}
  ui.expanded.forEach(x=>{if(doomed.has(x))ui.expanded.delete(x);});persist();ui.modal=null;
  if(!data.parents.length){render();toast(tr('deleted'));return;}
  render();toast(tr('deleted'));
@@ -3606,7 +3626,7 @@ $('#modalRoot').addEventListener('change',ev=>{
  if(ui.modal?.kind==='new-child'&&(ev.target.id==='formType'||ev.target.id==='formParent')){
   const typeEl=$('#formType');const parentEl=$('#formParent');let type=typeEl?.value||ui.modal.type;let parentId=parentEl?.value||ui.modal.parentId;
   if(ev.target.id==='formParent'){const allowed=allowedChildTypes(parentId);if(!allowed.includes(type))type=allowed[0]||'followup';typeEl.innerHTML=allowed.map(tp=>`<option value="${tp}" ${tp===type?'selected':''}>${esc(typeName(tp))}</option>`).join('');}
-  parentEl.innerHTML=parentOptions(parentId,type);if(![...parentEl.options].some(o=>o.value===parentId)){const allowedParent=allItem(parentId);const fallback=type==='task'?(allowedParent?.type==='project'?parentId:(data.parents.find(p=>p.type==='project')?.id||'')):(rootParent(allowedParent)?.id||data.parents[0]?.id||'');parentId=fallback;parentEl.innerHTML=parentOptions(parentId,type);}parentEl.value=parentId;ui.modal.type=type;ui.modal.parentId=parentId;
+  parentEl.innerHTML=parentOptions(parentId,type);if(![...parentEl.options].some(o=>o.value===parentId)){const allowedParent=allItem(parentId);const fallback=type==='task'?(allowedParent?.type==='project'?parentId:(data.parents.find(p=>p.type==='project')?.id||'')):(rootParent(allowedParent)?.id||defaultWorkspaceParentId(data.parents));parentId=fallback;parentEl.innerHTML=parentOptions(parentId,type);}parentEl.value=parentId;ui.modal.type=type;ui.modal.parentId=parentId;
   syncAssigneeControl(type);
  }
 });
@@ -3858,7 +3878,7 @@ async function applyRealtimeChangeBatch(changes){
   updateApplicationHistoryFromCommittedEvents(activityEvents);
  }
  if(deletedRootIds.has(String(ui.selectedParentId||''))){
-  ui.selectedParentId=data.parents[0]?.id||'';
+  ui.selectedParentId=defaultWorkspaceParentId(data.parents);
   ui.selectedAssignedItemId=null;
   dataLoadState.childrenLoaded.delete([...deletedRootIds][0]);
  }
@@ -4034,11 +4054,11 @@ async function startWorkspaceHydration(){
    if(meta.stage==='parents-page')dataLoadState.parentsReady=Boolean(meta.done);
    if(meta.stage==='parents-complete')dataLoadState.parentsReady=true;
    if(meta.stage==='complete'){dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;}
-   if(!ui.selectedParentId&&data.parents.length)ui.selectedParentId=data.parents[0].id;
+   if(!ui.selectedParentId&&data.parents.length)ui.selectedParentId=defaultWorkspaceParentId(data.parents);
    applyTranslations();renderParentList();renderDetail();if(ui.page==='account')renderAccountPage();
   });
   if(hydrationRun!==workspaceHydrationGeneration)return;
-  data=mergeRealtimeWorkspaceSnapshot(loaded);invalidateHierarchyIndex();const restoredParentState=await reconcileSelectedWorkspaceParent();if(restoredParentState==='missing'||(!ui.selectedParentId&&data.parents.length))ui.selectedParentId=data.parents[0]?.id||'';
+  data=mergeRealtimeWorkspaceSnapshot(loaded);invalidateHierarchyIndex();const restoredParentState=await reconcileSelectedWorkspaceParent();if(restoredParentState==='missing'||(!ui.selectedParentId&&data.parents.length))ui.selectedParentId=defaultWorkspaceParentId(data.parents);
   try{const meResponse=await window.TeamFollowUpDataApi.getMyProfile();if(hydrationRun!==workspaceHydrationGeneration)return;if(meResponse?.user){const profile=mergeProfileIntoData(meResponse.user,{preserveExistingTranslations:true});if(profile?.preferences){if(['en','ar'].includes(profile.preferences.lang))ui.lang=profile.preferences.lang;if(['light','dark'].includes(profile.preferences.theme))hydratedUserTheme=profile.preferences.theme;}}}catch(profileError){ui.accountError=String(profileError?.message||tr('accountError'));}
   ui.accountLoading=false;lastApiSnapshot=copyWorkspace(data);
   dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;

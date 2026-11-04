@@ -2038,7 +2038,8 @@ const initialPreferences=detectInitialPreferences();
 function isMobileSidebarViewport(){try{return typeof window.matchMedia==='function'&&window.matchMedia('(max-width: 820px)').matches;}catch{return false;}}
 let previousMobileSidebarViewport=isMobileSidebarViewport();
 const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:true,selectedParentId:'',tab:'overview',page:'account',accountTab:'assigned',accountLoading:true,accountSaving:false,accountMessage:'',accountProfileDraft:null,accountError:'',accountAssignedRows:[],accountAssignedQuery:'',accountAssignedType:'all',accountAssignedStatus:'all',accountAssignedPriority:'all',accountAssignedDateMode:'updated',accountAssignedDateFrom:'',accountAssignedDateTo:'',accountAssignedLoaded:false,accountAssignedLoading:false,accountAssignedError:'',accountPinnedRows:[],accountPinnedLoaded:false,accountPinnedLoading:false,accountPinnedError:'',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||''),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all',accountSearchQuery:'',accountSearchType:'all',accountSearchStatus:'all',accountSearchDateMode:'updated',accountSearchDateFrom:'',accountSearchDateTo:'',accountSearchUser:'all'};
-const WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-view-state-v2:';
+const WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-view-state-v3:';
+const PREVIOUS_WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-view-state-v2:';
 const LEGACY_WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-view-state-v1:';
 const WORKSPACE_VIEW_FILTER_KEYS=[
  'sidebarCollapsed','sidebarMode','selectedParentId','selectedAssignedItemId','tab','parentQuery','parentType','parentStatus','parentDateMode','parentDateFrom','parentDateTo',
@@ -2047,24 +2048,26 @@ const WORKSPACE_VIEW_FILTER_KEYS=[
  'accountSearchQuery','accountSearchType','accountSearchStatus','accountSearchDateMode','accountSearchDateFrom','accountSearchDateTo','accountSearchUser'
 ];
 function workspaceViewStateKey(){return WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(String(ui.actingUserId||'anonymous'));}
+function previousWorkspaceViewStateKey(){return PREVIOUS_WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(String(ui.actingUserId||'anonymous'));}
 function legacyWorkspaceViewStateKey(){return LEGACY_WORKSPACE_VIEW_STATE_PREFIX+String(ui.actingUserId||'anonymous');}
 function persistWorkspaceViewState(){
  try{
   const userId=String(ui.actingUserId||'');
   if(!userId)return false;
-  const state={version:2,userId,page:ui.page,values:{},expanded:[...(ui.expanded||[])].slice(0,1000),scrollY:Math.max(0,Math.round(window.scrollY||0))};
+  const state={version:3,userId,page:ui.page,values:{},expanded:[...(ui.expanded||[])].slice(0,1000),scrollY:Math.max(0,Math.round(window.scrollY||0))};
   for(const key of WORKSPACE_VIEW_FILTER_KEYS)state.values[key]=ui[key];
   // View state is deliberately tab-scoped. Never mirror it to localStorage:
   // localStorage is shared by every same-origin tab and would couple their views.
   sessionStorage.setItem(workspaceViewStateKey(),JSON.stringify(state));
-  // Remove only this tab's legacy copy after the new tab-scoped write succeeds.
-  try{sessionStorage.removeItem(legacyWorkspaceViewStateKey());}catch(error){}
+  // Remove older tab-scoped formats only after the v3 write succeeds.
+  try{sessionStorage.removeItem(previousWorkspaceViewStateKey());sessionStorage.removeItem(legacyWorkspaceViewStateKey());}catch(error){}
   return true;
  }catch(error){
   console.warn('This tab could not persist its workspace view in sessionStorage.',error);
   return false;
  }
 }
+let restoredWorkspaceViewStateVersion=0;
 function restoreWorkspaceViewState(){
  try{
   const userId=String(ui.actingUserId||'');
@@ -2072,10 +2075,12 @@ function restoreWorkspaceViewState(){
   // Read only sessionStorage. A missing tab snapshot must start with defaults;
   // falling back to localStorage would import another tab's last-opened view.
   let raw=sessionStorage.getItem(workspaceViewStateKey());
+  if(!raw)raw=sessionStorage.getItem(previousWorkspaceViewStateKey());
   if(!raw)raw=sessionStorage.getItem(legacyWorkspaceViewStateKey());
   const state=JSON.parse(raw||'null');
-  if(!state||![1,2].includes(state.version))return 0;
-  if(state.version===2&&String(state.userId||'')!==userId)return 0;
+  if(!state||![1,2,3].includes(state.version))return 0;
+  if(state.version>=2&&String(state.userId||'')!==userId)return 0;
+  restoredWorkspaceViewStateVersion=Number(state.version)||0;
   if(['account','workspace'].includes(state.page))ui.page=state.page;
   const values=state.values&&typeof state.values==='object'?state.values:{};
   for(const key of WORKSPACE_VIEW_FILTER_KEYS){
@@ -2110,6 +2115,7 @@ window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE=()=>{
  const userId=String(ui.actingUserId||'');
  if(userId){
   try{sessionStorage.removeItem(WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(userId));}catch(error){}
+  try{sessionStorage.removeItem(PREVIOUS_WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(userId));}catch(error){}
   try{sessionStorage.removeItem(LEGACY_WORKSPACE_VIEW_STATE_PREFIX+userId);}catch(error){}
  }
  ui.actingUserId='';
@@ -2886,6 +2892,19 @@ function mostRecentlyUpdatedParent(items){
 function defaultWorkspaceParentId(items=data.parents){
  const parent=mostRecentlyUpdatedParent(items);
  return parent?String(parent.id||''):'';
+}
+function isLegacyFirstCreatedSelection(selectedId,items){
+ const id=String(selectedId||'');if(!id)return false;
+ const parents=(Array.isArray(items)?items:[]).filter(parent=>parent&&['project','job'].includes(String(parent.type)));
+ if(parents.length<2)return false;
+ const timestamp=value=>{const parsed=Date.parse(String(value||''));return Number.isFinite(parsed)?parsed:0;};
+ let firstCreated=parents[0];
+ for(const parent of parents.slice(1)){
+  const created=timestamp(parent.createdAt),oldest=timestamp(firstCreated.createdAt);
+  if(created<oldest||(created===oldest&&String(parent.id||'')<String(firstCreated.id||'')))firstCreated=parent;
+ }
+ const latestUpdated=mostRecentlyUpdatedParent(parents);
+ return String(firstCreated.id||'')===id&&Boolean(latestUpdated)&&String(latestUpdated.id||'')!==id;
 }
 function renderDetail(){const selectedParentId=String(ui.selectedParentId||'');const parent=data.parents.find(p=>String(p.id)===selectedParentId);if(!parent){if(!dataLoadState.parentsReady&&!dataLoadState.initialError){$('#mainContent').innerHTML=spinnerMarkup(tr('loadingData'));return;}if(dataLoadState.initialError&&!data.parents.length){$('#mainContent').innerHTML=loadErrorMarkup(dataLoadState.initialError);return;}if(data.parents.length&&!selectedParentId){ui.selectedParentId=defaultWorkspaceParentId(data.parents);return renderDetail();}if(data.parents.length&&selectedParentId){$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('loadFailed'))}</strong></div>`;return;}$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('noFilterResults'))}</strong><button class="btn btn-primary" data-action="new-parent" type="button">${icon('plus',14)} ${esc(tr('newParent'))}</button></div>`;return;}
  const s=getItemSummary(parent);const creator=person(parent.createdBy);$('#mainContent').innerHTML=`<div class="main-head"><div class="breadcrumb">${icon('grid',12)} <span>${esc(tr('workspaceTitle'))}</span>${icon('chevron',11)}<strong>${esc(typeName(parent.type))}</strong></div><div class="head-actions"><button class="btn" data-action="history" data-item-id="${esc(parent.id)}" type="button">${icon('activity',14)} ${esc(tr('activityHistory'))}</button><button class="btn btn-primary" data-action="edit-item" data-id="${esc(parent.id)}" type="button">${icon('edit',14)} ${esc(tr('edit'))}</button>${pinActionMarkup(parent.id)}</div></div><section class="detail-card"><div class="detail-banner"><div class="detail-top"><div class="detail-nameblock"><div class="detail-type-icon">${typeIcon(parent.type)}</div><div class="detail-title-wrap"><div class="parent-detail-title-row"><div class="detail-title" dir="auto">${esc(parent.name)}</div><span class="type-pill">${esc(typeName(parent.type))}</span><span class="type-pill">${esc(s.all.length+' '+tr('items'))}</span></div><div class="created-label parent-detail-created">${creatorLabel(parent)}</div><div class="detail-description" dir="auto">${esc(parent.description||tr('noDescription'))}</div></div></div><div class="detail-controls">${statusPill(parent.status)}</div></div><div class="detail-meta"><div class="metadata-group"><span class="owner-pill assigned-owner">${icon('user',14)}<span class="assigned-label">${esc(tr('assignedTo'))}:</span>${parent.ownerId?userAvatar(parent.ownerId):''}<span class="assigned-person">${roleLabel(parent.ownerId)}</span></span><span class="meta-piece due-date-piece">${icon('calendar',14)} <span>${esc(tr('dueDate'))}:</span><strong>${esc(parent.dueDate?fmtDate(parent.dueDate,{month:'short',day:'numeric',year:'numeric'}):tr('noDueDate'))}</strong></span></div><div class="audit-line">${auditLabel(parent)}</div></div></div><div class="tabs" role="tablist"><button class="tab ${ui.tab==='overview'?'active':''}" role="tab" aria-selected="${ui.tab==='overview'}" data-action="detail-tab" data-tab="overview" type="button">${icon('grid',15)} ${esc(tr(parent.type==='job'?'jobOverview':'projectOverview'))}</button><button class="tab ${ui.tab==='activity'?'active':''}" role="tab" aria-selected="${ui.tab==='activity'}" data-action="detail-tab" data-tab="activity" type="button">${icon('activity',15)} ${esc(tr('activityHistory'))}<span class="tab-count">${rootActivityReady(parent.id)?activitiesFor(parent.id).length:(dataLoadState.parentsReady?0:'—')}</span></button></div>${ui.tab==='overview'?renderOverview(parent,s):renderActivity(parent)}</section>`;}
@@ -4054,11 +4073,10 @@ async function startWorkspaceHydration(){
    if(meta.stage==='parents-page')dataLoadState.parentsReady=Boolean(meta.done);
    if(meta.stage==='parents-complete')dataLoadState.parentsReady=true;
    if(meta.stage==='complete'){dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;}
-   if(!ui.selectedParentId&&data.parents.length)ui.selectedParentId=defaultWorkspaceParentId(data.parents);
    applyTranslations();renderParentList();renderDetail();if(ui.page==='account')renderAccountPage();
   });
   if(hydrationRun!==workspaceHydrationGeneration)return;
-  data=mergeRealtimeWorkspaceSnapshot(loaded);invalidateHierarchyIndex();const restoredParentState=await reconcileSelectedWorkspaceParent();if(restoredParentState==='missing'||(!ui.selectedParentId&&data.parents.length))ui.selectedParentId=defaultWorkspaceParentId(data.parents);
+  data=mergeRealtimeWorkspaceSnapshot(loaded);invalidateHierarchyIndex();if(restoredWorkspaceViewStateVersion<3&&!ui.selectedAssignedItemId&&isLegacyFirstCreatedSelection(ui.selectedParentId,data.parents))ui.selectedParentId='';const restoredParentState=await reconcileSelectedWorkspaceParent();if(restoredParentState==='missing'||(!ui.selectedParentId&&data.parents.length))ui.selectedParentId=defaultWorkspaceParentId(data.parents);persistWorkspaceViewState();
   try{const meResponse=await window.TeamFollowUpDataApi.getMyProfile();if(hydrationRun!==workspaceHydrationGeneration)return;if(meResponse?.user){const profile=mergeProfileIntoData(meResponse.user,{preserveExistingTranslations:true});if(profile?.preferences){if(['en','ar'].includes(profile.preferences.lang))ui.lang=profile.preferences.lang;if(['light','dark'].includes(profile.preferences.theme))hydratedUserTheme=profile.preferences.theme;}}}catch(profileError){ui.accountError=String(profileError?.message||tr('accountError'));}
   ui.accountLoading=false;lastApiSnapshot=copyWorkspace(data);
   dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;

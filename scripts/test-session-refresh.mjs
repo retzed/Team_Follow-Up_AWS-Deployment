@@ -9,6 +9,7 @@ assert.ok((html.match(/<strong>Follow-Up<\/strong>/g)||[]).length>=2, 'Both sign
 assert.doesNotMatch(html, /<title>Team Follow-Up<\/title>|<strong>Team Follow-Up<\/strong>/, 'The previous product name is not displayed in the app chrome.');
 assert.ok(html.includes('id="global-button-motion-and-brand-refresh"') && html.includes('button:not(:disabled)') && html.includes('[role="button"]'), 'The shared motion system covers native and custom button controls.');
 assert.ok(html.includes('function animateWorkspaceSurfaceEntry()') && html.includes('function openWorkspaceFromBrand()') && html.includes('followup-workspace-enter'), 'Opening the workspace from the brand control animates the workspace surface.');
+assert.ok(html.includes("const enteringWorkspace=lastAppliedPage==='account'&&ui.page==='workspace';") && html.includes('if(enteringWorkspace)animateWorkspaceSurfaceEntry();'), 'Every account-to-workspace entry path shares the same surface transition, not only the brand control.');
 assert.ok(html.includes('@media (prefers-reduced-motion:reduce)') && html.includes('animation:none!important'), 'Button and workspace animations respect reduced-motion preferences.');
 const helperStart = html.indexOf("const WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-view-state-v2:';");
 const helperEnd = html.indexOf('\nconst activityRefreshRequests=new Map();', helperStart);

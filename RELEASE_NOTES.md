@@ -1,5 +1,14 @@
 # Release notes
 
+## 4 November 2026 — Cognito browser-profile session continuity
+
+- Kept Cognito as the only AWS authentication provider and retained Amplify's persistent `utils.defaultStorage` token store in browser `localStorage`.
+- Added client-app-scoped storage-event synchronization so same-origin tabs revalidate the shared Cognito session, switch to a newly signed-in team identity, and return to sign-in when another tab signs out.
+- Changed the application's sign-out operation from Cognito global sign-out to local browser-session sign-out; other devices remain authenticated.
+- Added a scoped token cleanup fallback for local sign-out failures and stop realtime WebSocket/polling services in tabs signed out remotely.
+- Added regression coverage for cross-tab identity changes, sign-out, unrelated storage events, transient errors, and app-client-scoped cleanup.
+- No Cognito pool/client configuration, API Gateway, Lambda, DynamoDB schema, IAM policy or Amplify environment variable change is required. Session continuity remains bounded by Cognito refresh-token validity/revocation and browser website-data retention.
+
 ## 28 October 2026 — Account Search, workspace navigation and mobile hardening
 
 - Added Account Search date sort/range and user filters; text search covers item fields and canonical backend identity fields (`createdByUserId`, `updatedByUserId`, `ownerId`, `assignedTo` and related assignee aliases).

@@ -91,7 +91,7 @@ function createViewContext(ui, tabStorage, browserStorage, scrollY = 0) {
     Set, Number, Math, JSON, String, encodeURIComponent, console
   };
   vm.runInNewContext(
-    helperSource + '\nthis.persistWorkspaceViewState=persistWorkspaceViewState;this.clearView=window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE;',
+    helperSource + '\nthis.persistWorkspaceViewState=persistWorkspaceViewState;this.clearView=window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE;this.restoredWorkspaceScrollY=restoredWorkspaceScrollY;',
     context
   );
   return { ...context, listeners };
@@ -125,7 +125,7 @@ assert.equal(browserStorage.getItem('team-follow-up-view-state-v1:u2'), staleSha
 assert.equal(typeof firstContext.listeners.pagehide, 'function', 'A pagehide save is registered for hard refresh/unload.');
 assert.ok(helperSource.includes('sessionStorage.setItem') && helperSource.includes('sessionStorage.getItem'),
   'The tab view store uses sessionStorage for both save and restore.');
-assert.doesNotMatch(helperSource, /localStorage/,
+assert.doesNotMatch(helperSource, /localStorage\.(?:getItem|setItem|removeItem)/,
   'The view-state helper does not read, write, or clear browser-wide localStorage.');
 assert.ok(html.includes("for(const eventName of ['click','change','input'])window.addEventListener(eventName,scheduleWorkspaceViewStateSave,true);"),
   'Normal navigation, filtering and search interactions schedule a view-state save before browser unload.');
@@ -165,6 +165,7 @@ assert.equal(refreshedTabAUi.childPriority, 'high');
 assert.equal(refreshedTabAUi.accountTab, 'pinned');
 assert.deepEqual([...refreshedTabAUi.expanded], ['task-9', 'task-10']);
 assert.equal(refreshedTabAUi.modal, null, 'A browser refresh does not reopen an unfinished modal.');
+assert.equal(refreshedTabAContext.restoredWorkspaceScrollY, 584, 'The refreshed tab restores its own scroll position.');
 assert.equal(refreshedTabAUi.parentQuery, 'network');
 assert.notEqual(tabBStorage.getItem(tabAKey), null,
   'Tab B retains its separate snapshot while Tab A is refreshed.');

@@ -12,8 +12,10 @@ const bootstrapEnd = html.indexOf('function sameRecordFields', bootstrapStart);
 check(bootstrapStart >= 0 && bootstrapEnd > bootstrapStart, 'The data API must expose a standalone bootstrap function.');
 const bootstrapBody = html.slice(bootstrapStart, bootstrapEnd);
 const usersLoad = bootstrapBody.indexOf("await requestCachedGet('/users','team-users')");
-const parentLoad = bootstrapBody.indexOf("requestCachedGet('/items?scope=top-level&dateMode=updated&direction=desc','top-level-items')");
-check(usersLoad >= 0 && parentLoad > usersLoad, 'Bootstrap must load users then the paginated top-level Project/Job list.');
+const parentLoad = bootstrapBody.indexOf("await fetchPagedItems('/items?scope=top-level&dateMode=updated&direction=desc'");
+check(usersLoad >= 0 && parentLoad > usersLoad, 'Bootstrap must load users then every paginated top-level Project/Job page.');
+check(bootstrapBody.includes("done:result.nextOffset===undefined||result.nextOffset===null") && bootstrapBody.indexOf("notify(snapshot,'parents-complete'")>parentLoad, 'Parent hydration must be marked complete only after the final page.');
+check(!bootstrapBody.includes("requestCachedGet('/items?scope=top-level&dateMode=updated&direction=desc','top-level-items')"), 'A one-page API shortcut must not mark a partial parent list as complete.');
 for (const forbidden of ['/activity', 'queryActivity', 'queryGlobalActivity', 'rootParentId=']) {
   check(!bootstrapBody.includes(forbidden), `Bootstrap must not load Activity or descendants (${forbidden}).`);
 }

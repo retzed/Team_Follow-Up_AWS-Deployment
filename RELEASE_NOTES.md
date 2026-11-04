@@ -1,5 +1,11 @@
 # Release notes
 
+## 4 November 2026 — Keep off-page parent selections during refresh
+
+- AWS bootstrap now follows every paginated top-level Project/Job result page instead of treating the first 100 records as the complete workspace.
+- A saved parent beyond the first page remains selected throughout refresh; it is reconciled only after the final page has loaded.
+- Added a two-page API regression case where the selected parent appears only on page two. Frontend-only change; no backend route, Lambda, DynamoDB, IAM, Cognito, or Amplify configuration change.
+
 ## 4 November 2026 — Preserve selected workspace item on refresh
 
 - Removed the startup check that compared the restored selection with the intentionally empty pre-hydration AWS data set.

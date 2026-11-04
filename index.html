@@ -4037,7 +4037,8 @@ async function startWorkspaceHydration(){
  }
 }
 // Start with an empty workspace and populate it exclusively from the AWS API.
-if(!data.parents.some(p=>p.id===ui.selectedParentId))ui.selectedParentId=data.parents[0]?.id||'';
+// Keep the session-restored selection while this initial data set is empty.
+// startWorkspaceHydration validates it after the complete parent list loads.
 setSignInState(Boolean(sessionUserIdAtLoad));
 render();
 window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;stopRealtimeNotifications();ui.actingUserId=context.teamUserId;ui.page='account';ui.accountTab='assigned';ui.accountLoading=true;ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedRows=[];ui.accountPinnedRows=[];render();void startWorkspaceHydration();startRealtimeNotifications();};

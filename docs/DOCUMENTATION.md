@@ -1,4 +1,4 @@
-# Team Follow-Up Application — Complete Project Documentation
+# Follow-Up — Complete Project Documentation
 
 **Document purpose:** consolidated system analysis, design, data modeling, behavior, UI/UX, API, security, testing, operations, and deployment reference.
 
@@ -24,7 +24,7 @@
 
 ## 1. Executive summary
 
-Team Follow-Up is a shared, bilingual (English/Arabic) workspace for tracking projects, temporary jobs, tasks, and follow-ups. Team members sign in through Amazon Cognito. Work items, assignments, archive records, and activity history are persisted through an authenticated API backed by Amazon DynamoDB.
+Follow-Up is a shared, bilingual (English/Arabic) workspace for tracking projects, temporary jobs, tasks, and follow-ups. Team members sign in through Amazon Cognito. Work items, assignments, archive records, and activity history are persisted through an authenticated API backed by Amazon DynamoDB.
 
 The application is designed as a serverless web system. The browser contains the HTML, CSS, and JavaScript user interface; Amazon Cognito manages authentication; Amazon API Gateway validates JWTs; a Python AWS Lambda function applies application rules; DynamoDB stores the persistent records; and CloudWatch provides logs and monitoring. AWS Amplify Hosting is intended to publish the web frontend.
 
@@ -99,7 +99,7 @@ flowchart LR
     Admin[Team / Cognito administrator]
     Maintainer[Deployment maintainer]
 
-    subgraph App[Team Follow-Up application]
+    subgraph App[Follow-Up application]
         UC1([Sign in / recover password])
         UC2([View projects and jobs])
         UC3([Search and filter work])
@@ -440,7 +440,7 @@ These duplicated fields must be maintained by the API. The backend strips or reb
 flowchart LR
     Person[Team member]
     Operator[Administrator / operator]
-    System((Team Follow-Up system))
+    System((Follow-Up system))
     Cognito[(Amazon Cognito)]
     Database[(DynamoDB data store)]
     Monitor[(CloudWatch)]
@@ -776,7 +776,7 @@ These are structural wireframes rather than pixel-perfect screenshots. The curre
 
 ~~~text
 +----------------------------------------------------------------------------------+
-| Team Follow-Up | Projects & Jobs              Language | Theme | User | Sign out |
+| Follow-Up | Projects & Jobs              Language | Theme | User | Sign out |
 +-------------------------------+--------------------------------------------------+
 | [Search] [Assigned to me]     | Selected Project / Job                           |
 | Search projects/jobs          | Type · name · created by · description          |
@@ -800,7 +800,7 @@ These are structural wireframes rather than pixel-perfect screenshots. The curre
 
 ~~~text
 +-----------------------------------+
-| Team Follow-Up          Language  |
+| Follow-Up          Language  |
 | Theme / User / Sign out           |
 +-----------------------------------+
 | [Search / Projects & Jobs toggle] |

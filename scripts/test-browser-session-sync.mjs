@@ -187,7 +187,7 @@ localStorage.setItem('CognitoIdentityServiceProvider.test-client.user.accessToke
 localStorage.setItem('CognitoIdentityServiceProvider.test-client.user.refreshToken', 'refresh');
 localStorage.setItem('CognitoIdentityServiceProvider.other-client.user.accessToken', 'other');
 localStorage.setItem('team-follow-up-theme', 'dark');
-sandbox.clearCurrentBrowserCognitoTokens();
+sandbox.clearBrowserTokens();
 assert.equal(localStorage.getItem('CognitoIdentityServiceProvider.test-client.user.accessToken'), null);
 assert.equal(localStorage.getItem('CognitoIdentityServiceProvider.test-client.user.refreshToken'), null);
 assert.equal(localStorage.getItem('CognitoIdentityServiceProvider.other-client.user.accessToken'), 'other');

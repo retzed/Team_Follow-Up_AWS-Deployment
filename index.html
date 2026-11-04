@@ -4068,8 +4068,7 @@ async function startWorkspaceHydration(){
    if(meta.stage==='users')dataLoadState.usersReady=true;
    if(meta.stage==='parents-page')dataLoadState.parentsReady=Boolean(meta.done);
    if(meta.stage==='parents-complete')dataLoadState.parentsReady=true;
-   if(meta.stage==='complete'){dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;}
-   if(meta.stage==='complete'&&!ui.selectedParentId&&data.parents.length)ui.selectedParentId=defaultWorkspaceParentId(data.parents);
+   if(meta.stage==='complete'){dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;if(!ui.selectedParentId&&data.parents.length)ui.selectedParentId=defaultWorkspaceParentId(data.parents);}
    applyTranslations();renderParentList();renderDetail();if(ui.page==='account')renderAccountPage();
   });
   if(hydrationRun!==workspaceHydrationGeneration)return;

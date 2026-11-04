@@ -51,8 +51,8 @@ assert.ok(hydrationStart >= 0 && hydrationEnd > hydrationStart, 'Workspace data 
 const hydrationHeader = html.slice(hydrationStart, hydrationStart + 900);
 assert.doesNotMatch(hydrationHeader, /ui\.page='account';\s*ui\.accountTab='assigned'/,
   'Data refresh must not force the user back to Profile > Assigned Items.');
-assert.ok(html.includes("if(!ui.selectedParentId&&data.parents.length)ui.selectedParentId=data.parents[0].id;"),
-  'Only an empty selection may take the first available parent during progressive bootstrap.');
+assert.ok(html.includes("if(!ui.selectedParentId&&data.parents.length)ui.selectedParentId=defaultWorkspaceParentId(data.parents);"),
+  'Only an empty selection may take the most recently updated parent during progressive bootstrap.');
 assert.ok(html.includes("const restoredParentState=await reconcileSelectedWorkspaceParent();") &&
           html.includes("restoredParentState==='missing'"),
   'The saved parent is verified by exact ID after bootstrap; only a confirmed missing item may use the fallback.');
@@ -62,7 +62,7 @@ assert.ok(html.includes("const selectedParentId=String(ui.selectedParentId||'');
   'Detail rendering must compare normalized parent IDs and must not silently select the first item for a non-empty saved ID.');
 assert.doesNotMatch(html, /if\(!data\.parents\.some\(p=>p\.id===ui\.selectedParentId\)\)ui\.selectedParentId=data\.parents\[0\]\?\.id\|\|'';/,
   'AWS startup must not clear the restored selection against its intentionally empty initial data set.');
-assert.ok(html.includes("if(restoredParentState==='missing'||(!ui.selectedParentId&&data.parents.length))ui.selectedParentId=data.parents[0]?.id||'';"),
+assert.ok(html.includes("if(restoredParentState==='missing'||(!ui.selectedParentId&&data.parents.length))ui.selectedParentId=defaultWorkspaceParentId(data.parents);"),
   'Fallback selection is applied only when the exact-ID resolver confirms the saved parent is absent, or when there was no selection.');
 assert.ok(html.includes("else if(ui.accountTab==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();"),
   'A restored Pinned Items page reloads its own data instead of switching tabs.');

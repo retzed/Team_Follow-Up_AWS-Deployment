@@ -22,7 +22,7 @@ const defaultParentHelperStart=html.indexOf('function mostRecentlyUpdatedParent(
 const defaultParentHelperEnd=html.indexOf('function renderDetail(){',defaultParentHelperStart);
 check(defaultParentHelperStart>=0&&defaultParentHelperEnd>defaultParentHelperStart,'A timestamp-based default parent selector must exist.');
 const defaultParentContext={};
-vm.runInNewContext(html.slice(defaultParentHelperStart,defaultParentHelperEnd)+'\\nthis.defaultWorkspaceParentId=defaultWorkspaceParentId;this.mostRecentlyUpdatedParent=mostRecentlyUpdatedParent;',defaultParentContext);
+vm.runInNewContext(html.slice(defaultParentHelperStart,defaultParentHelperEnd)+'\nthis.defaultWorkspaceParentId=defaultWorkspaceParentId;this.mostRecentlyUpdatedParent=mostRecentlyUpdatedParent;',defaultParentContext);
 const parentOrderFixture=[
  {id:'created-first',type:'project',createdAt:'2026-01-01T08:00:00Z',updatedAt:'2026-02-01T08:00:00Z'},
  {id:'created-second',type:'job',createdAt:'2026-03-01T08:00:00Z',updatedAt:'2026-03-01T08:00:00Z'},

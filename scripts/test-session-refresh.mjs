@@ -9,6 +9,17 @@ assert.ok(helperStart >= 0 && helperEnd > helperStart, 'User-specific view-state
 const helperSource = html.slice(helperStart, helperEnd);
 
 assert.match(html, /const tokenStorage=utils\.defaultStorage/, 'Cognito uses Amplify’s documented persistent browser defaultStorage.');
+assert.ok(html.includes("CognitoIdentityServiceProvider.'+String(cognito.userPoolClientId||'')+'."),
+  'Cross-tab synchronization is limited to this Cognito app client token namespace.');
+assert.ok(html.includes("window.addEventListener('storage',handleBrowserSessionStorageEvent)"),
+  'Cognito localStorage changes are observed by other same-origin browser tabs.');
+assert.ok(html.includes('const context=await ensureAuthenticatedContext();') &&
+          html.includes("activeUserId!==String(context.teamUserId||'')"),
+  'A changed Cognito session is revalidated and a different team identity is applied to the running app.');
+assert.doesNotMatch(html, /signOut\(\{global:true\}\)/,
+  'Signing out of this browser profile must not revoke the Cognito session on other devices.');
+assert.ok(html.includes('clearCurrentBrowserCognitoTokens()'),
+  'A failed local sign-out clears only this app client’s browser token namespace as a fallback.');
 assert.ok(html.includes("typeof tokenStorage.clear!=='function'"), 'The supported Amplify storage interface is checked, including its clear operation.');
 assert.ok(html.includes('tokenStorageProbeKey') && html.includes('browserStorageProbe') && html.includes('Amplify defaultStorage is not backed by browser localStorage.'), 'Startup verifies the Amplify storage provider writes to browser localStorage before restoring a session.');
 assert.match(html, /CognitoIdentityServiceProvider\./, 'Existing sessionStorage Cognito tokens are migrated to persistent storage.');

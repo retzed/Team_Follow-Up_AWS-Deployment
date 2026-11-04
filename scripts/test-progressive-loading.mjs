@@ -18,6 +18,20 @@ const selectionHelperStart=html.indexOf('async function reconcileSelectedWorkspa
 const selectionHelperEnd=html.indexOf('async function startWorkspaceHydration(){',selectionHelperStart);
 check(selectionHelperStart>=0&&selectionHelperEnd>selectionHelperStart,'Restored parent reconciliation must exist before startup hydration.');
 const selectionHelper=html.slice(selectionHelperStart,selectionHelperEnd);
+const defaultParentHelperStart=html.indexOf('function mostRecentlyUpdatedParent(items){');
+const defaultParentHelperEnd=html.indexOf('function renderDetail(){',defaultParentHelperStart);
+check(defaultParentHelperStart>=0&&defaultParentHelperEnd>defaultParentHelperStart,'A timestamp-based default parent selector must exist.');
+const defaultParentContext={};
+vm.runInNewContext(html.slice(defaultParentHelperStart,defaultParentHelperEnd)+'\\nthis.defaultWorkspaceParentId=defaultWorkspaceParentId;this.mostRecentlyUpdatedParent=mostRecentlyUpdatedParent;',defaultParentContext);
+const parentOrderFixture=[
+ {id:'created-first',type:'project',createdAt:'2026-01-01T08:00:00Z',updatedAt:'2026-02-01T08:00:00Z'},
+ {id:'created-second',type:'job',createdAt:'2026-03-01T08:00:00Z',updatedAt:'2026-03-01T08:00:00Z'},
+ {id:'updated-last',type:'project',createdAt:'2026-01-15T08:00:00Z',updatedAt:'2026-10-30T08:00:00Z'},
+ {id:'child-must-be-ignored',type:'task',createdAt:'2026-01-01T08:00:00Z',updatedAt:'2026-11-01T08:00:00Z'}
+];
+assert.equal(defaultParentContext.defaultWorkspaceParentId(parentOrderFixture),'updated-last','A fresh workspace defaults to the Project/Job with the newest updatedAt, not the first-created array entry.');
+check(html.includes("if(!ui.selectedParentId&&data.parents.length)ui.selectedParentId=defaultWorkspaceParentId(data.parents);"),'Progressive startup selection must use the timestamp-based default rather than array order.');
+check(html.includes("if(restoredParentState==='missing'||(!ui.selectedParentId&&data.parents.length))ui.selectedParentId=defaultWorkspaceParentId(data.parents);"),'Only an empty or confirmed-missing saved selection may use the timestamp-based default.');
 const makeSelectionContext=(resolveItems)=>{
  const context={
   ui:{selectedParentId:'project-page-two'},

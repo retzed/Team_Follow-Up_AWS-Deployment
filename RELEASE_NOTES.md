@@ -1,5 +1,12 @@
 # Release notes
 
+## 4 November 2026 — Retain the selected parent through refresh reconciliation
+
+- Parent and Assigned/Pinned child navigation now writes the current tab snapshot immediately.
+- After parent pagination, the frontend resolves the exact saved Project/Job ID if it is absent from the loaded list. Only a confirmed missing item allows a fallback; transient API failures keep the selection.
+- Removed the last unconditional first-parent reset from final hydration and normalized selected-parent lookup in the detail renderer.
+- Added regression tests for a parent omitted from the list but returned by exact-ID resolution, a deleted parent, a temporary resolver failure, and immediate per-tab persistence. Frontend-only change; no API contract, Lambda, DynamoDB, IAM, or Cognito changes.
+
 ## 4 November 2026 — Keep off-page parent selections during refresh
 
 - AWS bootstrap now follows every paginated top-level Project/Job result page instead of treating the first 100 records as the complete workspace.

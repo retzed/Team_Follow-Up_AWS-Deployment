@@ -1,4 +1,4 @@
-# Team Follow-Up Application
+# Follow-Up
 
 An English/Arabic workspace for a team to manage projects, temporary jobs, tasks, and follow-ups. **This repository is AWS-only:** users sign in with Amazon Cognito and authoritative application data is read from and written to DynamoDB through an authenticated API. There is no local authentication, demo database, or offline-first work-data store. The browser may retain a versioned cache of successful API responses for performance; the authenticated API and DynamoDB remain authoritative.
 
@@ -98,7 +98,7 @@ npm run test:all
 
 This verifies the frontend, backend helper tests, infrastructure contract, Python compilation, and related checks. The AWS frontend build additionally requires the public Cognito/API runtime settings listed in the following section. Those browser-visible values are configuration, not credentials; never place AWS access keys, private tokens, client secrets, real Cognito subject mappings, or the budget-recipient email in frontend configuration or source control.
 
-**Related project:** [Team Follow-Up browser-local demo](https://github.com/retzed/Team_Follow-Up) is a separate static demonstration. It does not use this repository's Cognito/API/DynamoDB runtime.
+**Related project:** [Follow-Up browser-local demo](https://github.com/retzed/Team_Follow-Up) is a separate static demonstration. It does not use this repository's Cognito/API/DynamoDB runtime.
 
 ## Local validation
 

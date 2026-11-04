@@ -6041,7 +6041,8 @@ button,
 [role="button"],
 input[type="button"],
 input[type="submit"],
-input[type="reset"]{
+input[type="reset"],
+[data-action]:not(.modal-backdrop){
  -webkit-tap-highlight-color:transparent;
  transition:
   background-color var(--followup-feedback-standard) var(--followup-feedback-ease),
@@ -6056,8 +6057,15 @@ input[type="reset"]{
  [role="button"]:not([aria-disabled="true"]):hover,
  input[type="button"]:not(:disabled):hover,
  input[type="submit"]:not(:disabled):hover,
- input[type="reset"]:not(:disabled):hover{
+ input[type="reset"]:not(:disabled):hover,
+ [data-action]:not(.modal-backdrop):not(:disabled):not([aria-disabled="true"]):hover{
   filter:brightness(1.035);
+ }
+ button:not(:disabled):hover,
+ [role="button"]:not([aria-disabled="true"]):hover,
+ input[type="button"]:not(:disabled):hover,
+ input[type="submit"]:not(:disabled):hover,
+ input[type="reset"]:not(:disabled):hover{
   box-shadow:0 0 0 2px var(--accent-soft);
  }
 }
@@ -6065,7 +6073,8 @@ button:not(:disabled):active,
 [role="button"]:not([aria-disabled="true"]):active,
 input[type="button"]:not(:disabled):active,
 input[type="submit"]:not(:disabled):active,
-input[type="reset"]:not(:disabled):active{
+input[type="reset"]:not(:disabled):active,
+[data-action]:not(.modal-backdrop):not(:disabled):not([aria-disabled="true"]):active{
  filter:brightness(.94);
  transition-duration:90ms;
 }
@@ -6094,7 +6103,8 @@ input[type="reset"]:not(:disabled):active{
  [role="button"],
  input[type="button"],
  input[type="submit"],
- input[type="reset"]{
+ input[type="reset"],
+ [data-action]:not(.modal-backdrop){
   transition:none!important;
  }
  .layout.workspace-opening{animation:none!important}

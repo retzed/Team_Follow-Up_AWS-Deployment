@@ -248,6 +248,8 @@ flowchart TB
 5. Lambda maps the verified token's **sub** to exactly one enabled Users-table row using **cognitoSub**. Missing, duplicate, or disabled mappings are denied.
 6. Lambda queries or modifies the four configured DynamoDB tables and returns JSON to the frontend.
 
+**Browser-profile persistence and tab synchronization:** Amplify stores Cognito tokens in browser `localStorage`. Tabs on the same Amplify origin share that session, and it survives page refresh, tab closure, and browser restart while the Cognito refresh token remains valid and unrevoked. The frontend listens for changes only to the configured app-client token namespace and revalidates the current Cognito session before applying another tab's account switch or sign-out. Sign-out is local to the browser app-client session, not a Cognito global sign-out, so other devices remain authenticated. Clearing the site's website data or expiring/revoking the Cognito refresh token requires a new sign-in.
+
 **Both mappings must agree:** the Cognito user's custom team ID identifies the frontend team member, while the token's Cognito subject must map to the matching enabled row in the Users table.
 
 ### 3.5 Complete deployment diagram

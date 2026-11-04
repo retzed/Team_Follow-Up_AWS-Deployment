@@ -37,6 +37,8 @@ const project = {
   updatedBy: 'u1',
   version: 1
 };
+const project2 = { ...project, id: 'project-2', name: 'Project Beta', updatedAt: '2026-10-03T10:00:00.000Z' };
+
 const task = {
   id: 'task-1',
   type: 'task',
@@ -96,7 +98,10 @@ const window = {
       ], nextCursor: 'cursor-test-1', hasMore: false });
       if (method === 'GET' && url.pathname === '/users') return versioned(url, 'users', { users: [user] });
       if (method === 'GET' && url.pathname === '/items' && url.searchParams.get('scope') === 'top-level') {
-        return versioned(url, 'top-level', { items: [project], count: 1, nextOffset: null });
+        const offset = Number(url.searchParams.get('offset') || 0);
+        return versioned(url, 'top-level', offset === 0
+          ? { items: [project], count: 2, nextOffset: 1 }
+          : { items: [project2], count: 2, nextOffset: null });
       }
       if (method === 'GET' && url.pathname === '/items' && url.searchParams.has('rootParentId')) {
         return versioned(url, 'root-items', { items: [project, task], count: 2, nextOffset: null });
@@ -138,11 +143,12 @@ assert.ok(requests.some(request=>request.method==='POST'&&request.path==='/realt
 assert.ok(requests.some(request=>request.method==='GET'&&request.path==='/realtime/changes?since=cursor-before-test&limit=25'));
 
 const progress = [];
-const snapshot = await api.bootstrap((partial, meta) => progress.push({ count: partial.parents.length + partial.children.length, stage: meta.stage }));
+const snapshot = await api.bootstrap((partial, meta) => progress.push({ count: partial.parents.length + partial.children.length, stage: meta.stage, done: meta.done }));
 assert.equal(snapshot.users.length, 1);
 assert.equal(snapshot.users[0].id, 'u1');
-assert.equal(snapshot.parents.length, 1);
-assert.equal(snapshot.parents[0].id, 'project-1');
+assert.equal(snapshot.parents.length, 2, 'bootstrap follows pagination and does not treat the first parent page as the complete workspace');
+assert.deepEqual(Array.from(snapshot.parents, item => item.id), ['project-1', 'project-2']);
+assert.deepEqual(progress.filter(entry => entry.stage === 'parents-page').map(entry => ({ count: entry.count, done: entry.done })), [{ count: 1, done: false }, { count: 2, done: true }], 'the saved parent is not validated as missing until the final page has loaded');
 assert.equal(snapshot.children.length, 0, 'bootstrap must not fetch descendant items');
 assert.equal(snapshot.activity.length, 0, 'bootstrap must not fetch Activity history');
 assert.ok(!requests.some(request => request.path.includes('/activity')), 'bootstrap must not request Activity routes');
@@ -159,7 +165,7 @@ await api.queryAssigned('u1', { status: 'not-completed', query: 'Task' });
 await api.queryChildren('project-1', { type: 'task' });
 assert.equal((await api.queryGlobalActivity()).events.length, 1);
 assert.equal((await api.listArchive()).items.length, 0);
-for (const key of ['team-users','top-level-items','root-items:project-1:rootParentId=project-1&dateMode=updated&direction=desc','activity:project-1:all:','activity:application:scope=application&limit=100&offset=0','assigned-query:dateMode=updated&direction=desc&status=not-completed&q=Task','children-query:project-1:dateMode=updated&direction=desc&type=task','archive-page:/archive?limit=250&offset=0']) {
+for (const key of ['team-users','paged-query:/items?scope=top-level&dateMode=updated&direction=desc&limit=100&offset=0','paged-query:/items?scope=top-level&dateMode=updated&direction=desc&limit=100&offset=1','root-items:project-1:rootParentId=project-1&dateMode=updated&direction=desc','activity:project-1:all:','activity:application:scope=application&limit=100&offset=0','assigned-query:dateMode=updated&direction=desc&status=not-completed&q=Task','children-query:project-1:dateMode=updated&direction=desc&type=task','archive-page:/archive?limit=250&offset=0']) {
   assert.ok(storage.has('team-follow-up-api-cache-v2:' + key), `the disk cache must persist ${key}`);
 }
 const beforeRevalidation = requests.length;

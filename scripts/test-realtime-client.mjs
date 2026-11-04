@@ -7,6 +7,10 @@ const managerStart = html.indexOf('let realtimeSocket=null,realtimeReconnectTime
 const managerEnd = html.indexOf('async function startWorkspaceHydration()', managerStart);
 assert.ok(managerStart >= 0 && managerEnd > managerStart, 'the app must contain the real-time client manager');
 const managerSource = html.slice(managerStart, managerEnd);
+const defaultParentHelperStart=html.indexOf('function mostRecentlyUpdatedParent(items){');
+const defaultParentHelperEnd=html.indexOf('function renderDetail(){',defaultParentHelperStart);
+assert.ok(defaultParentHelperStart>=0&&defaultParentHelperEnd>defaultParentHelperStart,'the timestamp-based root-selection helper must be present');
+const defaultParentHelperSource=html.slice(defaultParentHelperStart,defaultParentHelperEnd);
 
 let nextTimerId = 1;
 const timers = new Map();
@@ -108,7 +112,7 @@ function createContext(overrides = {}) {
     Math, URL, URLSearchParams, JSON, Promise, Set, Map, String, Number, WebSocket: MockWebSocket
   };
   vm.runInNewContext(
-    managerSource + '\n' +
+    managerSource + '\n' + defaultParentHelperSource + '\n' +
     'this.applyRealtimeChangeBatch=applyRealtimeChangeBatch;' +
     'this.mergeRealtimeWorkspaceSnapshot=mergeRealtimeWorkspaceSnapshot;' +
     'this.queueRealtimeChangeBatch=queueRealtimeChangeBatch;' +

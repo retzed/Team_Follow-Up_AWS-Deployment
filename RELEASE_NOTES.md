@@ -1,13 +1,12 @@
 # Release notes
 
-## 4 November 2026 — Cognito browser-profile session continuity
+## 4 November 2026 — Cognito browser session with isolated per-tab views
 
-- Kept Cognito as the only AWS authentication provider and retained Amplify's persistent `utils.defaultStorage` token store in browser `localStorage`.
-- Added client-app-scoped storage-event synchronization so same-origin tabs revalidate the shared Cognito session, switch to a newly signed-in team identity, and return to sign-in when another tab signs out.
-- Changed the application's sign-out operation from Cognito global sign-out to local browser-session sign-out; other devices remain authenticated.
-- Added a scoped token cleanup fallback for local sign-out failures and stop realtime WebSocket/polling services in tabs signed out remotely.
-- Added regression coverage for cross-tab identity changes, sign-out, unrelated storage events, transient errors, and app-client-scoped cleanup.
-- No Cognito pool/client configuration, API Gateway, Lambda, DynamoDB schema, IAM policy or Amplify environment variable change is required. Session continuity remains bounded by Cognito refresh-token validity/revocation and browser website-data retention.
+- Cognito tokens remain in verified browser-profile `localStorage`; all same-origin tabs continue to share the browser session and synchronize account changes/sign-out.
+- Page, selection, filters, expanded state, and scroll position are now saved only in the current tab's versioned `sessionStorage` snapshot. Refresh restores that tab's own view without importing or overwriting another tab's view.
+- Added migration from a legacy v1 view snapshot only when it exists in the current tab's `sessionStorage`; legacy browser-wide view state is ignored.
+- Expanded session regression coverage for two simultaneous tabs with different views, hard refresh of each tab, shared Cognito identity boundaries, and tab-local view cleanup.
+- Frontend-only change. No Cognito pool/client configuration, API Gateway, Lambda, DynamoDB schema, IAM policy, Amplify environment variable, or data migration is required.
 
 ## 28 October 2026 — Account Search, workspace navigation and mobile hardening
 

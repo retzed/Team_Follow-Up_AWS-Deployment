@@ -14,6 +14,34 @@ const bootstrapBody = html.slice(bootstrapStart, bootstrapEnd);
 const usersLoad = bootstrapBody.indexOf("await requestCachedGet('/users','team-users')");
 const parentLoad = bootstrapBody.indexOf("await fetchPagedItems('/items?scope=top-level&dateMode=updated&direction=desc'");
 check(usersLoad >= 0 && parentLoad > usersLoad, 'Bootstrap must load users then every paginated top-level Project/Job page.');
+const selectionHelperStart=html.indexOf('async function reconcileSelectedWorkspaceParent(){');
+const selectionHelperEnd=html.indexOf('async function startWorkspaceHydration(){',selectionHelperStart);
+check(selectionHelperStart>=0&&selectionHelperEnd>selectionHelperStart,'Restored parent reconciliation must exist before startup hydration.');
+const selectionHelper=html.slice(selectionHelperStart,selectionHelperEnd);
+const makeSelectionContext=(resolveItems)=>({
+  ui:{selectedParentId:'project-page-two'},
+  data:{parents:[{id:'newest-parent',type:'project'}]},
+  window:{TeamFollowUpDataApi:{resolveItems}},
+  invalidateHierarchyIndex(){this.invalidated=true;},
+  console:{warn(){}}
+});
+const offPageSelection=makeSelectionContext(async ids=>({items:[{id:ids[0],type:'job',name:'Saved parent'}]}));
+vm.runInNewContext(selectionHelper+'\\nthis.reconcile=reconcileSelectedWorkspaceParent;',offPageSelection);
+assert.equal(await offPageSelection.reconcile(),'present','A saved parent omitted from the list is resolved by ID before any fallback is allowed.');
+assert.equal(offPageSelection.ui.selectedParentId,'project-page-two');
+assert.ok(offPageSelection.data.parents.some(parent=>parent.id==='project-page-two'));
+assert.equal(offPageSelection.invalidated,true);
+const deletedSelection=makeSelectionContext(async()=>({items:[]}));
+vm.runInNewContext(selectionHelper+'\\nthis.reconcile=reconcileSelectedWorkspaceParent;',deletedSelection);
+assert.equal(await deletedSelection.reconcile(),'missing','A fallback is permitted only after the exact ID is confirmed absent.');
+const transientSelection=makeSelectionContext(async()=>{throw new Error('temporary network failure');});
+vm.runInNewContext(selectionHelper+'\\nthis.reconcile=reconcileSelectedWorkspaceParent;',transientSelection);
+assert.equal(await transientSelection.reconcile(),'unknown','A temporary resolution failure must not discard the saved selection.');
+assert.equal(transientSelection.ui.selectedParentId,'project-page-two');
+check(html.includes("ui.expanded.clear();persistWorkspaceViewState();applyTranslations();"),'Selecting a Project or Job must synchronously persist the new selection in this tab.');
+check(html.includes("cursor=cursor.parentId?allItem(cursor.parentId):null;}persistWorkspaceViewState();applyTranslations();"),'Opening a child from Assigned/Pinned Items must synchronously persist its root selection.');
+check(html.includes("const selectedParentId=String(ui.selectedParentId||'');const parent=data.parents.find(p=>String(p.id)===selectedParentId);"),'Selected-parent lookup must compare normalized IDs rather than allowing a type mismatch to trigger a fallback.');
+
 check(bootstrapBody.includes("done:result.nextOffset===undefined||result.nextOffset===null") && bootstrapBody.indexOf("notify(snapshot,'parents-complete'")>parentLoad, 'Parent hydration must be marked complete only after the final page.');
 check(!bootstrapBody.includes("requestCachedGet('/items?scope=top-level&dateMode=updated&direction=desc','top-level-items')"), 'A one-page API shortcut must not mark a partial parent list as complete.');
 for (const forbidden of ['/activity', 'queryActivity', 'queryGlobalActivity', 'rootParentId=']) {

@@ -250,6 +250,8 @@ flowchart TB
 
 **Browser-profile persistence and tab synchronization:** Amplify stores Cognito tokens in browser `localStorage`. Tabs on the same Amplify origin share that session, and it survives page refresh, tab closure, and browser restart while the Cognito refresh token remains valid and unrevoked. The frontend listens for changes only to the configured app-client token namespace and revalidates the current Cognito session before applying another tab's account switch or sign-out. Sign-out is local to the browser app-client session, not a Cognito global sign-out, so other devices remain authenticated. Clearing the site's website data or expiring/revoking the Cognito refresh token requires a new sign-in.
 
+**Per-tab view restoration:** each browser tab separately stores its current page, selected records, workspace/account tab, filters, expanded rows, and scroll position in `sessionStorage`. A refresh restores that tab's snapshot, while other tabs retain their independent views. The view snapshot is not written to `localStorage` or synchronized through Cognito storage events. This is frontend-only and does not change the API, Lambda, DynamoDB schema, IAM, or Cognito configuration.
+
 **Both mappings must agree:** the Cognito user's custom team ID identifies the frontend team member, while the token's Cognito subject must map to the matching enabled row in the Users table.
 
 ### 3.5 Complete deployment diagram
@@ -1079,6 +1081,7 @@ The repository's **npm run test:all** command runs the frontend and backend cont
 | Command/script | Coverage focus |
 |---|---|
 | **npm run test:syntax** / scripts/check-syntax.mjs | JavaScript and markup/script syntax checks. |
+| **npm run test:session-refresh** / scripts/test-session-refresh.mjs | Verifies Cognito browser-profile session continuity and independent per-tab view snapshots, including refresh restoration, tab isolation, legacy migration, and local sign-out cleanup. |
 | **npm run test:data-api** / scripts/test-data-api.mjs | Ensures AWS-only data access uses authenticated API requests and covers bootstrap, queries, mutation, activity, and archive/restore calls with fixtures. |
 | **npm run test:build-config** / scripts/test-build-config.mjs | Requires valid Cognito/API configuration and prevents reverting to a local data/auth mode or a duplicate Cognito infrastructure definition. |
 | **npm run test:progressive-loading** | Guards progressive workspace loading behavior. |

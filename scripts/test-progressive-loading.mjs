@@ -172,7 +172,7 @@ check(html.includes('.data-loading-state.compact { justify-content:center;')&&ht
 
 
 check(html.includes("API_CACHE_PREFIX='team-follow-up-api-cache-v2:'") && html.includes('function requestCachedGet(path,key){'), 'Fetched API data must be stored persistently and conditionally revalidated.');
-check(html.includes("requestCachedGet('/users','team-users')") && html.includes("requestCachedGet('/items?scope=top-level&dateMode=updated&direction=desc','top-level-items')"), 'Startup must validate persisted profiles and top-level data.');
+check(html.includes("requestCachedGet('/users','team-users')") && html.includes("await fetchPagedItems('/items?scope=top-level&dateMode=updated&direction=desc'"), 'Startup must validate persisted profiles and retrieve every top-level data page.');
 check(html.includes("requestCachedGet(path,'activity:'+String(itemId)+':'+scope+':'+queryText)"), 'Item history must be conditionally revalidated from its local disk cache.');
 check(html.includes("requestCachedGet(path,'activity:application:'+params.toString())")&&html.includes('async function queryGlobalActivity(options={})'), 'Application-wide history pages must be conditionally revalidated and cached per page.');
 check(html.includes("void refreshActivityFor(id,'all')") && html.includes("void ensureActivityFromRootCache(itemId)"), 'Selecting a parent and expanding a child must reuse the root Activity cache.');

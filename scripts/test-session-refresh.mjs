@@ -7,10 +7,13 @@ assert.match(html, /<title>Follow-Up<\/title>/, 'The browser tab uses the Follow
 assert.ok(html.includes('<meta name="application-name" content="Follow-Up">') && html.includes('<meta name="apple-mobile-web-app-title" content="Follow-Up">'), 'Browser and installed-app metadata use the Follow-Up product name.');
 assert.ok((html.match(/<strong>Follow-Up<\/strong>/g)||[]).length>=2, 'Both sign-in and workspace headers use the Follow-Up brand.');
 assert.doesNotMatch(html, /<title>Team Follow-Up<\/title>|<strong>Team Follow-Up<\/strong>/, 'The previous product name is not displayed in the app chrome.');
-assert.ok(html.includes('id="global-button-motion-and-brand-refresh"') && html.includes('button:not(:disabled)') && html.includes('[role="button"]'), 'The shared motion system covers native and custom button controls.');
-assert.ok(html.includes('function animateWorkspaceSurfaceEntry()') && html.includes('function openWorkspaceFromBrand()') && html.includes('followup-workspace-enter'), 'Opening the workspace from the brand control animates the workspace surface.');
-assert.ok(html.includes("const enteringWorkspace=lastAppliedPage==='account'&&ui.page==='workspace';") && html.includes('if(enteringWorkspace)animateWorkspaceSurfaceEntry();'), 'Every account-to-workspace entry path shares the same surface transition, not only the brand control.');
-assert.ok(html.includes('@media (prefers-reduced-motion:reduce)') && html.includes('animation:none!important'), 'Button and workspace animations respect reduced-motion preferences.');
+const buttonFeedbackStyles = html.match(/<style id="global-button-feedback-and-brand-refresh">([\\s\\S]*?)<\\/style>/)?.[1] ?? '';
+assert.ok(buttonFeedbackStyles.includes('button:not(:disabled)') && buttonFeedbackStyles.includes('[role="button"]'), 'The shared feedback styles cover native and custom button controls.');
+assert.ok(buttonFeedbackStyles.includes('filter:brightness(1.035)') && buttonFeedbackStyles.includes('filter:brightness(.94)') && buttonFeedbackStyles.includes('box-shadow:0 0 0 2px var(--accent-soft)'), 'Buttons use subtle hover lighting and press dimming without positional feedback.');
+assert.doesNotMatch(buttonFeedbackStyles, /\\b(?:translate|scale|transform)\\s*:/i, 'Button feedback contains no movement, scaling, or transform rules.');
+assert.ok(html.includes('function animateWorkspaceSurfaceEntry()') && html.includes('function openWorkspaceFromBrand()') && buttonFeedbackStyles.includes('from{opacity:.975}') && buttonFeedbackStyles.includes('to{opacity:1}'), 'Workspace entry uses an opacity-only fade with no spatial movement.');
+assert.ok(html.includes("const enteringWorkspace=lastAppliedPage==='account'&&ui.page==='workspace';") && html.includes('if(enteringWorkspace)animateWorkspaceSurfaceEntry();'), 'Every account-to-workspace entry path shares the same surface fade, not only the brand control.');
+assert.ok(buttonFeedbackStyles.includes('@media (prefers-reduced-motion:reduce)') && buttonFeedbackStyles.includes('animation:none!important'), 'Transitions respect reduced-motion preferences.');
 const helperStart = html.indexOf("const WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-view-state-v2:';");
 const helperEnd = html.indexOf('\nconst activityRefreshRequests=new Map();', helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'User-specific view-state helpers must exist.');

@@ -1,6 +1,6 @@
 # Architecture reference
 
-**Purpose:** reference the complete Team Follow-Up target architecture, its trust boundaries, data model, monitoring and resource-creation approaches. This is a target-state design, not an assertion that every resource has already been created in the AWS account.
+**Purpose:** reference the complete Follow-Up target architecture, its trust boundaries, data model, monitoring and resource-creation approaches. This is a target-state design, not an assertion that every resource has already been created in the AWS account.
 
 **Primary deployment method:** create and configure AWS resources manually in the AWS Management Console. The optional full-stack CloudFormation/SAM template in `backend/template.yaml` is retained as an automation/reference method; it creates resources from scratch and does not expect pre-existing Cognito or DynamoDB resources.
 

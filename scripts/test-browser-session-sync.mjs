@@ -65,7 +65,8 @@ const state = {
 const window = {
   localStorage,
   __TEAM_FOLLOW_UP_AUTH_CONTEXT: { teamUserId: 'u2', authMode: 'cognito' },
-  __TEAM_FOLLOW_UP_CLEAR_VIEW_STATE() { clearViewCalls++; }
+  __TEAM_FOLLOW_UP_CLEAR_VIEW_STATE() { clearViewCalls++; },
+  __TEAM_FOLLOW_UP_APP_AUTH_SIGNED_OUT() { signedOutUiCalls++; }
 };
 const sandbox = {
   COGNITO_STORAGE_PREFIX: 'CognitoIdentityServiceProvider.test-client.',
@@ -157,7 +158,7 @@ emit(storageEvent('CognitoIdentityServiceProvider.test-client.u3.accessToken', '
 await settleTimers();
 assert.equal(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT, null);
 assert.equal(clearViewCalls, 1);
-assert.equal(signedOutUiCalls, 0);
+assert.equal(signedOutUiCalls, 1, 'A remotely signed-out tab stops its realtime WebSocket and polling lifecycle.');
 assert.equal(screen.hidden, false);
 assert.equal(app.inert, true);
 
@@ -166,6 +167,7 @@ nextError = Object.assign(new Error('NO_VALID_SESSION'), { name: 'UserUnAuthenti
 emit({ key: null, oldValue: null, newValue: null, storageArea: localStorage });
 await settleTimers();
 assert.equal(clearViewCalls, 2);
+assert.equal(signedOutUiCalls, 2);
 
 // Temporary network failures must not erase an otherwise active Cognito
 // browser session or force the user back through the sign-in form.
@@ -193,6 +195,8 @@ assert.equal(localStorage.getItem('team-follow-up-theme'), 'dark');
 
 assert.doesNotMatch(gate, /signOut\(\{global:true\}\)/,
   'The AWS browser-local sign-out must not revoke the user session on other devices.');
+assert.ok(html.includes('window.__TEAM_FOLLOW_UP_APP_AUTH_SIGNED_OUT=()=>{stopRealtimeNotifications();};'),
+  'A remotely signed-out tab stops its realtime WebSocket and polling lifecycle.');
 assert.ok(gate.includes('cognitoUserPoolsTokenProvider.setKeyValueStorage(tokenStorage)'),
   'Cognito must continue to use Amplify persistent token storage.');
 console.log('Browser-session synchronization tests passed: refresh persistence, app-client-scoped storage events, same-user token refresh, cross-tab identity switch/sign-out, storage clear, transient error retention, and local-only token cleanup.');

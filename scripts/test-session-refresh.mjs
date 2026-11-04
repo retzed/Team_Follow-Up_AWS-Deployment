@@ -53,6 +53,10 @@ assert.doesNotMatch(hydrationHeader, /ui\.page='account';\s*ui\.accountTab='assi
   'Data refresh must not force the user back to Profile > Assigned Items.');
 assert.match(html, /if\(!ui\.selectedParentId&&data\.parents\.length\)[\s\S]*?meta\.done===true/,
   'Progressive bootstrap must preserve a selected parent until the complete parent set has been checked.');
+assert.doesNotMatch(html, /if\(!data\.parents\.some\(p=>p\.id===ui\.selectedParentId\)\)ui\.selectedParentId=data\.parents\[0\]\?\.id\|\|'';/,
+  'AWS startup must not clear the restored selection against its intentionally empty initial data set.');
+assert.ok(html.includes("if(!data.parents.some(parent=>String(parent.id)===String(ui.selectedParentId)))ui.selectedParentId=data.parents[0]?.id||'';"),
+  'A missing selection is reconciled only after the complete AWS parent set has been loaded.');
 assert.ok(html.includes("else if(ui.accountTab==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();"),
   'A restored Pinned Items page reloads its own data instead of switching tabs.');
 assert.ok(html.includes('restoredWorkspaceScrollY>0') && html.includes('window.scrollTo({top:restoredWorkspaceScrollY'),

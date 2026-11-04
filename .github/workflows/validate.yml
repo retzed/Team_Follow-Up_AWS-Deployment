@@ -1,4 +1,4 @@
-name: Validate Team Follow-Up
+name: Validate Follow-Up
 
 on:
   push:

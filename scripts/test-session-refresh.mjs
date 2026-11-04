@@ -55,7 +55,7 @@ assert.ok(html.includes("const WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-v
   'The existing tab-scoped namespace remains stable so saved browser-tab selections can migrate without being discarded.');
 assert.ok(html.includes('const state={version:3,userId,page:ui.page,values:{},expanded:[...(ui.expanded||[])].slice(0,1000),scrollY:Math.max(0,Math.round(window.scrollY||0))};'),
   'New view snapshots use schema v3 while retaining the compatible v2 storage key.');
-assert.ok(html.includes("if(meta.stage==='complete'&&!ui.selectedParentId&&data.parents.length)ui.selectedParentId=defaultWorkspaceParentId(data.parents);"),
+assert.ok(html.includes("if(meta.stage==='complete'){dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;if(!ui.selectedParentId&&data.parents.length)ui.selectedParentId=defaultWorkspaceParentId(data.parents);}"),
   'An automatic default is not selected until every top-level bootstrap page has been loaded.');
 assert.ok(html.includes("restoredWorkspaceViewStateVersion<3&&!ui.selectedAssignedItemId&&isLegacyFirstCreatedSelection(ui.selectedParentId,data.parents)"),
   'Only a legacy automatically selected first-created parent is migrated; a manually selected parent remains intact.');

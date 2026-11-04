@@ -2038,8 +2038,7 @@ const initialPreferences=detectInitialPreferences();
 function isMobileSidebarViewport(){try{return typeof window.matchMedia==='function'&&window.matchMedia('(max-width: 820px)').matches;}catch{return false;}}
 let previousMobileSidebarViewport=isMobileSidebarViewport();
 const ui={lang:initialPreferences.lang,theme:initialPreferences.theme,sidebarCollapsed:true,selectedParentId:'',tab:'overview',page:'account',accountTab:'assigned',accountLoading:true,accountSaving:false,accountMessage:'',accountProfileDraft:null,accountError:'',accountAssignedRows:[],accountAssignedQuery:'',accountAssignedType:'all',accountAssignedStatus:'all',accountAssignedPriority:'all',accountAssignedDateMode:'updated',accountAssignedDateFrom:'',accountAssignedDateTo:'',accountAssignedLoaded:false,accountAssignedLoading:false,accountAssignedError:'',accountPinnedRows:[],accountPinnedLoaded:false,accountPinnedLoading:false,accountPinnedError:'',actingUserId:(window.__TEAM_FOLLOW_UP_AUTH_CONTEXT?.teamUserId||''),sidebarMode:'search',selectedAssignedItemId:null,parentQuery:'',parentType:'all',parentStatus:'all',parentDateMode:'updated',parentDateFrom:'',parentDateTo:'',childQuery:'',childType:'all',childStatus:'all',childPriority:'all',childDateMode:'updated',childDateFrom:'',childDateTo:'',childScope:'all',childSearchExpanded:false,expanded:new Set(),modal:null,historyQuery:'',historyScope:'all',accountSearchQuery:'',accountSearchType:'all',accountSearchStatus:'all',accountSearchDateMode:'updated',accountSearchDateFrom:'',accountSearchDateTo:'',accountSearchUser:'all'};
-const WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-view-state-v3:';
-const PREVIOUS_WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-view-state-v2:';
+const WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-tab-view-state-v2:';
 const LEGACY_WORKSPACE_VIEW_STATE_PREFIX='team-follow-up-view-state-v1:';
 const WORKSPACE_VIEW_FILTER_KEYS=[
  'sidebarCollapsed','sidebarMode','selectedParentId','selectedAssignedItemId','tab','parentQuery','parentType','parentStatus','parentDateMode','parentDateFrom','parentDateTo',
@@ -2048,7 +2047,6 @@ const WORKSPACE_VIEW_FILTER_KEYS=[
  'accountSearchQuery','accountSearchType','accountSearchStatus','accountSearchDateMode','accountSearchDateFrom','accountSearchDateTo','accountSearchUser'
 ];
 function workspaceViewStateKey(){return WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(String(ui.actingUserId||'anonymous'));}
-function previousWorkspaceViewStateKey(){return PREVIOUS_WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(String(ui.actingUserId||'anonymous'));}
 function legacyWorkspaceViewStateKey(){return LEGACY_WORKSPACE_VIEW_STATE_PREFIX+String(ui.actingUserId||'anonymous');}
 function persistWorkspaceViewState(){
  try{
@@ -2059,8 +2057,8 @@ function persistWorkspaceViewState(){
   // View state is deliberately tab-scoped. Never mirror it to localStorage:
   // localStorage is shared by every same-origin tab and would couple their views.
   sessionStorage.setItem(workspaceViewStateKey(),JSON.stringify(state));
-  // Remove older tab-scoped formats only after the v3 write succeeds.
-  try{sessionStorage.removeItem(previousWorkspaceViewStateKey());sessionStorage.removeItem(legacyWorkspaceViewStateKey());}catch(error){}
+  // Remove the retired legacy key only after the current tab snapshot is saved.
+  try{sessionStorage.removeItem(legacyWorkspaceViewStateKey());}catch(error){}
   return true;
  }catch(error){
   console.warn('This tab could not persist its workspace view in sessionStorage.',error);
@@ -2075,7 +2073,6 @@ function restoreWorkspaceViewState(){
   // Read only sessionStorage. A missing tab snapshot must start with defaults;
   // falling back to localStorage would import another tab's last-opened view.
   let raw=sessionStorage.getItem(workspaceViewStateKey());
-  if(!raw)raw=sessionStorage.getItem(previousWorkspaceViewStateKey());
   if(!raw)raw=sessionStorage.getItem(legacyWorkspaceViewStateKey());
   const state=JSON.parse(raw||'null');
   if(!state||![1,2,3].includes(state.version))return 0;
@@ -2115,7 +2112,6 @@ window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE=()=>{
  const userId=String(ui.actingUserId||'');
  if(userId){
   try{sessionStorage.removeItem(WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(userId));}catch(error){}
-  try{sessionStorage.removeItem(PREVIOUS_WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(userId));}catch(error){}
   try{sessionStorage.removeItem(LEGACY_WORKSPACE_VIEW_STATE_PREFIX+userId);}catch(error){}
  }
  ui.actingUserId='';
@@ -4073,6 +4069,7 @@ async function startWorkspaceHydration(){
    if(meta.stage==='parents-page')dataLoadState.parentsReady=Boolean(meta.done);
    if(meta.stage==='parents-complete')dataLoadState.parentsReady=true;
    if(meta.stage==='complete'){dataLoadState.usersReady=true;dataLoadState.parentsReady=true;dataLoadState.initialComplete=true;}
+   if(meta.stage==='complete'&&!ui.selectedParentId&&data.parents.length)ui.selectedParentId=defaultWorkspaceParentId(data.parents);
    applyTranslations();renderParentList();renderDetail();if(ui.page==='account')renderAccountPage();
   });
   if(hydrationRun!==workspaceHydrationGeneration)return;

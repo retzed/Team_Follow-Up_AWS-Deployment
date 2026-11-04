@@ -3628,7 +3628,7 @@ function animateWorkspaceSurfaceEntry(){
  void surface.offsetWidth;
  surface.classList.add('workspace-opening');
  const finish=event=>{
-  if(event.target!==surface||event.animationName!=='followup-workspace-enter')return;
+  if(event.target!==surface||event.animationName!=='followup-workspace-fade')return;
   surface.classList.remove('workspace-opening');
   surface.removeEventListener('animationend',finish);
  };
@@ -6031,11 +6031,11 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
 }
 </style>
 
-<style id="global-button-motion-and-brand-refresh">
+<style id="global-button-feedback-and-brand-refresh">
 :root{
- --followup-motion-ease:cubic-bezier(.2,.75,.25,1);
- --followup-motion-fast:140ms;
- --followup-motion-standard:190ms;
+ --followup-feedback-ease:cubic-bezier(.2,.75,.25,1);
+ --followup-feedback-fast:100ms;
+ --followup-feedback-standard:160ms;
 }
 button,
 [role="button"],
@@ -6044,14 +6044,12 @@ input[type="submit"],
 input[type="reset"]{
  -webkit-tap-highlight-color:transparent;
  transition:
-  translate var(--followup-motion-standard) var(--followup-motion-ease),
-  scale var(--followup-motion-fast) var(--followup-motion-ease),
-  background-color var(--followup-motion-standard) var(--followup-motion-ease),
-  border-color var(--followup-motion-standard) var(--followup-motion-ease),
-  color var(--followup-motion-standard) var(--followup-motion-ease),
-  box-shadow var(--followup-motion-standard) var(--followup-motion-ease),
-  opacity var(--followup-motion-standard) var(--followup-motion-ease),
-  filter var(--followup-motion-standard) var(--followup-motion-ease);
+  background-color var(--followup-feedback-standard) var(--followup-feedback-ease),
+  border-color var(--followup-feedback-standard) var(--followup-feedback-ease),
+  color var(--followup-feedback-standard) var(--followup-feedback-ease),
+  box-shadow var(--followup-feedback-standard) var(--followup-feedback-ease),
+  opacity var(--followup-feedback-standard) var(--followup-feedback-ease),
+  filter var(--followup-feedback-standard) var(--followup-feedback-ease);
 }
 @media (hover:hover) and (pointer:fine){
  button:not(:disabled):hover,
@@ -6059,8 +6057,8 @@ input[type="reset"]{
  input[type="button"]:not(:disabled):hover,
  input[type="submit"]:not(:disabled):hover,
  input[type="reset"]:not(:disabled):hover{
-  translate:0 -1px;
-  filter:brightness(1.025);
+  filter:brightness(1.035);
+  box-shadow:0 0 0 2px var(--accent-soft);
  }
 }
 button:not(:disabled):active,
@@ -6068,18 +6066,8 @@ button:not(:disabled):active,
 input[type="button"]:not(:disabled):active,
 input[type="submit"]:not(:disabled):active,
 input[type="reset"]:not(:disabled):active{
- translate:0 0;
- scale:.975;
- filter:brightness(.985);
+ filter:brightness(.94);
  transition-duration:90ms;
-}
-button:disabled,
-[role="button"][aria-disabled="true"],
-input[type="button"]:disabled,
-input[type="submit"]:disabled,
-input[type="reset"]:disabled{
- translate:none;
- scale:1;
 }
 #brandHome{
  border-radius:12px;
@@ -6089,41 +6077,27 @@ input[type="reset"]:disabled{
 @media (hover:hover) and (pointer:fine){
  #brandHome:hover{
   background-color:var(--accent-soft);
-  filter:none;
- }
- #brandHome:hover .brand-mark{
-  transform:scale(1.045) rotate(-1.5deg);
+  filter:brightness(1.025);
+  box-shadow:0 0 0 1px var(--accent-soft);
  }
 }
-#brandHome:active .brand-mark{transform:scale(.96)}
-#brandHome .brand-mark{transition:transform 220ms var(--followup-motion-ease)}
+#brandHome:active{filter:brightness(.94)}
 .layout.workspace-opening{
- animation:followup-workspace-enter 260ms var(--followup-motion-ease) both;
+ animation:followup-workspace-fade 180ms var(--followup-feedback-ease) both;
 }
-@keyframes followup-workspace-enter{
- from{opacity:0;translate:0 9px}
- to{opacity:1;translate:0 0}
+@keyframes followup-workspace-fade{
+ from{opacity:.975}
+ to{opacity:1}
 }
 @media (prefers-reduced-motion:reduce){
  button,
  [role="button"],
  input[type="button"],
  input[type="submit"],
- input[type="reset"],
- #brandHome .brand-mark{
+ input[type="reset"]{
   transition:none!important;
  }
- button:not(:disabled):hover,
- button:not(:disabled):active,
- [role="button"]:not([aria-disabled="true"]):hover,
- [role="button"]:not([aria-disabled="true"]):active{
-  translate:none!important;
-  scale:1!important;
-  transform:none!important;
-  filter:none!important;
- }
  .layout.workspace-opening{animation:none!important}
- #brandHome:hover .brand-mark,#brandHome:active .brand-mark{transform:none!important}
 }
 </style>
 </body>

@@ -3106,9 +3106,10 @@ async function saveCurrentProfile(form){
  ui.accountProfileDraft=payload;
  const button=form.querySelector('button[type="submit"]');
  const initialStatus=$('#profileSaveStatus');
+
  if(!payload.name||!payload.role){
   ui.accountMessageKey='accountError';
-  ui.accountMessage='';ui.accountMessageKey='';
+  ui.accountMessage='';
   if(initialStatus){
    initialStatus.textContent=tr('accountError');
    initialStatus.classList.add('error');
@@ -3117,7 +3118,7 @@ async function saveCurrentProfile(form){
  }
 
  ui.accountMessageKey='';
- ui.accountMessage='';ui.accountMessageKey='';
+ ui.accountMessage='';
  ui.accountSaving=true;
  if(button){
   button.disabled=true;
@@ -3144,7 +3145,7 @@ async function saveCurrentProfile(form){
 
   ui.accountError='';
   ui.accountMessageKey='profileSaved';
-  ui.accountMessage='';ui.accountMessageKey='';
+  ui.accountMessage='';
   ui.accountProfileDraft=null;
  }catch(error){
   const message=String(error?.message||tr('accountError'));

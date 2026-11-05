@@ -38,7 +38,7 @@ const finalFilterEnd = html.indexOf('</style>', finalFilterStart);
 assert.ok(finalFilterStart >= 0 && finalFilterEnd > finalFilterStart, 'The authoritative final mobile account filter layout must exist after the legacy overrides.');
 const finalFilterCss = html.slice(finalFilterStart, finalFilterEnd);
 assert.ok(finalFilterCss.includes('"user dateMode"'), 'Profile Search User and Date list filters must share one mobile row.');
-assert.ok(finalFilterCss.includes('"from from"') && finalFilterCss.includes('"to to"'), 'From and To date fields must receive separate full-width mobile rows.');
+assert.ok(finalFilterCss.includes('"from to"') && !finalFilterCss.includes('"from from"') && !finalFilterCss.includes('"to to"'), 'From and To date fields must remain side by side in flexible mobile columns.');
 assert.ok(finalFilterCss.includes('grid-column: 1 / -1 !important;') && finalFilterCss.includes('overflow: visible !important;'), 'Mobile date field wrappers must span the available width without clipping the native picker.');
 assert.ok(finalFilterCss.includes('height: 42px !important;') && finalFilterCss.includes('font-size: 16px !important;'), 'Mobile native date controls must retain a full-height, readable touch target.');
 assert.ok(!finalFilterCss.includes('128px') && !finalFilterCss.includes('overflow: hidden !important;'), 'The final mobile date rules must not reintroduce the fixed-width or clipping restrictions.');

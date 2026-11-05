@@ -32,9 +32,16 @@ const mobileDateFixCss = html.slice(mobileDateFixStart, mobileDateFixEnd);
 for (const area of ['.account-search-controls', '.account-assigned-controls']) {
   assert.ok(mobileDateFixCss.includes(`#accountPage ${area}`) && mobileDateFixCss.includes('grid-template-columns: repeat(2, minmax(0, 1fr))'), `${area} must keep the From/To fields in two shrinkable mobile columns.`);
 }
-assert.ok(mobileDateFixCss.includes('height: 34px !important;') && mobileDateFixCss.includes('min-height: 34px !important;') && mobileDateFixCss.includes('max-height: 34px !important;'), 'Mobile profile date controls must use a compact 34px height.');
-assert.ok(mobileDateFixCss.includes('width: min(100%, 128px) !important;') && mobileDateFixCss.includes('max-width: 128px !important;') && mobileDateFixCss.includes('justify-self: start !important;'), 'Mobile profile date controls must remain side by side at a compact maximum width.');
-assert.ok(mobileDateFixCss.includes('min-inline-size: 0 !important;') && mobileDateFixCss.includes('max-inline-size: 100% !important;') && mobileDateFixCss.includes('width: 100% !important;'), 'Mobile profile date controls must shrink when their grid track is narrower than the width cap.');
+assert.ok(mobileDateFixCss.includes('min-inline-size: 0 !important;') && mobileDateFixCss.includes('max-inline-size: 100% !important;') && mobileDateFixCss.includes('width: 100% !important;'), 'The earlier mobile date sizing block must retain shrink-safe control sizing.');
+const finalFilterStart = html.indexOf('<style id="mobile-account-filter-grid-final">');
+const finalFilterEnd = html.indexOf('</style>', finalFilterStart);
+assert.ok(finalFilterStart >= 0 && finalFilterEnd > finalFilterStart, 'The authoritative final mobile account filter layout must exist after the legacy overrides.');
+const finalFilterCss = html.slice(finalFilterStart, finalFilterEnd);
+assert.ok(finalFilterCss.includes('"user dateMode"'), 'Profile Search User and Date list filters must share one mobile row.');
+assert.ok(finalFilterCss.includes('"from from"') && finalFilterCss.includes('"to to"'), 'From and To date fields must receive separate full-width mobile rows.');
+assert.ok(finalFilterCss.includes('grid-column: 1 / -1 !important;') && finalFilterCss.includes('overflow: visible !important;'), 'Mobile date field wrappers must span the available width without clipping the native picker.');
+assert.ok(finalFilterCss.includes('height: 42px !important;') && finalFilterCss.includes('font-size: 16px !important;'), 'Mobile native date controls must retain a full-height, readable touch target.');
+assert.ok(!finalFilterCss.includes('128px') && !finalFilterCss.includes('overflow: hidden !important;'), 'The final mobile date rules must not reintroduce the fixed-width or clipping restrictions.');
 assert.ok(mobileDateFixCss.includes('#mainContent .child-toolbar.expanded .child-search-field > .child-search-box') && mobileDateFixCss.includes('#mainContent .child-toolbar.expanded .child-filter-field > .child-filter-control') && mobileDateFixCss.includes('#mainContent .child-toolbar.expanded .child-date-row .date-input'), 'Mobile child-item search fields share the compact sizing override.');
 assert.ok(mobileDateFixCss.includes('height: 34px !important;') && mobileDateFixCss.includes('min-height: 34px !important;'), 'Mobile child-item search controls are slightly shorter without changing their width.');
 assert.ok(!html.includes('id="sidebarSearchTab"') && !html.includes('class="sidebar-mode-tabs"') && !html.includes("$('#sidebarSearchTab')") && !html.includes("case 'sidebar-mode':"), 'The redundant Search tab button is removed from the expanded Projects & Jobs sidebar.');

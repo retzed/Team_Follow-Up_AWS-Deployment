@@ -6029,9 +6029,9 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
 </style>
 
 <style id="mobile-account-date-input-sizing-fix">
-/* Keep Profile > Assigned Items and Profile > Search date bounds aligned with
-   the working child-item filters on narrow screens. Native date controls have
-   browser-specific intrinsic sizing, so constrain both axes explicitly. */
+/* Compact mobile date bounds in Profile > Search and Assigned Items. Keep
+   From/To adjacent, but cap each native control instead of stretching it
+   across half of the account panel. */
 @media (max-width: 820px) {
   #accountPage .account-search-controls,
   #accountPage .account-assigned-controls {
@@ -6050,12 +6050,12 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     flex: 0 1 auto !important;
     flex-direction: column !important;
     align-self: stretch !important;
-    width: 100% !important;
+    justify-self: start !important;
+    width: min(100%, 128px) !important;
     min-width: 0 !important;
     min-inline-size: 0 !important;
-    max-width: 100% !important;
-    max-inline-size: 100% !important;
-    overflow: visible !important;
+    max-width: 128px !important;
+    max-inline-size: 128px !important;
     box-sizing: border-box !important;
   }
 
@@ -6064,21 +6064,41 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   #accountPage .account-assigned-controls > .account-search-date-from-field > input[type="date"],
   #accountPage .account-assigned-controls > .account-search-date-to-field > input[type="date"] {
     display: block !important;
-    flex: 0 0 40px !important;
+    flex: 0 0 34px !important;
     width: 100% !important;
     inline-size: 100% !important;
     min-width: 0 !important;
     min-inline-size: 0 !important;
-    max-width: 100% !important;
+    max-width: 128px !important;
     max-inline-size: 100% !important;
-    height: 40px !important;
-    min-height: 40px !important;
-    max-height: 40px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
     margin: 0 !important;
-    padding: 0 7px !important;
+    padding: 0 6px !important;
     box-sizing: border-box !important;
     font-size: 16px !important;
     line-height: normal !important;
+  }
+}
+
+/* Child-item search already uses compact paired columns. Reduce the controls
+   slightly without changing their existing mobile width or grid placement. */
+@media (max-width: 700px) {
+  #mainContent .child-toolbar.expanded .child-search-field > .child-search-box,
+  #mainContent .child-toolbar.expanded .child-filter-field > .child-filter-control,
+  #mainContent .child-toolbar.expanded .child-date-row .date-input {
+    box-sizing: border-box !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    flex-basis: 34px !important;
+  }
+
+  #mainContent .child-toolbar.expanded .child-search-field > .child-search-box input {
+    height: 100% !important;
+    min-height: 0 !important;
+    padding-block: 0 !important;
   }
 }
 </style>

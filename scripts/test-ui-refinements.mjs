@@ -25,25 +25,38 @@ for (const [col, width] of [[4,28],[5,28]]) {
   assert.ok(targetedCss.includes(`.application-history-table th:nth-child(${col}),.application-history-table td:nth-child(${col}){width:${width}%!important;min-width:0!important}`), `Application history cells in column ${col} must respect its width.`);
 }
 assert.ok(targetedCss.includes('.application-history-table col:nth-child(6){width:auto!important}'), 'Application history Action column must consume remaining space after assigning 28% to each item column.');
-const mobileDateFixStart = html.indexOf('<style id="mobile-account-date-input-sizing-fix">');
-const mobileDateFixEnd = html.indexOf('</style>', mobileDateFixStart);
-assert.ok(mobileDateFixStart >= 0 && mobileDateFixEnd > mobileDateFixStart, 'Mobile profile date sizing override must exist.');
-const mobileDateFixCss = html.slice(mobileDateFixStart, mobileDateFixEnd);
-for (const area of ['.account-search-controls', '.account-assigned-controls']) {
-  assert.ok(mobileDateFixCss.includes(`#accountPage ${area}`) && mobileDateFixCss.includes('grid-template-columns: repeat(2, minmax(0, 1fr))'), `${area} must keep the From/To fields in two shrinkable mobile columns.`);
+const dateRangeStart = html.indexOf('<style id="account-date-range-structural-layout">');
+const dateRangeEnd = html.indexOf('</style>', dateRangeStart);
+assert.ok(dateRangeStart >= 0 && dateRangeEnd > dateRangeStart, 'The structural account date-range stylesheet must exist.');
+const dateRangeCss = html.slice(dateRangeStart, dateRangeEnd);
+const searchFromPos = html.indexOf('id="accountSearchDateFrom"');
+const searchToPos = html.indexOf('id="accountSearchDateTo"');
+const assignedFromPos = html.indexOf('id="accountAssignedDateFrom"');
+const assignedToPos = html.indexOf('id="accountAssignedDateTo"');
+for (const [name, fromPos, toPos] of [
+  ['Profile Search', searchFromPos, searchToPos],
+  ['Assigned Items', assignedFromPos, assignedToPos]
+]) {
+  assert.ok(fromPos >= 0 && toPos > fromPos, `${name} must contain both From and To date inputs.`);
+  const wrapperStart = html.lastIndexOf('<div class="account-search-date-range">', fromPos);
+  const wrapperEnd = html.indexOf('</div>', toPos);
+  assert.ok(wrapperStart >= 0 && wrapperEnd > toPos, `${name} From/To inputs must be enclosed by one shared date-range wrapper.`);
+  assert.ok(html.slice(wrapperStart, wrapperEnd).includes('account-search-date-from-field') && html.slice(wrapperStart, wrapperEnd).includes('account-search-date-to-field'), `${name} must preserve distinct From and To labels inside the paired wrapper.`);
 }
-assert.ok(mobileDateFixCss.includes('min-inline-size: 0 !important;') && mobileDateFixCss.includes('max-inline-size: 100% !important;') && mobileDateFixCss.includes('width: 100% !important;'), 'The earlier mobile date sizing block must retain shrink-safe control sizing.');
-const finalFilterStart = html.indexOf('<style id="mobile-account-filter-grid-final">');
-const finalFilterEnd = html.indexOf('</style>', finalFilterStart);
-assert.ok(finalFilterStart >= 0 && finalFilterEnd > finalFilterStart, 'The authoritative final mobile account filter layout must exist after the legacy overrides.');
-const finalFilterCss = html.slice(finalFilterStart, finalFilterEnd);
-assert.ok(finalFilterCss.includes('"user dateMode"'), 'Profile Search User and Date list filters must share one mobile row.');
-assert.ok(finalFilterCss.includes('"from to"') && !finalFilterCss.includes('"from from"') && !finalFilterCss.includes('"to to"'), 'From and To date fields must remain side by side in flexible mobile columns.');
-assert.ok(finalFilterCss.includes('width: 100% !important;') && finalFilterCss.includes('min-width: 0 !important;') && finalFilterCss.includes('overflow: visible !important;'), 'Mobile date field wrappers must fill their assigned grid cells without clipping the native picker.');
-assert.ok(finalFilterCss.includes('height: 42px !important;') && finalFilterCss.includes('font-size: 16px !important;'), 'Mobile native date controls must retain a full-height, readable touch target.');
-assert.ok(!finalFilterCss.includes('128px') && !finalFilterCss.includes('overflow: hidden !important;'), 'The final mobile date rules must not reintroduce the fixed-width or clipping restrictions.');
-assert.ok(mobileDateFixCss.includes('#mainContent .child-toolbar.expanded .child-search-field > .child-search-box') && mobileDateFixCss.includes('#mainContent .child-toolbar.expanded .child-filter-field > .child-filter-control') && mobileDateFixCss.includes('#mainContent .child-toolbar.expanded .child-date-row .date-input'), 'Mobile child-item search fields share the compact sizing override.');
-assert.ok(mobileDateFixCss.includes('height: 34px !important;') && mobileDateFixCss.includes('min-height: 34px !important;'), 'Mobile child-item search controls are slightly shorter without changing their width.');
+assert.equal((html.match(/<div class="account-search-date-range">/g) || []).length, 2, 'Only Search and Assigned Items should each render one paired date-range wrapper.');
+assert.ok(dateRangeCss.includes('grid-template-columns:repeat(2,minmax(0,1fr))'), 'The paired date-range wrapper must use two shrinkable columns.');
+assert.ok(dateRangeCss.includes('width:100% !important;') && dateRangeCss.includes('min-width:0 !important;') && dateRangeCss.includes('min-inline-size:0 !important;'), 'Both the date-range wrapper and its native inputs must be shrinkable and constrained to their assigned width.');
+assert.ok(dateRangeCss.includes('-webkit-appearance:none !important;') && dateRangeCss.includes('appearance:none !important;'), 'The native date fields must opt out of iOS WebKit intrinsic sizing.');
+assert.ok(dateRangeCss.includes('padding:0 !important;') && !dateRangeCss.includes('padding:0 5px'), 'Native date inputs must not have horizontal padding because iOS WebKit miscalculates their width when padding is applied.');
+assert.ok(dateRangeCss.includes('::-webkit-date-and-time-value{') && dateRangeCss.includes('height:1.5em !important;'), 'The WebKit date-value pseudo-element must reserve height so empty date fields do not collapse.');
+assert.ok(dateRangeCss.includes('"user dateMode"') && dateRangeCss.includes('"dateRange dateRange"'), 'Profile Search User and Date list stay adjacent while the paired date range gets its own full-width row.');
+assert.ok(dateRangeCss.includes('"priority dateMode"'), 'Assigned Items Priority and Date list stay adjacent.');
+assert.ok(dateRangeCss.includes('@media (max-width:360px)'), 'Only very narrow screens may stack the two date inputs to preserve legibility.');
+const childDateSizingStart = html.indexOf('<style id="mobile-account-date-input-sizing-fix">');
+const childDateSizingEnd = html.indexOf('</style>', childDateSizingStart);
+assert.ok(childDateSizingStart >= 0 && childDateSizingEnd > childDateSizingStart, 'Existing child-item mobile sizing rules must remain available.');
+const childDateSizingCss = html.slice(childDateSizingStart, childDateSizingEnd);
+assert.ok(childDateSizingCss.includes('#mainContent .child-toolbar.expanded .child-date-row .date-input'), 'The account date-field correction must not remove child-item date sizing.');
 
 const profileStatusStart = html.indexOf('<span id="profileSaveStatus"');
 const profileStatusEnd = html.indexOf('</span>', profileStatusStart);

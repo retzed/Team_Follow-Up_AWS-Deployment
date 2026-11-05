@@ -3050,7 +3050,7 @@ function renderAccountPage(){
    const options=[['Administrator','administrator'],['Editor','editor'],['User','standardUser']].map(([v,k])=>`<option value="${v}" ${value===v?'selected':''}>${esc(tr(k))}</option>`).join('');
    return `<div class="account-team-row"><div class="account-team-avatar">${icon(profileIconName(member.icon||roleIcons[member.role]||'profile-user'),18)}</div><div class="account-team-details"><strong>${esc(person(member.id).name)} ${member.id===user.id?`<span class="account-pill">${esc(tr('signedInAs'))}</span>`:''}</strong><span>${esc(person(member.id).role)}</span></div><div class="account-team-control"><select id="privilegeChoice-${esc(member.id)}" aria-label="${esc(tr('privilegeLabel'))} — ${esc(person(member.id).name)}" ${isProtected?'disabled':''}>${options}</select><button class="btn btn-small" type="button" data-action="save-user-privilege" data-user-id="${esc(member.id)}" ${isProtected?'disabled':''}>${esc(tr('savePrivilege'))}</button></div></div>`;
   }).join('')}</div>`:'';
-  panel=`<div class="account-panel-heading"><div><h2>${esc(tr('profileHeading'))}</h2><p>${esc(tr('profileHelp'))}</p></div>${user.privilege==='User'?'':`<span class="account-pill">${esc(privLabel)}</span>`}</div>${isRoot?`<div class="account-notice">${esc(tr('readOnlyRoot'))}</div>`:''}<form id="accountSettingsForm" hidden></form><form id="accountProfileForm"><div class="account-form-grid"><div class="account-field"><label for="accountName">${esc(tr('nameLabel'))}</label><input id="accountName" name="name" maxlength="100" autocomplete="name" required value="${esc(ui.accountProfileDraft?.name??user.name)}" ${disabled}></div><div class="account-field"><label for="accountNameArabic">${esc(tr('nameArabicLabel'))}</label><input id="accountNameArabic" name="nameArabic" maxlength="100" autocomplete="off" placeholder="${esc(user.name||'')}" value="${esc(ui.accountProfileDraft?.nameArabic??user.nameArabic??'')}" ${disabled}></div><div class="account-field"><label for="accountPhone">${esc(tr('phoneLabel'))}</label><input id="accountPhone" name="phoneNumber" maxlength="40" autocomplete="tel" value="${esc(ui.accountProfileDraft?.phoneNumber??user.phoneNumber??'')}" ${disabled}></div><div class="account-field"><label for="accountEmail">${esc(tr('emailLabel'))}</label><input id="accountEmail" name="email" type="email" maxlength="254" autocomplete="email" value="${esc(ui.accountProfileDraft?.email??user.email??'')}" ${disabled}></div><div class="account-field"><label for="accountRole">${esc(tr('labelLabel'))}</label><input id="accountRole" name="role" maxlength="80" required placeholder="${esc(tr('labelPlaceholder'))}" value="${esc(ui.accountProfileDraft?.role??user.role??'')}" ${disabled}></div><div class="account-field"><label for="accountRoleArabic">${esc(tr('labelArabicLabel'))}</label><input id="accountRoleArabic" name="roleArabic" maxlength="80" placeholder="${esc(user.role||'')}" value="${esc(ui.accountProfileDraft?.roleArabic??user.roleArabic??'')}" ${disabled}></div><div class="account-profile-icon-save-row"><div class="account-field"><label for="accountIcon">${esc(tr('iconLabel'))}</label><div class="account-icon-select"><select id="accountIcon" name="icon" ${disabled}>${iconOptions}</select><span id="accountIconPreview" class="account-icon-preview" aria-hidden="true">${icon(selectedProfileIcon,24)}</span></div></div><div class="account-profile-save-slot"><div class="account-form-actions"><span id="profileSaveStatus" class="account-message" role="status">${esc(ui.accountMessage||'')}</span><button class="btn btn-primary" type="submit" ${disabled||ui.accountSaving?'disabled':''}>${icon('check',13)} ${esc(ui.accountSaving?tr('saving'):tr('saveProfile'))}</button></div></div></div></div><div class="account-divider"></div><div class="account-panel-heading"><div><h2>${esc(tr('settingsHeading'))}</h2><p>${esc(tr('settingsHelp'))}</p></div></div><div class="account-form-grid"><div class="account-field"><label for="accountTheme">${esc(tr('themeLabel'))}</label><select id="accountTheme" name="theme" form="accountSettingsForm" ${disabled}><option value="light" ${(prefs.theme||ui.theme)==='light'?'selected':''}>${esc(tr('lightTheme'))}</option><option value="dark" ${(prefs.theme||ui.theme)==='dark'?'selected':''}>${esc(tr('darkTheme'))}</option></select></div><div class="account-field"><label for="accountLanguage">${esc(tr('languageLabel'))}</label><select id="accountLanguage" name="lang" form="accountSettingsForm" ${disabled}><option value="en" ${(prefs.lang||ui.lang)==='en'?'selected':''}>${esc(tr('englishLanguage'))}</option><option value="ar" ${(prefs.lang||ui.lang)==='ar'?'selected':''}>${esc(tr('arabicLanguage'))}</option></select></div></div></form>${passwordSection}${team}`;
+  panel=`<div class="account-panel-heading"><div><h2>${esc(tr('profileHeading'))}</h2><p>${esc(tr('profileHelp'))}</p></div>${user.privilege==='User'?'':`<span class="account-pill">${esc(privLabel)}</span>`}</div>${isRoot?`<div class="account-notice">${esc(tr('readOnlyRoot'))}</div>`:''}<form id="accountSettingsForm" hidden></form><form id="accountProfileForm"><div class="account-form-grid"><div class="account-field"><label for="accountName">${esc(tr('nameLabel'))}</label><input id="accountName" name="name" maxlength="100" autocomplete="name" required value="${esc(ui.accountProfileDraft?.name??user.name)}" ${disabled}></div><div class="account-field"><label for="accountNameArabic">${esc(tr('nameArabicLabel'))}</label><input id="accountNameArabic" name="nameArabic" maxlength="100" autocomplete="off" placeholder="${esc(user.name||'')}" value="${esc(ui.accountProfileDraft?.nameArabic??user.nameArabic??'')}" ${disabled}></div><div class="account-field"><label for="accountPhone">${esc(tr('phoneLabel'))}</label><input id="accountPhone" name="phoneNumber" maxlength="40" autocomplete="tel" value="${esc(ui.accountProfileDraft?.phoneNumber??user.phoneNumber??'')}" ${disabled}></div><div class="account-field"><label for="accountEmail">${esc(tr('emailLabel'))}</label><input id="accountEmail" name="email" type="email" maxlength="254" autocomplete="email" value="${esc(ui.accountProfileDraft?.email??user.email??'')}" ${disabled}></div><div class="account-field"><label for="accountRole">${esc(tr('labelLabel'))}</label><input id="accountRole" name="role" maxlength="80" required placeholder="${esc(tr('labelPlaceholder'))}" value="${esc(ui.accountProfileDraft?.role??user.role??'')}" ${disabled}></div><div class="account-field"><label for="accountRoleArabic">${esc(tr('labelArabicLabel'))}</label><input id="accountRoleArabic" name="roleArabic" maxlength="80" placeholder="${esc(user.role||'')}" value="${esc(ui.accountProfileDraft?.roleArabic??user.roleArabic??'')}" ${disabled}></div><div class="account-profile-icon-save-row"><div class="account-field"><label for="accountIcon">${esc(tr('iconLabel'))}</label><div class="account-icon-select"><select id="accountIcon" name="icon" ${disabled}>${iconOptions}</select><span id="accountIconPreview" class="account-icon-preview" aria-hidden="true">${icon(selectedProfileIcon,24)}</span></div></div><div class="account-profile-save-slot"><div class="account-form-actions"><span id="profileSaveStatus" class="account-message" role="status">${esc(ui.accountMessageKey?tr(ui.accountMessageKey):(ui.accountMessage||''))}</span><button class="btn btn-primary" type="submit" ${disabled||ui.accountSaving?'disabled':''}>${icon('check',13)} ${esc(ui.accountSaving?tr('saving'):tr('saveProfile'))}</button></div></div></div></div><div class="account-divider"></div><div class="account-panel-heading"><div><h2>${esc(tr('settingsHeading'))}</h2><p>${esc(tr('settingsHelp'))}</p></div></div><div class="account-form-grid"><div class="account-field"><label for="accountTheme">${esc(tr('themeLabel'))}</label><select id="accountTheme" name="theme" form="accountSettingsForm" ${disabled}><option value="light" ${(prefs.theme||ui.theme)==='light'?'selected':''}>${esc(tr('lightTheme'))}</option><option value="dark" ${(prefs.theme||ui.theme)==='dark'?'selected':''}>${esc(tr('darkTheme'))}</option></select></div><div class="account-field"><label for="accountLanguage">${esc(tr('languageLabel'))}</label><select id="accountLanguage" name="lang" form="accountSettingsForm" ${disabled}><option value="en" ${(prefs.lang||ui.lang)==='en'?'selected':''}>${esc(tr('englishLanguage'))}</option><option value="ar" ${(prefs.lang||ui.lang)==='ar'?'selected':''}>${esc(tr('arabicLanguage'))}</option></select></div></div></form>${passwordSection}${team}`;
  }else if(ui.accountTab==='assigned'){
   const assignedCount=filteredAccountAssignedItems().length;
   panel=`<div class="account-panel-heading"><div><h2>${esc(tr('accountAssigned'))}</h2><p>${esc(tr('assignedItemsSub'))}</p></div><span class="account-pill" id="accountAssignedCount">${assignedCount} ${esc(tr('items'))}</span></div><div class="account-search-controls account-assigned-controls"><label class="account-search-field account-search-query-field"><span>${esc(tr('sidebarSearch'))}</span><input id="accountAssignedQuery" type="search" value="${esc(ui.accountAssignedQuery||'')}" autocomplete="off" placeholder="${esc(tr('searchAssignedPlaceholder'))}"></label><label class="account-search-field account-search-type-field"><span>${esc(tr('type'))}</span><select id="accountAssignedType" aria-label="${esc(tr('type'))}"><option value="all" ${(ui.accountAssignedType||'all')==='all'?'selected':''}>${esc(tr('allTypes'))}</option><option value="project" ${ui.accountAssignedType==='project'?'selected':''}>${esc(tr('project'))}</option><option value="job" ${ui.accountAssignedType==='job'?'selected':''}>${esc(tr('job'))}</option><option value="task" ${ui.accountAssignedType==='task'?'selected':''}>${esc(tr('task'))}</option><option value="followup" ${ui.accountAssignedType==='followup'?'selected':''}>${esc(tr('followup'))}</option></select></label><label class="account-search-field account-search-status-field"><span>${esc(tr('status'))}</span><select id="accountAssignedStatus" aria-label="${esc(tr('status'))}"><option value="all" ${(ui.accountAssignedStatus||'all')==='all'?'selected':''}>${esc(tr('allStatuses'))}</option><option value="not-started" ${ui.accountAssignedStatus==='not-started'?'selected':''}>${esc(tr('notStarted'))}</option><option value="in-progress" ${ui.accountAssignedStatus==='in-progress'?'selected':''}>${esc(tr('inProgress'))}</option><option value="on-hold" ${ui.accountAssignedStatus==='on-hold'?'selected':''}>${esc(tr('onHold'))}</option><option value="completed" ${ui.accountAssignedStatus==='completed'?'selected':''}>${esc(tr('completed'))}</option><option value="not-completed" ${ui.accountAssignedStatus==='not-completed'?'selected':''}>${esc(tr('notCompleted'))}</option></select></label><label class="account-search-field account-search-priority-field"><span>${esc(tr('priority'))}</span><select id="accountAssignedPriority" aria-label="${esc(tr('priority'))}"><option value="all" ${(ui.accountAssignedPriority||'all')==='all'?'selected':''}>${esc(tr('allAssignedItems'))}</option><option value="urgent" ${ui.accountAssignedPriority==='urgent'?'selected':''}>${esc(tr('urgent'))}</option><option value="high" ${ui.accountAssignedPriority==='high'?'selected':''}>${esc(tr('high'))}</option><option value="medium" ${ui.accountAssignedPriority==='medium'?'selected':''}>${esc(tr('medium'))}</option><option value="low" ${ui.accountAssignedPriority==='low'?'selected':''}>${esc(tr('low'))}</option></select></label><label class="account-search-field account-search-date-mode-field"><span>${esc(tr('dateList'))}</span><select id="accountAssignedDateMode" aria-label="${esc(tr('dateList'))}"><option value="updated" ${(ui.accountAssignedDateMode||'updated')==='updated'?'selected':''}>${esc(tr('lastUpdated'))}</option><option value="last-created" ${ui.accountAssignedDateMode==='last-created'?'selected':''}>${esc(tr('lastCreated'))}</option><option value="created" ${ui.accountAssignedDateMode==='created'?'selected':''}>${esc(tr('createdOldest'))}</option></select></label><label class="account-search-field account-search-date-from-field"><span>${esc(tr('from'))}</span><input id="accountAssignedDateFrom" type="date" value="${esc(ui.accountAssignedDateFrom||'')}" aria-label="${esc(tr('from'))}"></label><label class="account-search-field account-search-date-to-field"><span>${esc(tr('to'))}</span><input id="accountAssignedDateTo" type="date" value="${esc(ui.accountAssignedDateTo||'')}" aria-label="${esc(tr('to'))}"></label><button class="subtle-btn account-search-clear-button" type="button" data-action="clear-account-assigned-filters">${icon('filter',13)} ${esc(tr('clear'))}</button></div><div id="accountAssignedResults">${accountAssignedResultsMarkup()}</div>`;
@@ -3091,12 +3091,82 @@ async function togglePinnedItem(itemId){
  catch(error){toast(String(error?.message||tr('pinFailed')),true);}
 }
 async function saveCurrentProfile(form){
- if(ui.accountSaving||rawCurrentUser()?.id==='root')return;ui.accountProfileRefreshToken=(ui.accountProfileRefreshToken||0)+1;const fields=Object.fromEntries(new FormData(form).entries());const payload={name:String(fields.name||'').trim(),nameArabic:String(fields.nameArabic||'').trim(),phoneNumber:String(fields.phoneNumber||'').trim(),email:String(fields.email||'').trim(),icon:String(fields.icon||'profile-user'),role:String(fields.role||'').trim(),roleArabic:String(fields.roleArabic||'').trim()};
- if(!payload.name||!payload.role){const status=$('#profileSaveStatus');if(status){status.textContent=tr('accountError');status.classList.add('error');}return;}
- ui.accountSaving=true;const button=form.querySelector('button[type="submit"]'),status=$('#profileSaveStatus');if(button){button.disabled=true;button.textContent=tr('saving');}if(status){status.textContent=tr('saving');status.classList.remove('error');}
- try{const result=await window.TeamFollowUpDataApi.updateMyProfile(payload);if(!result?.user)throw new Error(tr('accountError'));const profile=mergeProfileIntoData(result.user);mergeProfileEvents(result.activityEvents||[]);if(profile?.preferences){ui.lang=profile.preferences.lang;ui.theme=profile.preferences.theme;applyTheme();}ui.accountError='';ui.accountMessage=tr('profileSaved');ui.accountProfileDraft=null;ui.accountSaving=false;render();}
- catch(error){ui.accountSaving=false;if(status){status.textContent=String(error?.message||tr('accountError'));status.classList.add('error');}else toast(String(error?.message||tr('accountError')),true);}
- finally{ui.accountSaving=false;if(button)button.disabled=false;}
+ if(ui.accountSaving||rawCurrentUser()?.id==='root')return;
+ ui.accountProfileRefreshToken=(ui.accountProfileRefreshToken||0)+1;
+ const fields=Object.fromEntries(new FormData(form).entries());
+ const payload={
+  name:String(fields.name||'').trim(),
+  nameArabic:String(fields.nameArabic||'').trim(),
+  phoneNumber:String(fields.phoneNumber||'').trim(),
+  email:String(fields.email||'').trim(),
+  icon:String(fields.icon||'profile-user'),
+  role:String(fields.role||'').trim(),
+  roleArabic:String(fields.roleArabic||'').trim()
+ };
+ ui.accountProfileDraft=payload;
+ const button=form.querySelector('button[type="submit"]');
+ const initialStatus=$('#profileSaveStatus');
+ if(!payload.name||!payload.role){
+  ui.accountMessageKey='accountError';
+  ui.accountMessage='';ui.accountMessageKey='';
+  if(initialStatus){
+   initialStatus.textContent=tr('accountError');
+   initialStatus.classList.add('error');
+  }
+  return;
+ }
+
+ ui.accountMessageKey='';
+ ui.accountMessage='';ui.accountMessageKey='';
+ ui.accountSaving=true;
+ if(button){
+  button.disabled=true;
+  button.textContent=tr('saving');
+ }
+ if(initialStatus){
+  initialStatus.textContent=tr('saving');
+  initialStatus.classList.remove('error');
+ }
+
+ try{
+  const api=window.TeamFollowUpDataApi;
+  if(!api||typeof api.updateMyProfile!=='function')throw new Error(tr('accountError'));
+  const result=await api.updateMyProfile(payload);
+  if(!result?.user)throw new Error(tr('accountError'));
+
+  const profile=mergeProfileIntoData(result.user);
+  mergeProfileEvents(result.activityEvents||[]);
+  if(profile?.preferences){
+   ui.lang=profile.preferences.lang;
+   ui.theme=profile.preferences.theme;
+   applyTheme();
+  }
+
+  ui.accountError='';
+  ui.accountMessageKey='profileSaved';
+  ui.accountMessage='';ui.accountMessageKey='';
+  ui.accountProfileDraft=null;
+ }catch(error){
+  const message=String(error?.message||tr('accountError'));
+  ui.accountMessageKey='';
+  ui.accountMessage=message;
+  const currentStatus=$('#profileSaveStatus');
+  if(currentStatus){
+   currentStatus.textContent=message;
+   currentStatus.classList.add('error');
+  }else{
+   toast(message,true);
+  }
+ }finally{
+  ui.accountSaving=false;
+  const activeButton=button?.isConnected?button:$('#accountProfileForm button[type="submit"]');
+  if(activeButton){
+   activeButton.disabled=false;
+   activeButton.innerHTML=`${icon('check',13)} ${esc(tr('saveProfile'))}`;
+  }
+ }
+
+ if(ui.page==='account'&&ui.accountTab==='profile')renderAccountPage();
 }
 let currentPasswordVerificationSequence=0;
 let verifiedCurrentPasswordOwner='';
@@ -3211,7 +3281,7 @@ async function changeCurrentPassword(form){
 }
 async function saveUserPrivilege(userId){
  const targetId=String(userId||''),select=$('privilegeChoice-'+targetId);if(!select||!canManagePrivileges()||targetId==='root')return;
- try{const result=await window.TeamFollowUpDataApi.updateUserPrivilege(targetId,select.value);if(!result?.user)throw new Error(tr('accountError'));mergeProfileIntoData(result.user);mergeProfileEvents(result.activityEvents||[]);ui.accountMessage=tr('privilegeSaved');ui.accountError='';renderAccountPage();}
+ try{const result=await window.TeamFollowUpDataApi.updateUserPrivilege(targetId,select.value);if(!result?.user)throw new Error(tr('accountError'));mergeProfileIntoData(result.user);mergeProfileEvents(result.activityEvents||[]);ui.accountMessageKey='privilegeSaved';ui.accountMessage='';ui.accountError='';renderAccountPage();}
  catch(error){toast(String(error?.message||tr('accountError')),true);}
 }
 let preferenceSaveQueue=Promise.resolve(),preferenceChangeSequence=0;
@@ -4112,7 +4182,7 @@ async function reconcileSelectedWorkspaceParent(){
 }
 async function startWorkspaceHydration(){
  let hydratedUserTheme=null;
- ui.accountLoading=ui.page==='account';ui.accountAssignedRows=[];ui.accountPinnedRows=[];ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedLoading=false;ui.accountPinnedLoading=false;ui.accountAssignedError='';ui.accountPinnedError='';ui.accountError='';ui.accountMessage='';
+ ui.accountLoading=ui.page==='account';ui.accountAssignedRows=[];ui.accountPinnedRows=[];ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedLoading=false;ui.accountPinnedLoading=false;ui.accountAssignedError='';ui.accountPinnedError='';ui.accountError='';ui.accountMessage='';ui.accountMessageKey='';
  const hydrationRun=++workspaceHydrationGeneration;
  dataLoadState.initialComplete=false;dataLoadState.usersReady=false;dataLoadState.parentsReady=false;
  dataLoadState.childrenLoaded.clear();dataLoadState.activityLoaded.clear();dataLoadState.rootErrors.clear();dataLoadState.initialError='';
@@ -6236,5 +6306,140 @@ input[type="reset"]:not(:disabled):active,
  .layout.workspace-opening{animation:none!important}
 }
 </style>
+
+<style id="mobile-account-filter-grid-final">
+/* Final, authoritative account filter layout. Keep search metadata compact,
+   but give native date controls a full row so iOS cannot clip their value. */
+@media (max-width: 820px) {
+  #accountPage .account-search-controls,
+  #accountPage .account-assigned-controls {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-flow: row !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #accountPage .account-search-controls {
+    grid-template-areas:
+      "query query"
+      "type status"
+      "user dateMode"
+      "from from"
+      "to to"
+      "clear clear" !important;
+  }
+
+  #accountPage .account-assigned-controls {
+    grid-template-areas:
+      "query query"
+      "type status"
+      "priority dateMode"
+      "from from"
+      "to to"
+      "clear clear" !important;
+  }
+
+  #accountPage .account-search-controls > .account-search-query-field,
+  #accountPage .account-assigned-controls > .account-search-query-field { grid-area: query !important; }
+  #accountPage .account-search-controls > .account-search-type-field,
+  #accountPage .account-assigned-controls > .account-search-type-field { grid-area: type !important; }
+  #accountPage .account-search-controls > .account-search-status-field,
+  #accountPage .account-assigned-controls > .account-search-status-field { grid-area: status !important; }
+  #accountPage .account-assigned-controls > .account-search-priority-field { grid-area: priority !important; }
+  #accountPage .account-search-controls > .account-search-date-mode-field,
+  #accountPage .account-assigned-controls > .account-search-date-mode-field { grid-area: dateMode !important; }
+  #accountPage .account-search-controls > .account-search-user-field { grid-area: user !important; }
+
+  #accountPage .account-search-controls > .account-search-date-from-field,
+  #accountPage .account-assigned-controls > .account-search-date-from-field {
+    grid-area: from !important;
+  }
+  #accountPage .account-search-controls > .account-search-date-to-field,
+  #accountPage .account-assigned-controls > .account-search-date-to-field {
+    grid-area: to !important;
+  }
+  #accountPage .account-search-controls > .account-search-clear-button,
+  #accountPage .account-assigned-controls > .account-search-clear-button {
+    grid-area: clear !important;
+    justify-self: end !important;
+  }
+
+  #accountPage .account-search-controls > .account-search-field,
+  #accountPage .account-assigned-controls > .account-search-field {
+    display: flex !important;
+    flex-direction: column !important;
+    align-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-inline-size: 0 !important;
+    max-width: 100% !important;
+    max-inline-size: 100% !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  #accountPage .account-search-controls > .account-search-field > input,
+  #accountPage .account-search-controls > .account-search-field > select,
+  #accountPage .account-assigned-controls > .account-search-field > input,
+  #accountPage .account-assigned-controls > .account-search-field > select {
+    display: block !important;
+    width: 100% !important;
+    inline-size: 100% !important;
+    min-width: 0 !important;
+    min-inline-size: 0 !important;
+    max-width: 100% !important;
+    max-inline-size: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #accountPage .account-search-controls > .account-search-date-from-field,
+  #accountPage .account-search-controls > .account-search-date-to-field,
+  #accountPage .account-assigned-controls > .account-search-date-from-field,
+  #accountPage .account-assigned-controls > .account-search-date-to-field {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  #accountPage .account-search-controls > .account-search-date-from-field > input[type="date"],
+  #accountPage .account-search-controls > .account-search-date-to-field > input[type="date"],
+  #accountPage .account-assigned-controls > .account-search-date-from-field > input[type="date"],
+  #accountPage .account-assigned-controls > .account-search-date-to-field > input[type="date"] {
+    display: block !important;
+    flex: 0 1 auto !important;
+    width: 100% !important;
+    inline-size: 100% !important;
+    min-width: 0 !important;
+    min-inline-size: 0 !important;
+    max-width: 100% !important;
+    max-inline-size: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    margin: 0 !important;
+    padding: 0 10px !important;
+    box-sizing: border-box !important;
+    font-size: 16px !important;
+    line-height: normal !important;
+    direction: ltr !important;
+    text-align: left !important;
+    -webkit-appearance: auto !important;
+    appearance: auto !important;
+  }
+
+  #accountPage .account-search-controls > .account-search-clear-button,
+  #accountPage .account-assigned-controls > .account-search-clear-button {
+    min-height: 38px !important;
+  }
+}
+</style>
+
 </body>
 </html>

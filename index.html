@@ -5667,8 +5667,8 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
 #accountPage .account-search-controls > .account-search-status-field { grid-area: status !important; }
 #accountPage .account-search-controls > .account-search-date-mode-field { grid-area: dateMode !important; }
 #accountPage .account-search-controls > .account-search-user-field { grid-area: user !important; }
-#accountPage .account-search-controls > .account-search-date-from-field { grid-area: from !important; }
-#accountPage .account-search-controls > .account-search-date-to-field { grid-area: to !important; }
+
+
 #accountPage .account-search-controls > .account-search-clear-button { grid-area: clear !important; }
 
 #accountPage .account-search-controls > .account-search-field {
@@ -5688,18 +5688,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   max-inline-size: 100% !important;
   box-sizing: border-box !important;
 }
-#accountPage .account-search-controls > .account-search-date-from-field > input,
-#accountPage .account-search-controls > .account-search-date-to-field > input {
-  width: 100% !important;
-  inline-size: 100% !important;
-  min-width: 0 !important;
-  min-inline-size: 0 !important;
-  max-width: 100% !important;
-  max-inline-size: 100% !important;
-  padding-inline: 5px !important;
-  font-size: 12px !important;
-  flex: 0 1 auto !important;
-}
+
 
 /* Match Search result action groups to Assigned/Pinned rows on desktop: one
    right-aligned horizontal group, consistent 31px controls, no flex wrapping. */
@@ -5772,11 +5761,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
       "clear clear" !important;
     gap: 8px !important;
   }
-  #accountPage .account-search-controls > .account-search-date-from-field > input,
-  #accountPage .account-search-controls > .account-search-date-to-field > input {
-    padding-inline: 3px !important;
-    font-size: 11px !important;
-  }
+  
 }
 </style>
 
@@ -5918,20 +5903,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
       "clear clear" !important;
   }
 }
-@media (max-width: 380px) {
-  #accountPage .account-assigned-controls {
-    grid-template-columns: minmax(0, 1fr) !important;
-    grid-template-areas:
-      "query"
-      "type"
-      "status"
-      "dateMode"
-      "from"
-      "to"
-      "clear" !important;
-  }
-  #accountPage .account-assigned-controls > .account-search-clear-button { justify-self: end !important; }
-}
+
 </style>
 
 
@@ -6098,73 +6070,8 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
 </style>
 
 <style id="mobile-account-date-input-sizing-fix">
-/* Keep paired date fields fully visible on mobile. Do not cap native date
-   controls to a fixed width or clip their internal picker UI. */
-@media (max-width: 820px) {
-  #accountPage .account-search-controls,
-  #accountPage .account-assigned-controls {
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    box-sizing: border-box !important;
-  }
-
-  #accountPage .account-search-controls > .account-search-date-from-field,
-  #accountPage .account-search-controls > .account-search-date-to-field,
-  #accountPage .account-assigned-controls > .account-search-date-from-field,
-  #accountPage .account-assigned-controls > .account-search-date-to-field {
-    display: flex !important;
-    flex: 1 1 auto !important;
-    flex-direction: column !important;
-    align-self: stretch !important;
-    justify-self: stretch !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    min-inline-size: 0 !important;
-    max-width: 100% !important;
-    max-inline-size: 100% !important;
-    overflow: visible !important;
-    box-sizing: border-box !important;
-  }
-
-  #accountPage .account-search-controls > .account-search-date-from-field > input[type="date"],
-  #accountPage .account-search-controls > .account-search-date-to-field > input[type="date"],
-  #accountPage .account-assigned-controls > .account-search-date-from-field > input[type="date"],
-  #accountPage .account-assigned-controls > .account-search-date-to-field > input[type="date"] {
-    display: block !important;
-    flex: 1 1 auto !important;
-    width: 100% !important;
-    inline-size: 100% !important;
-    min-width: 0 !important;
-    min-inline-size: 0 !important;
-    max-width: 100% !important;
-    max-inline-size: 100% !important;
-    height: 40px !important;
-    min-height: 40px !important;
-    max-height: 40px !important;
-    margin: 0 !important;
-    padding: 0 4px !important;
-    box-sizing: border-box !important;
-    font-size: 16px !important;
-    line-height: normal !important;
-    direction: ltr !important;
-    text-align: left !important;
-    -webkit-appearance: auto !important;
-    appearance: auto !important;
-  }
-
-  #accountPage .account-search-controls > .account-search-date-from-field > input[type="date"]::-webkit-date-and-time-value,
-  #accountPage .account-search-controls > .account-search-date-to-field > input[type="date"]::-webkit-date-and-time-value,
-  #accountPage .account-assigned-controls > .account-search-date-from-field > input[type="date"]::-webkit-date-and-time-value,
-  #accountPage .account-assigned-controls > .account-search-date-to-field > input[type="date"]::-webkit-date-and-time-value {
-    min-width: 0;
-    white-space: nowrap;
-    text-align: left;
-  }
-}
-
-/* Keep child-item search control sizing unchanged. */
+/* Keep child-item search controls compact on mobile. Account date controls
+   are handled by the paired account-date-range component below. */
 @media (max-width: 700px) {
   #mainContent .child-toolbar.expanded .child-search-field > .child-search-box,
   #mainContent .child-toolbar.expanded .child-filter-field > .child-filter-control,
@@ -6302,7 +6209,7 @@ input[type="reset"]:not(:disabled):active,
   min-height:42px !important;
   max-height:42px !important;
   margin:0 !important;
-  padding:0 5px !important;
+  padding:0 !important;
   box-sizing:border-box !important;
   font-family:inherit !important;
   font-size:16px !important;
@@ -6314,8 +6221,11 @@ input[type="reset"]:not(:disabled):active,
   appearance:none !important;
 }
 #accountPage .account-search-date-range > .account-search-field > input[type="date"]::-webkit-date-and-time-value{
+  display:block !important;
+  width:100% !important;
   min-width:0 !important;
   min-inline-size:0 !important;
+  height:1.5em !important;
   margin:0 !important;
   padding:0 !important;
   text-align:left !important;

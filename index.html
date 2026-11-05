@@ -1230,48 +1230,6 @@ html[dir="rtl"] #signOutButton svg {
 .account-item-row{align-items:flex-start}.account-item-icon{width:38px;height:38px;display:grid;place-items:center;flex:none;background:var(--panel-2);border:1px solid var(--border);border-radius:11px;color:var(--accent)}.account-item-icon svg{width:18px;height:18px}.account-item-copy{flex:1;min-width:0}.account-item-copy strong{display:block;font-size:12px;line-height:1.5;overflow-wrap:anywhere}.account-item-copy span{display:block;margin-top:4px;color:var(--muted);font-size:10px;line-height:1.5;overflow-wrap:anywhere}.account-item-actions{display:flex;align-items:center;gap:7px;flex:none}.pin-item-btn{width:31px;height:31px;min-width:31px;border-radius:8px;padding:0;color:var(--muted)}.pin-item-btn[aria-pressed="true"]{color:var(--accent);background:var(--accent-soft);border-color:var(--accent)}.account-empty{padding:32px 16px;text-align:center;border:1px dashed var(--border);border-radius:12px;color:var(--muted);font-size:12px;line-height:1.7}.account-empty svg{width:25px;height:25px;color:var(--accent);margin-bottom:9px}
 @media(max-width:640px){.account-page{padding:13px 10px 22px}.account-hero{padding:15px;gap:12px}.account-hero-avatar{width:47px;height:47px}.account-tabs{gap:4px}.account-tab{padding:8px 10px;font-size:11px}.account-form-grid{grid-template-columns:minmax(0,1fr)}.account-password-current-field,.account-password-new-field,.account-password-confirm-field{grid-column:1;grid-row:auto}.account-field.full{grid-column:auto}.account-panel-heading{flex-direction:column}.account-team-row{align-items:flex-start;flex-wrap:wrap}.account-team-control{width:100%;justify-content:space-between}.account-team-control select{flex:1;max-width:none}.account-item-row{gap:8px;padding:10px}.account-item-icon{width:32px;height:32px}.account-item-actions{gap:4px}.account-item-actions .btn{font-size:10px;padding:0 8px;white-space:normal}.account-form-actions{justify-content:stretch}.account-form-actions .btn{flex:1}}
 </style>
-<style id="account-date-range-mobile-fix">
-/* Keep the account-page From/To fields usable side-by-side on narrow screens.
-   The mobile 16px input size prevents focus zoom; shrink the native date
-   control's internal spacing instead of reducing that font size. */
-.account-search-controls .account-search-date-from-field,
-.account-search-controls .account-search-date-to-field {
-  min-width: 0;
-  width: 100%;
-}
-.account-search-controls .account-search-date-from-field input[type="date"],
-.account-search-controls .account-search-date-to-field input[type="date"] {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-@media (max-width: 700px) {
-  .account-search-controls .account-search-date-from-field,
-  .account-search-controls .account-search-date-to-field {
-    grid-column: span 1 !important;
-  }
-  .account-search-controls input[type="date"] {
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    padding-inline: 4px !important;
-    font-size: 16px !important;
-    line-height: normal;
-  }
-  .account-search-controls input[type="date"]::-webkit-date-and-time-value {
-    min-width: 0;
-    text-align: start;
-  }
-  .account-search-controls input[type="date"]::-webkit-calendar-picker-indicator {
-    margin: 0;
-    padding: 0;
-  }
-}
-</style>
-
 </head>
 <body>
 <section class="signin-screen" id="signInScreen" role="dialog" aria-modal="true" aria-labelledby="signInTitle" hidden>
@@ -3053,11 +3011,11 @@ function renderAccountPage(){
   panel=`<div class="account-panel-heading"><div><h2>${esc(tr('profileHeading'))}</h2><p>${esc(tr('profileHelp'))}</p></div>${user.privilege==='User'?'':`<span class="account-pill">${esc(privLabel)}</span>`}</div>${isRoot?`<div class="account-notice">${esc(tr('readOnlyRoot'))}</div>`:''}<form id="accountSettingsForm" hidden></form><form id="accountProfileForm"><div class="account-form-grid"><div class="account-field"><label for="accountName">${esc(tr('nameLabel'))}</label><input id="accountName" name="name" maxlength="100" autocomplete="name" required value="${esc(ui.accountProfileDraft?.name??user.name)}" ${disabled}></div><div class="account-field"><label for="accountNameArabic">${esc(tr('nameArabicLabel'))}</label><input id="accountNameArabic" name="nameArabic" maxlength="100" autocomplete="off" placeholder="${esc(user.name||'')}" value="${esc(ui.accountProfileDraft?.nameArabic??user.nameArabic??'')}" ${disabled}></div><div class="account-field"><label for="accountPhone">${esc(tr('phoneLabel'))}</label><input id="accountPhone" name="phoneNumber" maxlength="40" autocomplete="tel" value="${esc(ui.accountProfileDraft?.phoneNumber??user.phoneNumber??'')}" ${disabled}></div><div class="account-field"><label for="accountEmail">${esc(tr('emailLabel'))}</label><input id="accountEmail" name="email" type="email" maxlength="254" autocomplete="email" value="${esc(ui.accountProfileDraft?.email??user.email??'')}" ${disabled}></div><div class="account-field"><label for="accountRole">${esc(tr('labelLabel'))}</label><input id="accountRole" name="role" maxlength="80" required placeholder="${esc(tr('labelPlaceholder'))}" value="${esc(ui.accountProfileDraft?.role??user.role??'')}" ${disabled}></div><div class="account-field"><label for="accountRoleArabic">${esc(tr('labelArabicLabel'))}</label><input id="accountRoleArabic" name="roleArabic" maxlength="80" placeholder="${esc(user.role||'')}" value="${esc(ui.accountProfileDraft?.roleArabic??user.roleArabic??'')}" ${disabled}></div><div class="account-profile-icon-save-row"><div class="account-field"><label for="accountIcon">${esc(tr('iconLabel'))}</label><div class="account-icon-select"><select id="accountIcon" name="icon" ${disabled}>${iconOptions}</select><span id="accountIconPreview" class="account-icon-preview" aria-hidden="true">${icon(selectedProfileIcon,24)}</span></div></div><div class="account-profile-save-slot"><div class="account-form-actions"><span id="profileSaveStatus" class="account-message" role="status">${esc(ui.accountMessageKey?tr(ui.accountMessageKey):(ui.accountMessage||''))}</span><button class="btn btn-primary" type="submit" ${disabled||ui.accountSaving?'disabled':''}>${icon('check',13)} ${esc(ui.accountSaving?tr('saving'):tr('saveProfile'))}</button></div></div></div></div><div class="account-divider"></div><div class="account-panel-heading"><div><h2>${esc(tr('settingsHeading'))}</h2><p>${esc(tr('settingsHelp'))}</p></div></div><div class="account-form-grid"><div class="account-field"><label for="accountTheme">${esc(tr('themeLabel'))}</label><select id="accountTheme" name="theme" form="accountSettingsForm" ${disabled}><option value="light" ${(prefs.theme||ui.theme)==='light'?'selected':''}>${esc(tr('lightTheme'))}</option><option value="dark" ${(prefs.theme||ui.theme)==='dark'?'selected':''}>${esc(tr('darkTheme'))}</option></select></div><div class="account-field"><label for="accountLanguage">${esc(tr('languageLabel'))}</label><select id="accountLanguage" name="lang" form="accountSettingsForm" ${disabled}><option value="en" ${(prefs.lang||ui.lang)==='en'?'selected':''}>${esc(tr('englishLanguage'))}</option><option value="ar" ${(prefs.lang||ui.lang)==='ar'?'selected':''}>${esc(tr('arabicLanguage'))}</option></select></div></div></form>${passwordSection}${team}`;
  }else if(ui.accountTab==='assigned'){
   const assignedCount=filteredAccountAssignedItems().length;
-  panel=`<div class="account-panel-heading"><div><h2>${esc(tr('accountAssigned'))}</h2><p>${esc(tr('assignedItemsSub'))}</p></div><span class="account-pill" id="accountAssignedCount">${assignedCount} ${esc(tr('items'))}</span></div><div class="account-search-controls account-assigned-controls"><label class="account-search-field account-search-query-field"><span>${esc(tr('sidebarSearch'))}</span><input id="accountAssignedQuery" type="search" value="${esc(ui.accountAssignedQuery||'')}" autocomplete="off" placeholder="${esc(tr('searchAssignedPlaceholder'))}"></label><label class="account-search-field account-search-type-field"><span>${esc(tr('type'))}</span><select id="accountAssignedType" aria-label="${esc(tr('type'))}"><option value="all" ${(ui.accountAssignedType||'all')==='all'?'selected':''}>${esc(tr('allTypes'))}</option><option value="project" ${ui.accountAssignedType==='project'?'selected':''}>${esc(tr('project'))}</option><option value="job" ${ui.accountAssignedType==='job'?'selected':''}>${esc(tr('job'))}</option><option value="task" ${ui.accountAssignedType==='task'?'selected':''}>${esc(tr('task'))}</option><option value="followup" ${ui.accountAssignedType==='followup'?'selected':''}>${esc(tr('followup'))}</option></select></label><label class="account-search-field account-search-status-field"><span>${esc(tr('status'))}</span><select id="accountAssignedStatus" aria-label="${esc(tr('status'))}"><option value="all" ${(ui.accountAssignedStatus||'all')==='all'?'selected':''}>${esc(tr('allStatuses'))}</option><option value="not-started" ${ui.accountAssignedStatus==='not-started'?'selected':''}>${esc(tr('notStarted'))}</option><option value="in-progress" ${ui.accountAssignedStatus==='in-progress'?'selected':''}>${esc(tr('inProgress'))}</option><option value="on-hold" ${ui.accountAssignedStatus==='on-hold'?'selected':''}>${esc(tr('onHold'))}</option><option value="completed" ${ui.accountAssignedStatus==='completed'?'selected':''}>${esc(tr('completed'))}</option><option value="not-completed" ${ui.accountAssignedStatus==='not-completed'?'selected':''}>${esc(tr('notCompleted'))}</option></select></label><label class="account-search-field account-search-priority-field"><span>${esc(tr('priority'))}</span><select id="accountAssignedPriority" aria-label="${esc(tr('priority'))}"><option value="all" ${(ui.accountAssignedPriority||'all')==='all'?'selected':''}>${esc(tr('allAssignedItems'))}</option><option value="urgent" ${ui.accountAssignedPriority==='urgent'?'selected':''}>${esc(tr('urgent'))}</option><option value="high" ${ui.accountAssignedPriority==='high'?'selected':''}>${esc(tr('high'))}</option><option value="medium" ${ui.accountAssignedPriority==='medium'?'selected':''}>${esc(tr('medium'))}</option><option value="low" ${ui.accountAssignedPriority==='low'?'selected':''}>${esc(tr('low'))}</option></select></label><label class="account-search-field account-search-date-mode-field"><span>${esc(tr('dateList'))}</span><select id="accountAssignedDateMode" aria-label="${esc(tr('dateList'))}"><option value="updated" ${(ui.accountAssignedDateMode||'updated')==='updated'?'selected':''}>${esc(tr('lastUpdated'))}</option><option value="last-created" ${ui.accountAssignedDateMode==='last-created'?'selected':''}>${esc(tr('lastCreated'))}</option><option value="created" ${ui.accountAssignedDateMode==='created'?'selected':''}>${esc(tr('createdOldest'))}</option></select></label><label class="account-search-field account-search-date-from-field"><span>${esc(tr('from'))}</span><input id="accountAssignedDateFrom" type="date" value="${esc(ui.accountAssignedDateFrom||'')}" aria-label="${esc(tr('from'))}"></label><label class="account-search-field account-search-date-to-field"><span>${esc(tr('to'))}</span><input id="accountAssignedDateTo" type="date" value="${esc(ui.accountAssignedDateTo||'')}" aria-label="${esc(tr('to'))}"></label><button class="subtle-btn account-search-clear-button" type="button" data-action="clear-account-assigned-filters">${icon('filter',13)} ${esc(tr('clear'))}</button></div><div id="accountAssignedResults">${accountAssignedResultsMarkup()}</div>`;
+  panel=`<div class="account-panel-heading"><div><h2>${esc(tr('accountAssigned'))}</h2><p>${esc(tr('assignedItemsSub'))}</p></div><span class="account-pill" id="accountAssignedCount">${assignedCount} ${esc(tr('items'))}</span></div><div class="account-search-controls account-assigned-controls"><label class="account-search-field account-search-query-field"><span>${esc(tr('sidebarSearch'))}</span><input id="accountAssignedQuery" type="search" value="${esc(ui.accountAssignedQuery||'')}" autocomplete="off" placeholder="${esc(tr('searchAssignedPlaceholder'))}"></label><label class="account-search-field account-search-type-field"><span>${esc(tr('type'))}</span><select id="accountAssignedType" aria-label="${esc(tr('type'))}"><option value="all" ${(ui.accountAssignedType||'all')==='all'?'selected':''}>${esc(tr('allTypes'))}</option><option value="project" ${ui.accountAssignedType==='project'?'selected':''}>${esc(tr('project'))}</option><option value="job" ${ui.accountAssignedType==='job'?'selected':''}>${esc(tr('job'))}</option><option value="task" ${ui.accountAssignedType==='task'?'selected':''}>${esc(tr('task'))}</option><option value="followup" ${ui.accountAssignedType==='followup'?'selected':''}>${esc(tr('followup'))}</option></select></label><label class="account-search-field account-search-status-field"><span>${esc(tr('status'))}</span><select id="accountAssignedStatus" aria-label="${esc(tr('status'))}"><option value="all" ${(ui.accountAssignedStatus||'all')==='all'?'selected':''}>${esc(tr('allStatuses'))}</option><option value="not-started" ${ui.accountAssignedStatus==='not-started'?'selected':''}>${esc(tr('notStarted'))}</option><option value="in-progress" ${ui.accountAssignedStatus==='in-progress'?'selected':''}>${esc(tr('inProgress'))}</option><option value="on-hold" ${ui.accountAssignedStatus==='on-hold'?'selected':''}>${esc(tr('onHold'))}</option><option value="completed" ${ui.accountAssignedStatus==='completed'?'selected':''}>${esc(tr('completed'))}</option><option value="not-completed" ${ui.accountAssignedStatus==='not-completed'?'selected':''}>${esc(tr('notCompleted'))}</option></select></label><label class="account-search-field account-search-priority-field"><span>${esc(tr('priority'))}</span><select id="accountAssignedPriority" aria-label="${esc(tr('priority'))}"><option value="all" ${(ui.accountAssignedPriority||'all')==='all'?'selected':''}>${esc(tr('allAssignedItems'))}</option><option value="urgent" ${ui.accountAssignedPriority==='urgent'?'selected':''}>${esc(tr('urgent'))}</option><option value="high" ${ui.accountAssignedPriority==='high'?'selected':''}>${esc(tr('high'))}</option><option value="medium" ${ui.accountAssignedPriority==='medium'?'selected':''}>${esc(tr('medium'))}</option><option value="low" ${ui.accountAssignedPriority==='low'?'selected':''}>${esc(tr('low'))}</option></select></label><label class="account-search-field account-search-date-mode-field"><span>${esc(tr('dateList'))}</span><select id="accountAssignedDateMode" aria-label="${esc(tr('dateList'))}"><option value="updated" ${(ui.accountAssignedDateMode||'updated')==='updated'?'selected':''}>${esc(tr('lastUpdated'))}</option><option value="last-created" ${ui.accountAssignedDateMode==='last-created'?'selected':''}>${esc(tr('lastCreated'))}</option><option value="created" ${ui.accountAssignedDateMode==='created'?'selected':''}>${esc(tr('createdOldest'))}</option></select></label><div class="account-search-date-range"><label class="account-search-field account-search-date-from-field"><span>${esc(tr('from'))}</span><input id="accountAssignedDateFrom" type="date" value="${esc(ui.accountAssignedDateFrom||'')}" aria-label="${esc(tr('from'))}"></label><label class="account-search-field account-search-date-to-field"><span>${esc(tr('to'))}</span><input id="accountAssignedDateTo" type="date" value="${esc(ui.accountAssignedDateTo||'')}" aria-label="${esc(tr('to'))}"></label></div><button class="subtle-btn account-search-clear-button" type="button" data-action="clear-account-assigned-filters">${icon('filter',13)} ${esc(tr('clear'))}</button></div><div id="accountAssignedResults">${accountAssignedResultsMarkup()}</div>`;
  } else {
   panel=`<div class="account-panel-heading"><div><h2>${esc(tr('accountPinned'))}</h2><p>${esc(tr('noPinnedItems'))}</p></div><span class="account-pill">${ui.accountPinnedRows.length} ${esc(tr('items'))}</span></div>${ui.accountPinnedLoading?`<div class="account-empty">${spinnerMarkup(tr('loadingPinned'),true)}</div>`:ui.accountPinnedError?`<div class="account-notice">${esc(ui.accountPinnedError)}</div>`:ui.accountPinnedRows.length?`<div class="account-item-list">${ui.accountPinnedRows.map(accountItemRow).join('')}</div>`:`<div class="account-empty">${icon('pin',24)}<div>${esc(tr('noPinnedItems'))}</div></div>`}`;
  }
- if(ui.accountTab==='search'){const accountSearchMarkup=accountSearchResultsMarkup();panel=`<div class="account-panel-heading"><div><h2>${esc(tr('accountSearch'))}</h2><p>${esc(tr('accountSearchHelp'))}</p></div><span class="account-pill" id="accountSearchCount">${ui.accountSearchResultCount||0} ${esc(tr('items'))}</span></div><div class="account-search-controls"><label class="account-search-field account-search-query-field"><span>${esc(tr('accountSearch'))}</span><input id="accountSearchQuery" type="search" value="${esc(ui.accountSearchQuery||'')}" autocomplete="off" placeholder="${esc(tr('searchPlaceholder'))}"></label><label class="account-search-field account-search-type-field"><span>${esc(tr('type'))}</span><select id="accountSearchType" aria-label="${esc(tr('type'))}"><option value="all" ${ui.accountSearchType==='all'?'selected':''}>${esc(tr('allTypes'))}</option><option value="project" ${ui.accountSearchType==='project'?'selected':''}>${esc(tr('project'))}</option><option value="job" ${ui.accountSearchType==='job'?'selected':''}>${esc(tr('job'))}</option></select></label><label class="account-search-field account-search-status-field"><span>${esc(tr('status'))}</span><select id="accountSearchStatus" aria-label="${esc(tr('status'))}"><option value="all" ${ui.accountSearchStatus==='all'?'selected':''}>${esc(tr('allStatuses'))}</option><option value="not-completed" ${ui.accountSearchStatus==='not-completed'?'selected':''}>${esc(tr('notCompleted'))}</option><option value="not-started" ${ui.accountSearchStatus==='not-started'?'selected':''}>${esc(tr('notStarted'))}</option><option value="in-progress" ${ui.accountSearchStatus==='in-progress'?'selected':''}>${esc(tr('inProgress'))}</option><option value="on-hold" ${ui.accountSearchStatus==='on-hold'?'selected':''}>${esc(tr('onHold'))}</option><option value="completed" ${ui.accountSearchStatus==='completed'?'selected':''}>${esc(tr('completed'))}</option></select></label><label class="account-search-field account-search-date-mode-field"><span>${esc(tr('dateList'))}</span><select id="accountSearchDateMode" aria-label="${esc(tr('dateList'))}"><option value="updated" ${(ui.accountSearchDateMode||'updated')==='updated'?'selected':''}>${esc(tr('lastUpdated'))}</option><option value="last-created" ${ui.accountSearchDateMode==='last-created'?'selected':''}>${esc(tr('lastCreated'))}</option><option value="created" ${ui.accountSearchDateMode==='created'?'selected':''}>${esc(tr('createdOldest'))}</option></select></label><label class="account-search-field account-search-user-field"><span>${esc(tr('accountSearchUserLabel'))}</span><select id="accountSearchUser" aria-label="${esc(tr('accountSearchUserLabel'))}"><option value="all" ${(ui.accountSearchUser||'all')==='all'?'selected':''}>${esc(tr('accountSearchAllUsers'))}</option>${(data.users||[]).slice().sort((a,b)=>String(person(a.id).name).localeCompare(String(person(b.id).name))).map(member=>`<option value="${esc(member.id)}" ${String(ui.accountSearchUser||'all')===String(member.id)?'selected':''}>${esc(person(member.id).name)}</option>`).join('')}</select></label><label class="account-search-field account-search-date-from-field"><span>${esc(tr('from'))}</span><input id="accountSearchDateFrom" type="date" value="${esc(ui.accountSearchDateFrom||'')}" aria-label="${esc(tr('from'))}"></label><label class="account-search-field account-search-date-to-field"><span>${esc(tr('to'))}</span><input id="accountSearchDateTo" type="date" value="${esc(ui.accountSearchDateTo||'')}" aria-label="${esc(tr('to'))}"></label><button class="subtle-btn account-search-clear-button" type="button" data-action="clear-account-search">${icon('filter',13)} ${esc(tr('clear'))}</button></div><div id="accountSearchResults" class="account-search-results">${accountSearchMarkup}</div>`;}
+ if(ui.accountTab==='search'){const accountSearchMarkup=accountSearchResultsMarkup();panel=`<div class="account-panel-heading"><div><h2>${esc(tr('accountSearch'))}</h2><p>${esc(tr('accountSearchHelp'))}</p></div><span class="account-pill" id="accountSearchCount">${ui.accountSearchResultCount||0} ${esc(tr('items'))}</span></div><div class="account-search-controls"><label class="account-search-field account-search-query-field"><span>${esc(tr('accountSearch'))}</span><input id="accountSearchQuery" type="search" value="${esc(ui.accountSearchQuery||'')}" autocomplete="off" placeholder="${esc(tr('searchPlaceholder'))}"></label><label class="account-search-field account-search-type-field"><span>${esc(tr('type'))}</span><select id="accountSearchType" aria-label="${esc(tr('type'))}"><option value="all" ${ui.accountSearchType==='all'?'selected':''}>${esc(tr('allTypes'))}</option><option value="project" ${ui.accountSearchType==='project'?'selected':''}>${esc(tr('project'))}</option><option value="job" ${ui.accountSearchType==='job'?'selected':''}>${esc(tr('job'))}</option></select></label><label class="account-search-field account-search-status-field"><span>${esc(tr('status'))}</span><select id="accountSearchStatus" aria-label="${esc(tr('status'))}"><option value="all" ${ui.accountSearchStatus==='all'?'selected':''}>${esc(tr('allStatuses'))}</option><option value="not-completed" ${ui.accountSearchStatus==='not-completed'?'selected':''}>${esc(tr('notCompleted'))}</option><option value="not-started" ${ui.accountSearchStatus==='not-started'?'selected':''}>${esc(tr('notStarted'))}</option><option value="in-progress" ${ui.accountSearchStatus==='in-progress'?'selected':''}>${esc(tr('inProgress'))}</option><option value="on-hold" ${ui.accountSearchStatus==='on-hold'?'selected':''}>${esc(tr('onHold'))}</option><option value="completed" ${ui.accountSearchStatus==='completed'?'selected':''}>${esc(tr('completed'))}</option></select></label><label class="account-search-field account-search-date-mode-field"><span>${esc(tr('dateList'))}</span><select id="accountSearchDateMode" aria-label="${esc(tr('dateList'))}"><option value="updated" ${(ui.accountSearchDateMode||'updated')==='updated'?'selected':''}>${esc(tr('lastUpdated'))}</option><option value="last-created" ${ui.accountSearchDateMode==='last-created'?'selected':''}>${esc(tr('lastCreated'))}</option><option value="created" ${ui.accountSearchDateMode==='created'?'selected':''}>${esc(tr('createdOldest'))}</option></select></label><label class="account-search-field account-search-user-field"><span>${esc(tr('accountSearchUserLabel'))}</span><select id="accountSearchUser" aria-label="${esc(tr('accountSearchUserLabel'))}"><option value="all" ${(ui.accountSearchUser||'all')==='all'?'selected':''}>${esc(tr('accountSearchAllUsers'))}</option>${(data.users||[]).slice().sort((a,b)=>String(person(a.id).name).localeCompare(String(person(b.id).name))).map(member=>`<option value="${esc(member.id)}" ${String(ui.accountSearchUser||'all')===String(member.id)?'selected':''}>${esc(person(member.id).name)}</option>`).join('')}</select></label><div class="account-search-date-range"><label class="account-search-field account-search-date-from-field"><span>${esc(tr('from'))}</span><input id="accountSearchDateFrom" type="date" value="${esc(ui.accountSearchDateFrom||'')}" aria-label="${esc(tr('from'))}"></label><label class="account-search-field account-search-date-to-field"><span>${esc(tr('to'))}</span><input id="accountSearchDateTo" type="date" value="${esc(ui.accountSearchDateTo||'')}" aria-label="${esc(tr('to'))}"></label></div><button class="subtle-btn account-search-clear-button" type="button" data-action="clear-account-search">${icon('filter',13)} ${esc(tr('clear'))}</button></div><div id="accountSearchResults" class="account-search-results">${accountSearchMarkup}</div>`;}
  const heroUser=user||currentUser();
  $('#accountPage').innerHTML=`<div class="account-page-inner"><section class="account-hero"><div class="account-hero-avatar">${icon(profileIconName(heroUser?.icon),25)}</div><div class="account-hero-copy"><h1>${esc(person(heroUser?.id||ui.actingUserId).name)}</h1><p>${esc(tr('accountHubSubtitle'))}</p></div><span class="account-pill">${esc(heroUser?.privilege==='Administrator'?tr('administrator'):heroUser?.privilege==='Editor'?tr('editor'):tr('standardUser'))}</span></section><nav class="account-tabs" aria-label="Account sections">${tabMarkup}</nav><section class="account-panel">${ui.accountError?`<div class="account-notice">${esc(ui.accountError)}</div>`:''}${panel}</section></div>`;
 }
@@ -5619,7 +5577,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
       "query query"
       "type status"
       "dateMode user"
-      "from to"
+      "dateRange dateRange"
       "clear clear" !important;
     grid-auto-flow: row !important;
     align-items: stretch !important;
@@ -5694,7 +5652,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   grid-template-areas:
     "query query type status"
-    "user dateMode from to"
+    "user dateMode dateRange dateRange"
     ". . . clear" !important;
   grid-auto-flow: row !important;
   align-items: stretch !important;
@@ -5809,9 +5767,8 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     grid-template-areas:
       "query query"
       "type status"
-      "user user"
-      "dateMode dateMode"
-      "from to"
+      "user dateMode"
+      "dateRange dateRange"
       "clear clear" !important;
     gap: 8px !important;
   }
@@ -5945,7 +5902,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   grid-template-areas:
     "query query type status"
-    "priority dateMode from to"
+    "priority dateMode dateRange dateRange"
     ". . . clear" !important;
 }
 #accountPage .account-assigned-controls > .account-search-priority-field { grid-area: priority !important; }
@@ -5957,7 +5914,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
       "query query"
       "type status"
       "priority dateMode"
-      "from to"
+      "dateRange dateRange"
       "clear clear" !important;
   }
 }
@@ -6000,9 +5957,8 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     grid-template-areas:
       "query query"
       "type status"
-      "user user"
-      "dateMode dateMode"
-      "from to"
+      "user dateMode"
+      "dateRange dateRange"
       "clear clear" !important;
   }
 
@@ -6011,7 +5967,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
       "query query"
       "type status"
       "priority dateMode"
-      "from to"
+      "dateRange dateRange"
       "clear clear" !important;
   }
 
@@ -6097,9 +6053,8 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
     grid-template-areas:
       "query query"
       "type status"
-      "user user"
-      "dateMode dateMode"
-      "from to"
+      "user dateMode"
+      "dateRange dateRange"
       "clear clear" !important;
   }
   #accountPage .account-assigned-controls {
@@ -6107,7 +6062,7 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
       "query query"
       "type status"
       "priority dateMode"
-      "from to"
+      "dateRange dateRange"
       "clear clear" !important;
   }
 }
@@ -6124,13 +6079,13 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   html[dir="rtl"] #accountPage .account-search-controls {
     grid-template-areas:
       "query query type status"
-      "user dateMode from to"
+      "user dateMode dateRange dateRange"
       "clear . . ." !important;
   }
   html[dir="rtl"] #accountPage .account-assigned-controls {
     grid-template-areas:
       "query query type status"
-      "priority dateMode from to"
+      "priority dateMode dateRange dateRange"
       "clear . . ." !important;
   }
 }
@@ -6308,133 +6263,140 @@ input[type="reset"]:not(:disabled):active,
 }
 </style>
 
-<style id="mobile-account-filter-grid-final">
-/* Final, authoritative account filter layout. Keep search metadata compact,
-   while keeping From and To paired in shrink-safe mobile columns. */
-@media (max-width: 820px) {
-  #accountPage .account-search-controls,
-  #accountPage .account-assigned-controls {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    grid-auto-flow: row !important;
-    align-items: stretch !important;
-    gap: 8px !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
+<style id="account-date-range-structural-layout">
+/* Date bounds are one structural control group. Its parent owns the account
+   filter grid position; the two labels share a separate, shrink-safe grid. */
+#accountPage .account-search-date-range{
+  grid-area:dateRange !important;
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  align-items:end !important;
+  gap:8px !important;
+  width:100% !important;
+  min-width:0 !important;
+  min-inline-size:0 !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+}
+#accountPage .account-search-date-range > .account-search-field{
+  display:flex !important;
+  flex-direction:column !important;
+  align-self:stretch !important;
+  width:100% !important;
+  min-width:0 !important;
+  min-inline-size:0 !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+  overflow:visible !important;
+}
+#accountPage .account-search-date-range > .account-search-field > input[type="date"]{
+  display:block !important;
+  flex:0 1 auto !important;
+  width:100% !important;
+  inline-size:100% !important;
+  min-width:0 !important;
+  min-inline-size:0 !important;
+  max-width:100% !important;
+  max-inline-size:100% !important;
+  height:42px !important;
+  min-height:42px !important;
+  max-height:42px !important;
+  margin:0 !important;
+  padding:0 5px !important;
+  box-sizing:border-box !important;
+  font-family:inherit !important;
+  font-size:16px !important;
+  line-height:normal !important;
+  direction:ltr !important;
+  text-align:left !important;
+  white-space:nowrap !important;
+  -webkit-appearance:none !important;
+  appearance:none !important;
+}
+#accountPage .account-search-date-range > .account-search-field > input[type="date"]::-webkit-date-and-time-value{
+  min-width:0 !important;
+  min-inline-size:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  text-align:left !important;
+}
+#accountPage .account-search-date-range > .account-search-field > input[type="date"]::-webkit-datetime-edit,
+#accountPage .account-search-date-range > .account-search-field > input[type="date"]::-webkit-datetime-edit-fields-wrapper{
+  min-width:0 !important;
+  padding:0 !important;
+}
+#accountPage .account-search-date-range > .account-search-field > input[type="date"]::-webkit-calendar-picker-indicator{
+  flex:0 0 auto !important;
+  width:16px !important;
+  min-width:16px !important;
+  margin:0 !important;
+  padding:0 !important;
+}
+@media (min-width:821px){
+  #accountPage .account-search-controls{
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    grid-template-areas:
+      "query query type status"
+      "user dateMode dateRange dateRange"
+      ". . . clear" !important;
   }
-
-  #accountPage .account-search-controls {
+  #accountPage .account-assigned-controls{
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    grid-template-areas:
+      "query query type status"
+      "priority dateMode dateRange dateRange"
+      ". . . clear" !important;
+  }
+}
+@media (max-width:820px){
+  #accountPage .account-search-controls,
+  #accountPage .account-assigned-controls{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    grid-auto-flow:row !important;
+    align-items:stretch !important;
+    gap:8px !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    box-sizing:border-box !important;
+  }
+  #accountPage .account-search-controls{
     grid-template-areas:
       "query query"
       "type status"
       "user dateMode"
-      "from to"
+      "dateRange dateRange"
       "clear clear" !important;
   }
-
-  #accountPage .account-assigned-controls {
+  #accountPage .account-assigned-controls{
     grid-template-areas:
       "query query"
       "type status"
       "priority dateMode"
-      "from to"
+      "dateRange dateRange"
       "clear clear" !important;
   }
-
-  #accountPage .account-search-controls > .account-search-query-field,
-  #accountPage .account-assigned-controls > .account-search-query-field { grid-area: query !important; }
-  #accountPage .account-search-controls > .account-search-type-field,
-  #accountPage .account-assigned-controls > .account-search-type-field { grid-area: type !important; }
-  #accountPage .account-search-controls > .account-search-status-field,
-  #accountPage .account-assigned-controls > .account-search-status-field { grid-area: status !important; }
-  #accountPage .account-assigned-controls > .account-search-priority-field { grid-area: priority !important; }
-  #accountPage .account-search-controls > .account-search-date-mode-field,
-  #accountPage .account-assigned-controls > .account-search-date-mode-field { grid-area: dateMode !important; }
-  #accountPage .account-search-controls > .account-search-user-field { grid-area: user !important; }
-
-  #accountPage .account-search-controls > .account-search-date-from-field,
-  #accountPage .account-assigned-controls > .account-search-date-from-field {
-    grid-area: from !important;
+  #accountPage .account-search-date-range{
+    grid-column:1 / -1 !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
   }
-  #accountPage .account-search-controls > .account-search-date-to-field,
-  #accountPage .account-assigned-controls > .account-search-date-to-field {
-    grid-area: to !important;
+  #accountPage .account-search-date-range > .account-search-field,
+  #accountPage .account-search-date-range > .account-search-field > input[type="date"]{
+    min-width:0 !important;
+    min-inline-size:0 !important;
+    max-width:100% !important;
+    max-inline-size:100% !important;
   }
-  #accountPage .account-search-controls > .account-search-clear-button,
-  #accountPage .account-assigned-controls > .account-search-clear-button {
-    grid-area: clear !important;
-    justify-self: end !important;
-  }
-
-  #accountPage .account-search-controls > .account-search-field,
-  #accountPage .account-assigned-controls > .account-search-field {
-    display: flex !important;
-    flex-direction: column !important;
-    align-self: stretch !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    min-inline-size: 0 !important;
-    max-width: 100% !important;
-    max-inline-size: 100% !important;
-    box-sizing: border-box !important;
-    overflow: visible !important;
-  }
-
-  #accountPage .account-search-controls > .account-search-field > input,
-  #accountPage .account-search-controls > .account-search-field > select,
-  #accountPage .account-assigned-controls > .account-search-field > input,
-  #accountPage .account-assigned-controls > .account-search-field > select {
-    display: block !important;
-    width: 100% !important;
-    inline-size: 100% !important;
-    min-width: 0 !important;
-    min-inline-size: 0 !important;
-    max-width: 100% !important;
-    max-inline-size: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  #accountPage .account-search-controls > .account-search-date-from-field,
-  #accountPage .account-search-controls > .account-search-date-to-field,
-  #accountPage .account-assigned-controls > .account-search-date-from-field,
-  #accountPage .account-assigned-controls > .account-search-date-to-field {
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    overflow: visible !important;
-  }
-
-  #accountPage .account-search-controls > .account-search-date-from-field > input[type="date"],
-  #accountPage .account-search-controls > .account-search-date-to-field > input[type="date"],
-  #accountPage .account-assigned-controls > .account-search-date-from-field > input[type="date"],
-  #accountPage .account-assigned-controls > .account-search-date-to-field > input[type="date"] {
-    display: block !important;
-    flex: 0 1 auto !important;
-    width: 100% !important;
-    inline-size: 100% !important;
-    min-width: 0 !important;
-    min-inline-size: 0 !important;
-    max-width: 100% !important;
-    max-inline-size: 100% !important;
-    height: 42px !important;
-    min-height: 42px !important;
-    max-height: 42px !important;
-    margin: 0 !important;
-    padding: 0 10px !important;
-    box-sizing: border-box !important;
-    font-size: 16px !important;
-    line-height: normal !important;
-    direction: ltr !important;
-    text-align: left !important;
-    -webkit-appearance: auto !important;
-    appearance: auto !important;
-  }
-
-  #accountPage .account-search-controls > .account-search-clear-button,
-  #accountPage .account-assigned-controls > .account-search-clear-button {
-    min-height: 38px !important;
+}
+@media (max-width:360px){
+  /* On very narrow 320px-class viewports, keep the rest of the filters in two
+     columns and stack only the two native date controls to protect their text. */
+  #accountPage .account-search-date-range{
+    grid-template-columns:minmax(0,1fr) !important;
   }
 }
 </style>

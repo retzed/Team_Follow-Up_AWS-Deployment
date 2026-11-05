@@ -6310,7 +6310,7 @@ input[type="reset"]:not(:disabled):active,
 
 <style id="mobile-account-filter-grid-final">
 /* Final, authoritative account filter layout. Keep search metadata compact,
-   but give native date controls a full row so iOS cannot clip their value. */
+   while keeping From and To paired in shrink-safe mobile columns. */
 @media (max-width: 820px) {
   #accountPage .account-search-controls,
   #accountPage .account-assigned-controls {
@@ -6330,8 +6330,7 @@ input[type="reset"]:not(:disabled):active,
       "query query"
       "type status"
       "user dateMode"
-      "from from"
-      "to to"
+      "from to"
       "clear clear" !important;
   }
 
@@ -6340,8 +6339,7 @@ input[type="reset"]:not(:disabled):active,
       "query query"
       "type status"
       "priority dateMode"
-      "from from"
-      "to to"
+      "from to"
       "clear clear" !important;
   }
 
@@ -6402,7 +6400,6 @@ input[type="reset"]:not(:disabled):active,
   #accountPage .account-search-controls > .account-search-date-to-field,
   #accountPage .account-assigned-controls > .account-search-date-from-field,
   #accountPage .account-assigned-controls > .account-search-date-to-field {
-    grid-column: 1 / -1 !important;
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;

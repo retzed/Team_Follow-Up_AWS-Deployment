@@ -25,3 +25,13 @@ for (const [col, width] of [[4,28],[5,28]]) {
   assert.ok(targetedCss.includes(`.application-history-table th:nth-child(${col}),.application-history-table td:nth-child(${col}){width:${width}%!important;min-width:0!important}`), `Application history cells in column ${col} must respect its width.`);
 }
 assert.ok(targetedCss.includes('.application-history-table col:nth-child(6){width:auto!important}'), 'Application history Action column must consume remaining space after assigning 28% to each item column.');
+const mobileDateFixStart = html.indexOf('<style id="mobile-account-date-input-sizing-fix">');
+const mobileDateFixEnd = html.indexOf('</style>', mobileDateFixStart);
+assert.ok(mobileDateFixStart >= 0 && mobileDateFixEnd > mobileDateFixStart, 'Mobile profile date sizing override must exist.');
+const mobileDateFixCss = html.slice(mobileDateFixStart, mobileDateFixEnd);
+for (const area of ['.account-search-controls', '.account-assigned-controls']) {
+  assert.ok(mobileDateFixCss.includes(`#accountPage ${area}`) && mobileDateFixCss.includes('grid-template-columns: repeat(2, minmax(0, 1fr))'), `${area} must keep the From/To fields in two shrinkable mobile columns.`);
+}
+assert.ok(mobileDateFixCss.includes('height: 40px !important;') && mobileDateFixCss.includes('min-height: 40px !important;') && mobileDateFixCss.includes('max-height: 40px !important;'), 'Mobile profile date controls must have a consistent touch-friendly height.');
+assert.ok(mobileDateFixCss.includes('min-inline-size: 0 !important;') && mobileDateFixCss.includes('max-inline-size: 100% !important;') && mobileDateFixCss.includes('width: 100% !important;'), 'Mobile profile date controls must shrink to their available grid width.');
+assert.ok(!html.includes('id="sidebarSearchTab"') && !html.includes('class="sidebar-mode-tabs"') && !html.includes("$('#sidebarSearchTab')") && !html.includes("case 'sidebar-mode':"), 'The redundant Search tab button is removed from the expanded Projects & Jobs sidebar.');

@@ -54,6 +54,11 @@ assert.ok(dateRangeCss.includes('"priority dateMode"'), 'Assigned Items Priority
 assert.ok(dateRangeCss.includes('@media (max-width:360px)'), 'Only very narrow screens may stack the two date inputs to preserve legibility.');
 assert.ok(!html.includes('#accountPage .account-search-controls > .account-search-date-from-field') && !html.includes('#accountPage .account-search-controls > .account-search-date-to-field'), 'Obsolete direct-child date selectors must be removed now that the date inputs share a wrapper.');
 assert.ok(!html.includes('#accountPage .account-assigned-controls > .account-search-date-from-field') && !html.includes('#accountPage .account-assigned-controls > .account-search-date-to-field'), 'Assigned Items must use the same wrapper-based date layout without old direct-child overrides.');
+assert.ok(!html.includes('id="mobile-profile-search-date-width-fix"') && !html.includes('id="mobile-profile-date-row-width-fix"'), 'Legacy mobile date stylesheets with direct-child placement and clipping rules must be removed.');
+const dateRangeCssStart = html.indexOf('<style id="account-date-range-structural-layout">');
+const dateRangeCssEnd = html.indexOf('</style>', dateRangeCssStart);
+const finalDateRangeCss = html.slice(dateRangeCssStart, dateRangeCssEnd);
+assert.ok(!finalDateRangeCss.includes('overflow: hidden') && !finalDateRangeCss.includes('padding:0 5px'), 'The final date stylesheet must not clip native date inputs or apply horizontal padding that triggers iOS width miscalculation.');
 const childDateSizingStart = html.indexOf('<style id="mobile-account-date-input-sizing-fix">');
 const childDateSizingEnd = html.indexOf('</style>', childDateSizingStart);
 assert.ok(childDateSizingStart >= 0 && childDateSizingEnd > childDateSizingStart, 'Existing child-item mobile sizing rules must remain available.');

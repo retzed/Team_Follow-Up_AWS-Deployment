@@ -1,5 +1,5 @@
 {
-  "name": "team-follow-up-application",
+  "name": "follow-up",
   "version": "1.0.0",
   "private": true,
   "description": "Follow-Up application for AWS Amplify Hosting, Cognito and DynamoDB-compatible API access.",

@@ -59,7 +59,7 @@ const savingPosition = saveProfileSource.indexOf('ui.accountSaving=true');
 assert.ok(validationPosition >= 0 && savingPosition > validationPosition, 'Client-side validation must complete before entering the saving state.');
 assert.ok(saveProfileSource.includes('ui.accountProfileDraft=payload;'), 'Profile edits must remain in the form draft when the API rejects invalid data.');
 assert.ok(saveProfileSource.includes('finally{') && saveProfileSource.includes('ui.accountSaving=false;') && saveProfileSource.includes('activeButton.disabled=false;'), 'The profile saving state and submit button must always be released in finally, including rejected API requests.');
-assert.ok(saveProfileSource.includes("activeButton.innerHTML=`\${icon('check',13)} \${esc(tr('saveProfile'))}`;"), 'After any save outcome, the submit button must return to its localized Save label.');
+assert.ok(saveProfileSource.includes("activeButton.innerHTML=`${icon('check',13)} ${esc(tr('saveProfile'))}`;"), 'After any save outcome, the submit button must return to its localized Save label.');
 const preferenceStart = html.indexOf('async function changeUserPreference(key,value){');
 const preferenceEnd = html.indexOf('function render(){', preferenceStart);
 assert.ok(preferenceStart >= 0 && preferenceEnd > preferenceStart, 'The user preference handler must exist.');

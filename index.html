@@ -4486,7 +4486,7 @@ async function applyRealtimeChangeBatch(changes){
   else if(ui.accountAssignedLoaded){
    const assigned=new Map((ui.accountAssignedRows||[]).map(row=>[String(row.id),row]));
    for(const id of new Set([...updatedIds,...deletedIds]))assigned.delete(id);
-   for(const item of resolvedById.values())if(itemAssigneeIds(item).includes(currentUserId))assigned.set(String(item.id),item);
+   for(const item of resolvedById.values())if(item.assigneeMode==='all'||(item.assigneeMode!=='none'&&(Array.isArray(item.assigneeIds)?item.assigneeIds:[item.ownerId]).some(id=>String(id||'')===currentUserId)))assigned.set(String(item.id),item);
    ui.accountAssignedRows=[...assigned.values()];
    if(ui.page==='account'&&ui.accountTab==='assigned')renderAccountPage();
   }else if(ui.page==='account'&&ui.accountTab==='assigned')void loadAccountAssignedItems();

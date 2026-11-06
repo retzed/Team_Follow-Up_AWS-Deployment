@@ -83,7 +83,7 @@ check(newParentBranch.includes('dataLoadState.childrenLoaded.add(String(item.id)
 check(html.includes("case 'retry-data-load':if(ui.modal?.kind==='history')"),
   'Data-load retry must remain available and target the relevant view.');
 
-const itemPopupStart = html.indexOf('function openHistory(itemId)');
+const itemPopupStart = html.indexOf('function openHistory(itemId,');
 const appPopupStart = html.indexOf('function openApplicationHistory()', itemPopupStart);
 const editPopupStart = html.indexOf('function openEdit(', appPopupStart);
 check(itemPopupStart >= 0 && appPopupStart > itemPopupStart, 'The item and application-wide history popup openers must exist.');

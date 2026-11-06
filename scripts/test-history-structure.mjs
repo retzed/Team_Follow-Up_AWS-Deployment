@@ -274,3 +274,63 @@ const workspaceFixCss = html.slice(workspaceFixStart, workspaceFixEnd);
 assert.ok(workspaceFixCss.includes('grid-template-columns:22px minmax(132px,1fr)') && workspaceFixCss.includes('minmax(132px,1fr)') && workspaceFixCss.includes('overflow-wrap:break-word !important;') && workspaceFixCss.includes('writing-mode:horizontal-tb !important;'), 'Hierarchy rows must preserve a usable text column and horizontal text flow on phones.');
 assert.ok(workspaceFixCss.includes('.mobile-search-toggle[aria-expanded="true"]') && workspaceFixCss.includes('.mobile-search-toggle[aria-expanded="false"]') && workspaceFixCss.includes('mobile-search-toggle-state svg'), 'The search toggle must visually distinguish expanded and collapsed states.');
 assert.ok(workspaceFixCss.includes('position:fixed !important; top:86px !important; bottom:auto !important;') && workspaceFixCss.includes('top:78px !important;'), 'The scroll-to-top button must stay at the top edge of the workspace below the sticky header.');
+
+const assignedRowStart=html.indexOf('function accountAssignedItemRow(item){');
+const assignedRowEnd=html.indexOf('\nfunction filteredAccountAssignedItems(',assignedRowStart);
+assert.ok(assignedRowStart>=0&&assignedRowEnd>assignedRowStart,'Assigned Items must have a dedicated row renderer so Pinned Items retain their existing layout.');
+const assignedRowSource=html.slice(assignedRowStart,assignedRowEnd);
+assert.ok(assignedRowSource.includes('account-assigned-context-row')&&assignedRowSource.includes('account-assigned-parent-name')&&assignedRowSource.includes('typeLabel'), 'Task and Follow-up rows must show their type and immediate parent in the first metadata row.');
+assert.ok(assignedRowSource.includes("priorityPill(item.priority||'medium')")&&assignedRowSource.includes('statusPill(item.status)')&&assignedRowSource.includes('account-assigned-due'), 'Task and Follow-up rows must show priority, status, and due date together in the second metadata row.');
+assert.ok(assignedRowSource.includes('isParent')&&assignedRowSource.includes('data-history-scope="item"')&&assignedRowSource.includes('statusPill(item.status)'), 'Project and Job rows must show type, status, and due date together and request item-only history.');
+assert.ok(assignedRowSource.includes('data-action="select-assigned"')&&assignedRowSource.includes('pinActionMarkup(id)')&&assignedRowSource.includes('data-action="history"'), 'The Assigned Items row must retain its existing Work, Activity, and Pin actions.');
+
+const assignedHydratorStart=html.indexOf('async function hydrateAccountAssignedParentNames(');
+const assignedHydratorEnd=html.indexOf('\nfunction accountAssignedItemRow(',assignedHydratorStart);
+assert.ok(assignedHydratorStart>=0&&assignedHydratorEnd>assignedHydratorStart,'Immediate parent-name hydration must be isolated from the display renderer.');
+const assignedHydratorSource=html.slice(assignedHydratorStart,assignedHydratorEnd);
+assert.ok(assignedHydratorSource.includes('api.resolveItems')&&assignedHydratorSource.includes('offset+=100')&&assignedHydratorSource.includes('assignedParentName'), 'Missing immediate parent names must be resolved in bounded batches and attached as display metadata.');
+assert.ok(assignedHydratorSource.includes('catch(error)')&&assignedHydratorSource.includes('return rows;'), 'Optional parent-name hydration failures must not block Assigned Items loading.');
+
+const assignedVisibilityStart=html.indexOf('function accountAssignedSectionVisibility(){');
+const assignedGroupsEnd=html.indexOf('\nfunction accountAssignedSectionMarkup(',assignedVisibilityStart);
+assert.ok(assignedVisibilityStart>=0&&assignedGroupsEnd>assignedVisibilityStart,'Assigned Items must define explicit section visibility and grouping rules.');
+const assignedGroupsSource=html.slice(assignedVisibilityStart,assignedGroupsEnd);
+function assignedGroupsFor(type,priority){
+ const rows=[
+  {id:'t1',type:'task'},{id:'f1',type:'followup'},
+  {id:'p1',type:'project'},{id:'j1',type:'job'}
+ ];
+ return vm.runInNewContext(assignedGroupsSource+'; accountAssignedSections(rows);',{
+  ui:{accountAssignedType:type,accountAssignedPriority:priority},rows
+ });
+}
+const allAssignedGroups=assignedGroupsFor('all','all');
+assert.equal(allAssignedGroups.taskFollowups.length,2,'The first section must contain Tasks and Follow-ups when no type filter is selected.');
+assert.equal(allAssignedGroups.projectsJobs.length,2,'The second section must contain Projects and Jobs when no type or priority filter is selected.');
+const priorityAssignedGroups=assignedGroupsFor('all','high');
+assert.equal(priorityAssignedGroups.taskFollowups.length,2,'Priority filtering must retain the Tasks & Follow-ups section.');
+assert.equal(priorityAssignedGroups.projectsJobs.length,0,'Priority filtering must hide the Projects & Jobs section.');
+const projectAssignedGroups=assignedGroupsFor('project','all');
+assert.equal(projectAssignedGroups.taskFollowups.length,0,'An explicit Project type filter must hide Tasks & Follow-ups.');
+assert.equal(projectAssignedGroups.projectsJobs.length,1,'An explicit Project type filter must retain only the matching parent section rows.');
+const followupAssignedGroups=assignedGroupsFor('followup','all');
+assert.equal(followupAssignedGroups.taskFollowups.length,1,'An explicit Follow-up type filter must retain only Follow-ups.');
+assert.equal(followupAssignedGroups.projectsJobs.length,0,'An explicit Follow-up type filter must hide Projects & Jobs.');
+const assignedResultsStart=html.indexOf('function accountAssignedResultsMarkup(){');
+const assignedResultsEnd=html.indexOf('\nfunction refreshAccountAssignedResults(',assignedResultsStart);
+assert.ok(assignedResultsStart>=0&&assignedResultsEnd>assignedResultsStart,'The two-section Assigned Items result renderer must exist.');
+const assignedResultsSource=html.slice(assignedResultsStart,assignedResultsEnd);
+assert.ok(assignedResultsSource.includes("accountAssignedSectionMarkup('taskFollowups'")&&assignedResultsSource.includes("accountAssignedSectionMarkup('projectsJobs'")&&assignedResultsSource.indexOf("accountAssignedSectionMarkup('taskFollowups'")<assignedResultsSource.indexOf("accountAssignedSectionMarkup('projectsJobs'"), 'Tasks & Follow-ups must render before Projects & Jobs.');
+assert.ok(assignedResultsSource.includes('filteredAccountAssignedItems()')&&assignedResultsSource.includes('accountAssignedSections(rows)'), 'Both sections must use the same filtered row set.');
+
+const assignedHistoryStart=html.indexOf('function openHistory(');
+const assignedHistoryEnd=html.indexOf('\nfunction openApplicationHistory(',assignedHistoryStart);
+assert.ok(assignedHistoryStart>=0&&assignedHistoryEnd>assignedHistoryStart,'The item history opener must exist.');
+const assignedHistorySource=html.slice(assignedHistoryStart,assignedHistoryEnd);
+assert.ok(assignedHistorySource.includes("requestedScope==='item'")&&assignedHistorySource.includes("historyScope=item.type==='followup'||requestedScope==='item'?'item':'all'"), 'The history opener must honor an Assigned Items request to default to This item only.');
+assert.ok(html.includes("actionEl.dataset.historyScope||''"), 'The Activity action handler must forward the requested history scope.');
+
+assert.ok(html.includes("assignedTasksFollowups:'Tasks & Follow-ups'")&&html.includes("assignedProjectsJobs:'Projects & Jobs'"), 'The two Assigned Items section headings must be translated in English.');
+assert.ok(html.includes("assignedTasksFollowups:'المهام والمتابعات'")&&html.includes("assignedProjectsJobs:'المشروعات والأعمال المؤقتة'"), 'The two Assigned Items section headings must be translated in Arabic.');
+assert.ok(html.includes('id="account-assigned-sections-layout"')&&html.includes('.account-assigned-item-row .account-item-actions'), 'The new section metadata styling must preserve the existing action-row layout.');
+

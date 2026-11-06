@@ -280,7 +280,7 @@ const syncAssigneeStart = html.indexOf('function syncAssigneeControl(type,parent
 const syncAssigneeEnd = html.indexOf("$('#modalRoot').addEventListener('change'", syncAssigneeStart);
 assert.ok(syncAssigneeStart >= 0 && syncAssigneeEnd > syncAssigneeStart, 'Assignee control synchronization must be bounded.');
 const syncAssigneeSource = html.slice(syncAssigneeStart, syncAssigneeEnd);
-assert.ok(syncAssigneeSource.includes('parentChanged||typeChanged||!owner') && syncAssigneeSource.includes('parentCreatorAssigneeId(parent)'), 'Changing the new child form to Follow-up must default to the immediate parent creator.');
+assert.ok(syncAssigneeSource.includes('parentChanged||typeChanged||!selected.length') && syncAssigneeSource.includes('parentCreatorAssigneeId(parent)'), 'Changing the new child form to Follow-up must default to the immediate parent creator.');
 
 const submitStart = html.indexOf('function handleItemSubmit(form){');
 const submitEnd = html.indexOf('\nfunction ', submitStart + 10);
@@ -291,8 +291,8 @@ assert.ok(submitSource.includes('submittedAssigneeMode(type,fd)') && submitSourc
 assert.ok(submitSource.includes('item.assigneeIds=assigneeIds') && submitSource.includes('item.ownerId=ownerId'), 'The canonical assignee list and legacy primary owner must both be persisted.');
 
 assert.ok(html.includes("mode==='all'?tr('allUsersOption')") && html.includes("allUsersOption:'All Users'"), 'All Users must have a dedicated picker label without changing Activity history filtering.');
-const selectedDefault = html.includes("(type==='followup'?[parentCreatorAssigneeId(parent)]:[]).filter(isAssignableUserId)") && html.includes("(type==='followup'?'selected':'none')");
-assert.ok(selectedDefault, 'New Projects, Jobs, and Tasks must default to None.');
+const selectedDefault = syncAssigneeSource.includes("modal?.kind==='new-child'&&type==='followup'") && syncAssigneeSource.includes('parentCreatorAssigneeId(parent)') && syncAssigneeSource.includes("mode=selected.length?'selected':'none'");
+assert.ok(selectedDefault, 'New Follow-ups must default to their immediate parent creator while retaining the shared picker.');
 const pickerCssStart = html.indexOf('<style id="assignee-picker-popover">');
 const pickerCssEnd = html.indexOf('</style>',pickerCssStart);
 assert.ok(pickerCssStart>=0&&pickerCssEnd>pickerCssStart&&html.slice(pickerCssStart,pickerCssEnd).includes('position:fixed')&&html.slice(pickerCssStart,pickerCssEnd).includes('overflow-y:auto'), 'The checklist popover must stay within the viewport and scroll without resizing the form.');

@@ -110,16 +110,16 @@ assert.equal(html.split("['due',tr('dueDate')]").length-1,2,'The workspace and c
 assert.ok(html.includes("ui.accountAssignedDateMode==='due'")&&html.includes("ui.accountSearchDateMode==='due'"),'Profile Assigned Items and Search Date lists must append Due date.');
 const dueDateStart=html.indexOf('function dueDateKey(item){');
 const dueDateEnd=html.indexOf('\nfunction parentDate(item){',dueDateStart);
-const compareStart=html.indexOf("function compareByDateMode(a,b,mode,source='application'){");
-const compareEnd=html.indexOf('\nfunction parentDateForMode(',compareStart);
-const matchesDateStart=html.indexOf('function matchesDate(item,mode,from,to,source=',compareEnd);
-const matchesDateEnd=html.indexOf('function matchesStatusFilter(',matchesDateStart);
-const childSortModeStart=html.indexOf('function childDateSortMode(mode=ui.childDateMode){');
-const childSortStart=html.indexOf('function sortChildrenByDate(items){',childSortModeStart);
-const childSortEnd=html.indexOf('\nfunction childCard(',childSortStart);
-assert.ok(dueDateStart>=0&&dueDateEnd>dueDateStart&&compareStart>=0&&compareEnd>compareStart&&matchesDateStart>=0&&matchesDateEnd>matchesDateStart&&childSortModeStart>=0&&childSortEnd>childSortStart,'Could not isolate Due date parsing, filtering, and ordering helpers.');
+const dueCompareStart=html.indexOf("function compareByDateMode(a,b,mode,source='application'){");
+const dueCompareEnd=html.indexOf('\nfunction parentDateForMode(',dueCompareStart);
+const dueMatchesDateStart=html.indexOf('function matchesDate(item,mode,from,to,source=',dueCompareEnd);
+const dueMatchesDateEnd=html.indexOf('function matchesStatusFilter(',dueMatchesDateStart);
+const dueChildSortModeStart=html.indexOf('function childDateSortMode(mode=ui.childDateMode){');
+const dueChildSortStart=html.indexOf('function sortChildrenByDate(items){',dueChildSortModeStart);
+const dueChildSortEnd=html.indexOf('\nfunction childCard(',dueChildSortStart);
+assert.ok(dueDateStart>=0&&dueDateEnd>dueDateStart&&dueCompareStart>=0&&dueCompareEnd>dueCompareStart&&dueMatchesDateStart>=0&&dueMatchesDateEnd>dueMatchesDateStart&&dueChildSortModeStart>=0&&dueChildSortEnd>dueChildSortStart,'Could not isolate Due date parsing, filtering, and ordering helpers.');
 const dueSortContext={activityTimestamp:(item,mode)=>Date.parse(mode==='updated'?(item.latestActivityAt||item.updatedAt):(item.createdAt))||0,dateKey:value=>String(value||'').slice(0,10),ui:{childDateMode:'due'}};
-vm.runInNewContext(html.slice(dueDateStart,dueDateEnd)+html.slice(compareStart,compareEnd)+html.slice(matchesDateStart,matchesDateEnd)+';this.compareByDateMode=compareByDateMode;this.matchesDate=matchesDate;'+html.slice(childSortModeStart,childSortEnd)+';this.childDateSortMode=childDateSortMode;this.sortChildrenByDate=sortChildrenByDate;',dueSortContext);
+vm.runInNewContext(html.slice(dueDateStart,dueDateEnd)+html.slice(dueCompareStart,dueCompareEnd)+html.slice(dueMatchesDateStart,dueMatchesDateEnd)+';this.compareByDateMode=compareByDateMode;this.matchesDate=matchesDate;'+html.slice(dueChildSortModeStart,dueChildSortEnd)+';this.childDateSortMode=childDateSortMode;this.sortChildrenByDate=sortChildrenByDate;',dueSortContext);
 const dueItems=[{id:'later',dueDate:'2026-12-01'},{id:'no-due'},{id:'nearest',dueDate:'2026-11-10'},{id:'middle',dueDate:'2026-11-20'}];
 assert.deepEqual(Array.from(dueItems.slice().sort((a,b)=>dueSortContext.compareByDateMode(a,b,'due')),item=>item.id),['nearest','middle','later','no-due'],'Due date sorting must place the nearest due date first and undated items last.');
 assert.deepEqual(Array.from(dueItems.filter(item=>dueSortContext.matchesDate(item,'due','2026-11-01','2026-11-30')),item=>item.id),['nearest','middle'],'Due date range filtering must include only items whose due dates fall within the selected range.');
@@ -323,11 +323,11 @@ assert.ok(workspaceFixCss.includes('.mobile-search-toggle[aria-expanded="true"]'
 assert.ok(workspaceFixCss.includes('position:fixed !important; top:86px !important; bottom:auto !important;') && workspaceFixCss.includes('top:78px !important;'), 'The scroll-to-top button must stay at the top edge of the workspace below the sticky header.');
 
 
-const childCardStart=html.indexOf('function childCard(item,parent');
-const childCardEnd=html.indexOf('\nfunction childTreeFiltered(',childCardStart);
-assert.ok(childCardStart>=0&&childCardEnd>childCardStart,'The child card renderer must exist.');
-const childCardSource=html.slice(childCardStart,childCardEnd);
-assert.ok(childCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")>=0&&childCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")<childCardSource.indexOf('item.dueDate?'), 'Child cards must display the Assignee label before the Due date.');
+const followupOrderCardStart=html.indexOf('function childCard(item,parent');
+const followupOrderCardEnd=html.indexOf('\nfunction childTreeFiltered(',followupOrderCardStart);
+assert.ok(followupOrderCardStart>=0&&followupOrderCardEnd>followupOrderCardStart,'The child card renderer must exist.');
+const followupOrderCardSource=html.slice(followupOrderCardStart,followupOrderCardEnd);
+assert.ok(followupOrderCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")>=0&&followupOrderCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")<followupOrderCardSource.indexOf('item.dueDate?'), 'Child cards must display the Assignee label before the Due date.');
 
 const assignedRowStart=html.indexOf('function accountAssignedItemRow(item){');
 const assignedRowEnd=html.indexOf('\nfunction filteredAccountAssignedItems(',assignedRowStart);

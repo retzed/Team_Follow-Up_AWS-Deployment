@@ -120,3 +120,9 @@ assert.ok(html.includes("child.type!=='task'||child.status==='completed'"), 'Not
 assert.ok(html.includes("item.type==='followup'?'':'<span class=\"account-assigned-due\""), 'Assigned Items must not render a due date for Follow-ups.');
 assert.ok(html.includes("isParent||item.type==='task'?' data-history-scope=\"item\"'"), 'Assigned-item Task history must open scoped to the selected item.');
 assert.ok(html.includes('left:50% !important') && html.includes('transform:translateX(-50%) !important'), 'The scroll-to-top button must be horizontally centered.');
+
+assert.ok(html.includes("function dateModeOptionsMarkup(current,includeDue=true)") && html.includes("filter(([value])=>includeDue||value!=='due')"), 'Due-date filter options must be removable when the selected item type does not support due dates.');
+assert.ok(html.includes("ui.childType==='followup'?'disabled':''") && html.includes("ui.accountAssignedType==='followup'?'disabled':''"), 'Status filters must be disabled when Follow-up is the selected type.');
+assert.ok(html.includes("ui.childType!=='followup')") && html.includes("ui.accountAssignedType!=='followup')"), 'Workspace and Assigned Items must omit the Due date option for Follow-ups.');
+assert.ok(html.includes("ui.accountAssignedStatus='all'") && html.includes("ui.childStatus='all'"), 'Selecting Follow-up must clear stale status filters.');
+assert.ok(html.includes("ui.accountAssignedDateMode==='due'") && html.includes("ui.childDateMode==='due'"), 'Selecting Follow-up must reset an inapplicable Due date sort to Last updated.');

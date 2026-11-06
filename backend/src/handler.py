@@ -588,6 +588,8 @@ def validate_item(event, item, previous=None):
                 creator_record=USERS.get_item(Key={'userId':parent_creator}).get('Item')
                 if creator_record and creator_record.get('enabled',True):
                     requested_assignee_ids=[parent_creator]
+                    assignment_mode='selected'
+                    item['assigneeMode']=assignment_mode
         elif previous is not None:
             previous_ids=item_assignee_ids(previous)
             current_owner=str(item.get('ownerId') or '').strip()

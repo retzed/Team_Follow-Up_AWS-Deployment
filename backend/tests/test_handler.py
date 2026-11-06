@@ -930,7 +930,7 @@ class MultiAssigneeTests(unittest.TestCase):
             handler.item_assignee_ids({
                 "type": "task",
                 "ownerId": "u1",
-                "assigneeIds": ["u2", "root", "u3", "u2"],
+                "assigneeIds": ["u2", "root", "ROOT", "u3", "u2"],
             }),
             ["u2", "u3"],
         )

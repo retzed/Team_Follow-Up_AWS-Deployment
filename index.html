@@ -3196,7 +3196,7 @@ function renderChildList(parent){
  const cards=roots.map(({item,nested})=>childCard(item,parent,{filteredNested:nested})).join('');
  return cards+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):error?loadErrorMarkup(error):'');
 }
-function treeActivity(parent){const roots=childrenOf(parent.id).sort(newestCreatedFirst);const ready=rootChildrenReady(parent.id);const rootMeta=`<div class="tree-created-meta tree-root-created-meta">${creatorLabel(parent)}</div>`;if(!roots.length&&!ready)return rootMeta+rootPendingMarkup(parent.id,'children',tr('loadingItems'));if(!roots.length)return rootMeta+`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`;const markup=roots.map(item=>{if(item.type==='task'){const nested=childrenOf(item.id).sort(newestCreatedFirst);return `<div class="tree-task-wrap"><div class="tree-task-row">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-title" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div><div class="tree-task-controls">${statusPill(item.status)}<button class="subtle-btn tree-task-edit" data-action="edit-item" data-id="${esc(item.id)}" type="button">${icon('edit',12)} ${esc(tr('edit'))}</button></div></div><div class="tree-created-meta">${creatorLabel(item)}</div><details class="tree-item"><summary>${icon('chevron',13)}<span class="tree-title">${esc(tr('openFollowups'))}</span><span class="tree-count" title="${esc(tr('openFollowups'))}">${nested.length}${!ready?` ${icon('spinner',10)}`:''}</span>${icon('chevron',13)}</summary><div class="tree-contents">${nested.length?nested.map(c=>`<div class="tree-child-row"><div class="tree-child-main">${typeIcon(c.type)}<span class="tree-child-name" dir="auto">${esc(c.name)}</span>${statusPill(c.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(c.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(c)}</div></div>`).join(''):`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`}${!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button></div></details></div>`;}return `<div class="tree-direct"><div class="tree-direct-main">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-child-name" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div>${statusPill(item.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(item)}</div></div>`;}).join('');return rootMeta+markup+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):'');}
+function treeActivity(parent){const roots=childrenOf(parent.id).sort(newestCreatedFirst);const ready=rootChildrenReady(parent.id);const rootMeta=`<div class="tree-created-meta tree-root-created-meta">${creatorLabel(parent)}</div>`;if(!roots.length&&!ready)return rootMeta+rootPendingMarkup(parent.id,'children',tr('loadingItems'));if(!roots.length)return rootMeta+`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`;const markup=roots.map(item=>{if(item.type==='task'){const nested=childrenOf(item.id).sort(newestCreatedFirst);return `<div class="tree-task-wrap"><div class="tree-task-row">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-title" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div><div class="tree-task-controls">${statusPill(item.status)}<button class="subtle-btn tree-task-edit" data-action="edit-item" data-id="${esc(item.id)}" type="button">${icon('edit',12)} ${esc(tr('edit'))}</button></div></div><div class="tree-created-meta">${creatorLabel(item)}</div><details class="tree-item"><summary>${icon('chevron',13)}<span class="tree-title tree-followups-label">${esc(tr('openFollowups'))}</span><span class="tree-count" title="${esc(tr('openFollowups'))}">${nested.length}${!ready?` ${icon('spinner',10)}`:''}</span>${icon('chevron',13)}</summary><div class="tree-contents">${nested.length?nested.map(c=>`<div class="tree-child-row"><div class="tree-child-main">${typeIcon(c.type)}<span class="tree-child-name" dir="auto">${esc(c.name)}</span>${statusPill(c.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(c.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(c)}</div></div>`).join(''):`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`}${!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button></div></details></div>`;}return `<div class="tree-direct"><div class="tree-direct-main">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-child-name" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div>${statusPill(item.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(item)}</div></div>`;}).join('');return rootMeta+markup+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):'');}
 function timelineEvents(parent,limit=8){
  const ready=rootActivityReady(parent.id),error=rootLoadingError(parent.id,'activity');
  if(!ready&&!error)return `<div class="timeline-empty">${esc(tr('activityNotLoaded'))}</div>`;
@@ -6716,5 +6716,67 @@ body.signin-open .scroll-to-top {
   updateVisibility();
 })();
 </script>
+
+<style id="hierarchy-followups-label-layout-fix">
+/* Dedicated layout for the Follow-ups disclosure: the label always owns
+   the flexible middle column; count and chevrons never compress it. */
+.tree-task-wrap .tree-item > summary {
+  display: grid !important;
+  grid-template-columns: 14px minmax(0, 1fr) auto 14px !important;
+  align-items: center !important;
+  column-gap: 7px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.tree-task-wrap .tree-item > summary > svg:first-child {
+  grid-column: 1;
+  grid-row: 1;
+  width: 13px;
+  height: 13px;
+  min-width: 13px;
+}
+.tree-task-wrap .tree-item > summary > .tree-followups-label {
+  grid-column: 2;
+  grid-row: 1;
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  flex: none !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  text-align: start;
+}
+.tree-task-wrap .tree-item > summary > .tree-count {
+  grid-column: 3;
+  grid-row: 1;
+  white-space: nowrap !important;
+  flex: none !important;
+}
+.tree-task-wrap .tree-item > summary > svg:last-child {
+  grid-column: 4;
+  grid-row: 1;
+  width: 13px;
+  height: 13px;
+  min-width: 13px;
+  justify-self: end;
+}
+@media (max-width: 700px) {
+  .tree-task-wrap .tree-item > summary {
+    grid-template-columns: 13px minmax(0, 1fr) auto 13px !important;
+    column-gap: 6px !important;
+    padding: 10px 8px !important;
+  }
+  .tree-task-wrap .tree-item > summary > .tree-followups-label {
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    letter-spacing: normal !important;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+  }
+}
+</style>
 </body>
 </html>

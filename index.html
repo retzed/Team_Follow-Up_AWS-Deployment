@@ -6708,6 +6708,10 @@ body.signin-open .scroll-to-top {
     attributes: true,
     attributeFilter: ['class']
   });
+  authObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['lang']
+  });
 
   updateVisibility();
 })();

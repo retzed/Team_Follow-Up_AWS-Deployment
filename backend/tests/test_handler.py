@@ -484,6 +484,16 @@ class RealtimeDeliveryTests(unittest.TestCase):
         self.assertNotIn("description", public)
         self.assertLessEqual(change["expiresAt"] - handler.epoch_seconds(), handler.REALTIME_CHANGE_RETENTION_SECONDS)
 
+    def test_make_realtime_change_includes_all_users_marker(self):
+        item = {
+            "itemId": "task-all", "type": "task", "parentId": "project-1",
+            "rootParentId": "project-1", "assigneeMode": "all",
+            "assigneeIds": ["u1", "u2"],
+        }
+        with patch.object(handler, "query_children_rows", return_value=[]):
+            change = handler.public_realtime_change(handler.make_realtime_change(item))
+        self.assertEqual(set(change["assigneeIds"]), {"u1", "u2", "ALL_USERS"})
+
     def test_subtree_delete_change_includes_affected_roots_and_assignees(self):
         root = {"itemId": "project-1", "type": "project", "rootParentId": "project-1", "ownerId": "u1"}
         task = {"itemId": "task-1", "type": "task", "parentId": "project-1", "rootParentId": "project-1", "ownerId": "u2"}
@@ -975,6 +985,27 @@ class MultiAssigneeTests(unittest.TestCase):
         self.assertTrue(all(write["Put"]["TableName"] == handler.REALTIME_TABLE.name for write in writes))
         self.assertTrue(all(write["Put"]["Item"]["sortKey"]["S"].endswith("#task-multi") for write in writes))
 
+    def test_all_users_assignment_index_uses_global_marker_and_removes_it_on_mode_change(self):
+        all_users = {
+            "itemId": "task-all", "type": "task", "assigneeMode": "all",
+            "assigneeIds": ["u1", "u2", "u3"], "ownerId": "u1",
+            "updatedAt": "2026-11-06T08:00:00.000Z",
+        }
+        writes = handler.assignment_index_operations(all_users)
+        self.assertEqual(len(writes), 1)
+        marker = writes[0]["Put"]["Item"]
+        self.assertEqual(marker["partitionKey"], {"S": "ASSIGNEE#ALL_USERS"})
+        self.assertEqual(marker["itemId"], {"S": "task-all"})
+
+        selected = {**all_users, "assigneeMode": "selected", "assigneeIds": ["u2"],
+                    "ownerId": "u2", "updatedAt": "2026-11-06T08:05:00.000Z"}
+        changes = handler.assignment_index_operations(selected, previous=all_users)
+        deleted = [row["Delete"]["Key"] for row in changes if "Delete" in row]
+        inserted = [row["Put"]["Item"] for row in changes if "Put" in row]
+        self.assertEqual(deleted[0]["partitionKey"], {"S": "ASSIGNEE#ALL_USERS"})
+        self.assertEqual(inserted[0]["partitionKey"], {"S": "ASSIGNEE#u2"})
+        self.assertEqual(handler.item_assignee_ids({"assigneeMode": "none", "ownerId": "u2"}), [])
+
     def test_assignment_index_update_moves_old_and_new_assignee_keys_atomically(self):
         previous = {
             "itemId": "task-multi",
@@ -1011,13 +1042,20 @@ class MultiAssigneeTests(unittest.TestCase):
             "createdAt": "2026-11-06T07:00:00.000Z", "updatedAt": "2026-11-06T08:05:00.000Z",
         }
         assignment = {"itemId": "task-secondary", "partitionKey": "ASSIGNEE#u2", "sortKey": "2026-11-06T08:05:00.000Z#task-secondary"}
+        all_assignment = {"itemId": "task-all", "partitionKey": "ASSIGNEE#ALL_USERS", "sortKey": "2026-11-06T08:10:00.000Z#task-all"}
+        all_item = {
+            "itemId": "task-all", "type": "task", "name": "All users",
+            "ownerId": "u1", "assigneeIds": ["u1", "u2"], "assigneeMode": "all",
+            "status": "not-started", "createdAt": "2026-11-06T07:00:00.000Z",
+            "updatedAt": "2026-11-06T08:10:00.000Z",
+        }
         with (
-            patch.object(handler, "all_pages", side_effect=[[primary], [assignment]]),
-            patch.object(handler.WORK, "get_item", return_value={"Item": secondary}),
+            patch.object(handler, "all_pages", side_effect=[[primary], [assignment], [all_assignment]]),
+            patch.object(handler.WORK, "get_item", side_effect=[{"Item": secondary}, {"Item": all_item}]),
         ):
             result = handler.query_work_items({"assigneeUserId": "u2"})
-        self.assertEqual({item["id"] for item in result["items"]}, {"task-primary", "task-secondary"})
-        self.assertEqual(result["count"], 2)
+        self.assertEqual({item["id"] for item in result["items"]}, {"task-primary", "task-secondary", "task-all"})
+        self.assertEqual(result["count"], 3)
 
     def test_validate_item_allows_multiple_assignees_for_parent_items(self):
         def user_lookup(**kwargs):
@@ -1031,6 +1069,38 @@ class MultiAssigneeTests(unittest.TestCase):
                 "itemId": "project-multi", "type": "project", "name": "Multi",
                 "assigneeIds": ["u2", "u3"],
             })
+        self.assertEqual(item["assigneeIds"], ["u2", "u3"])
+        self.assertEqual(item["ownerId"], "u2")
+
+    def test_validate_item_allows_none_for_projects_jobs_and_tasks(self):
+        with patch.object(handler, "current_profile", return_value={"userId": "u1"}):
+            item, _ = handler.validate_item({}, {
+                "itemId": "project-none", "type": "project", "name": "Unassigned project",
+                "assigneeMode": "none", "assigneeIds": [],
+            })
+        self.assertEqual(item["assigneeMode"], "none")
+        self.assertEqual(item["assigneeIds"], [])
+        self.assertIsNone(item["ownerId"])
+
+    def test_validate_item_resolves_all_users_from_enabled_team_roster(self):
+        roster = [
+            {"userId": "u2", "enabled": True},
+            {"userId": "u3", "enabled": True},
+            {"userId": "u4", "enabled": False},
+            {"userId": "root", "enabled": True, "role": "Root"},
+        ]
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler, "scan_pages", return_value=roster),
+            patch.object(handler.USERS, "get_item", side_effect=lambda **kwargs: {
+                "Item": {"userId": kwargs["Key"]["userId"], "enabled": True}
+            }),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "project-all", "type": "project", "name": "All team",
+                "assigneeMode": "all", "assigneeIds": [],
+            })
+        self.assertEqual(item["assigneeMode"], "all")
         self.assertEqual(item["assigneeIds"], ["u2", "u3"])
         self.assertEqual(item["ownerId"], "u2")
 

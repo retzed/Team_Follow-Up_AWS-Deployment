@@ -195,9 +195,9 @@ const childCardEnd = html.indexOf('\nfunction renderOverview(', childCardStart);
 assert.ok(childCardStart >= 0 && childCardEnd > childCardStart, 'Child-card renderer must exist as one bounded function.');
 const childCardSource = html.slice(childCardStart, childCardEnd);
 const priorityBeforeStatus = childCardSource.indexOf("\${item.priority?priorityPill(item.priority):''}");
-const statusAfterPriority = childCardSource.indexOf('\${statusPill(item.status)}');
-assert.ok(priorityBeforeStatus >= 0 && statusAfterPriority > priorityBeforeStatus, 'Child-card priority must be rendered before status.');
-assert.ok((html.match(/<div class="child-meta">\$\{item\.priority\?priorityPill\(item\.priority\):''\}\$\{statusPill\(item\.status\)\}/g) || []).length === 2, 'Normal and archived child cards must both render priority before status.');
+const statusAfterPriority = childCardSource.indexOf("\${item.type!=='followup'?statusPill(item.status):''}");
+assert.ok(priorityBeforeStatus >= 0 && statusAfterPriority > priorityBeforeStatus, 'Child-card priority must be rendered before the conditional status pill.');
+assert.ok((html.match(/<div class="child-meta">\$\{item\.priority\?priorityPill\(item\.priority\):''\}\$\{item\.type!==\x27followup\x27\?statusPill\(item\.status\):''\}/g) || []).length === 2, 'Normal and archived child cards must render priority before the conditional status pill.');
 
 const childHierarchyFixStart = html.indexOf('<style id="child-item-mobile-metadata-and-hierarchy-layout-fix-v2">');
 const childHierarchyFixEnd = html.indexOf('</style>', childHierarchyFixStart);

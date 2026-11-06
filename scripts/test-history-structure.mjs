@@ -333,5 +333,5 @@ assert.ok(html.includes("actionEl.dataset.historyScope||''"), 'The Activity acti
 
 assert.ok(html.includes("assignedTasksFollowups:'Tasks & Follow-ups'")&&html.includes("assignedProjectsJobs:'Projects & Jobs'"), 'The two Assigned Items section headings must be translated in English.');
 assert.ok(html.includes("assignedTasksFollowups:'المهام والمتابعات'")&&html.includes("assignedProjectsJobs:'المشروعات والأعمال المؤقتة'"), 'The two Assigned Items section headings must be translated in Arabic.');
-assert.ok(html.includes('id="account-assigned-sections-layout"')&&html.includes('.account-assigned-item-row .account-item-actions'), 'The new section metadata styling must preserve the existing action-row layout.');
+assert.ok(html.includes('id="account-assigned-sections-layout"')&&html.includes('.account-item-row .account-item-actions'), 'The new section metadata styling must leave the shared, existing action-row layout in place.');
 

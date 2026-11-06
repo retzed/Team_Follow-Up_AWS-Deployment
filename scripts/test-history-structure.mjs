@@ -154,3 +154,24 @@ const treeStart=html.indexOf('function childTreeFiltered(parent){');
 const treeEnd=html.indexOf('\nfunction renderChildList(',treeStart);
 assert.ok(treeStart>=0&&treeEnd>treeStart,'Dashboard must define the child-tree filtering function used by rendering.');
 console.log('Unified activity-history tests passed: shared schemas, one search per view, action-only labels, type tags, global field search, parent dashes, stable equal-time history and restore ordering, and fixed non-overlapping columns.');
+
+
+// Child-item metadata order, mobile assignee width, and hierarchy text layout.
+const childCardStart = html.indexOf('function childCard(');
+const childCardEnd = html.indexOf('\nfunction renderOverview(', childCardStart);
+assert.ok(childCardStart >= 0 && childCardEnd > childCardStart, 'Child-card renderer must exist as one bounded function.');
+const childCardSource = html.slice(childCardStart, childCardEnd);
+const priorityBeforeStatus = childCardSource.indexOf("\${item.priority?priorityPill(item.priority):''}");
+const statusAfterPriority = childCardSource.indexOf('\${statusPill(item.status)}');
+assert.ok(priorityBeforeStatus >= 0 && statusAfterPriority > priorityBeforeStatus, 'Child-card priority must be rendered before status.');
+assert.ok((html.match(/<div class="child-meta">\$\{item\.priority\?priorityPill\(item\.priority\):''\}\$\{statusPill\(item\.status\)\}/g) || []).length === 2, 'Normal and archived child cards must both render priority before status.');
+
+const childHierarchyFixStart = html.indexOf('<style id="child-item-mobile-metadata-and-hierarchy-layout-fix-v2">');
+const childHierarchyFixEnd = html.indexOf('</style>', childHierarchyFixStart);
+assert.ok(childHierarchyFixStart >= 0 && childHierarchyFixEnd > childHierarchyFixStart, 'Final child-item and hierarchy layout overrides must be present.');
+const childHierarchyFixCss = html.slice(childHierarchyFixStart, childHierarchyFixEnd);
+assert.ok(childHierarchyFixCss.includes('#mainContent .child-meta > .child-assignee') && childHierarchyFixCss.includes('flex: 0 0 100% !important;') && childHierarchyFixCss.includes('width: 100% !important;'), 'On mobile, the child assignee pill must occupy the full child metadata row.');
+assert.ok(html.includes('class="tree-followups-summary"'), 'The Follow-ups disclosure summary must have a dedicated layout hook.');
+assert.ok(childHierarchyFixCss.includes('grid-template-columns: 18px minmax(120px, 1fr) auto 18px !important;') && childHierarchyFixCss.includes('white-space: nowrap !important;') && childHierarchyFixCss.includes('text-overflow: ellipsis !important;'), 'The hierarchy Follow-ups label must retain a usable text column instead of wrapping one character per line.');
+assert.ok(childHierarchyFixCss.includes('.tree-task-wrap .tree-child-main > .tree-child-name') && childHierarchyFixCss.includes('grid-column: 2 / 4 !important;') && childHierarchyFixCss.includes('overflow-wrap: anywhere !important;'), 'Nested hierarchy item names must receive a full-width title row with controls moved below on mobile.');
+assert.ok(childHierarchyFixCss.includes('.tree-task-wrap .tree-direct-main > .tree-name-type') && childHierarchyFixCss.includes('grid-template-rows: auto auto !important;'), 'Direct hierarchy item names must have a dedicated title row before status and Edit controls.');

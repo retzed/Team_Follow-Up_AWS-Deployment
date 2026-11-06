@@ -285,7 +285,7 @@ const assigneePositionSource = html.slice(assigneePositionStart, assigneePositio
 assert.ok(assigneePositionSource.includes('menu.getBoundingClientRect().height') && !assigneePositionSource.includes('menu.scrollHeight'), 'Popover placement must use its rendered constrained height, not the full checklist scroll height.');
 assert.ok(html.includes('setAssigneeMenuOpen(false);trigger?.focus({preventScroll:true});return;'), 'Escape must collapse the assignee checklist before closing the item form.');
 const syncAssigneeStart = html.indexOf('function syncAssigneeControl(type,parentChanged=false,typeChanged=false){');
-const syncAssigneeEnd = html.indexOf("$('#modalRoot').addEventListener('change'", syncAssigneeStart);
+const syncAssigneeEnd = html.indexOf('\nfunction positionAssigneeMenu(', syncAssigneeStart);
 assert.ok(syncAssigneeStart >= 0 && syncAssigneeEnd > syncAssigneeStart, 'Assignee control synchronization must be bounded.');
 const syncAssigneeSource = html.slice(syncAssigneeStart, syncAssigneeEnd);
 assert.ok(syncAssigneeSource.includes("modal?.kind==='new-child'&&type==='followup'&&!selected.length") && syncAssigneeSource.includes('parentCreatorAssigneeId(parent)') && !syncAssigneeSource.includes('parentChanged||typeChanged||!selected.length'), 'New Follow-ups may default to their parent creator only when no assignee has already been selected.');

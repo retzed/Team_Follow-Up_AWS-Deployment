@@ -3615,10 +3615,10 @@ function renderItemMutationView({refreshSidebar=true}={}){
 function assignableUsers(){
  return (data.users||[]).filter(raw=>{
   const id=String(raw?.id||raw?.userId||'').trim().toLowerCase();
-  const username=String(raw?.username||raw?.userName||'').trim().toLowerCase();
-  const role=String(raw?.role||raw?.roleName||'').trim().toLowerCase();
-  const systemFlag=raw?.isRoot===true||raw?.isSystem===true||raw?.isSystemUser===true||raw?.systemUser===true;
-  return Boolean(id)&&id!=='root'&&username!=='root'&&role!=='root'&&!systemFlag&&raw.enabled!==false;
+  const identityFields=[raw?.username,raw?.userName,raw?.role,raw?.roleName,raw?.privilege,raw?.level,raw?.accountType,raw?.userType];
+  const hasRootIdentity=identityFields.some(value=>String(value??'').trim().toLowerCase()==='root');
+  const systemFlag=raw?.isRoot===true||raw?.isSystem===true||raw?.isSystemUser===true||raw?.systemUser===true||raw?.root===true;
+  return Boolean(id)&&id!=='root'&&!hasRootIdentity&&!systemFlag&&raw.enabled!==false;
  });
 }
 function isAssignableUserId(value){
@@ -4129,6 +4129,7 @@ function syncAssigneeControl(type,parentChanged=false,typeChanged=false){
  $('#formOwnerField')?.classList.remove('required-assignee');
 }
 $('#modalRoot').addEventListener('change',ev=>{
+ if(ev.target.name==='assigneeIds'||ev.target.name==='ownerId')$('#formOwnerField')?.classList.remove('required-assignee');
  if(ui.modal?.kind==='history'&&ev.target.id==='historyScopeFilter'){ui.modal.historyScope=ev.target.value==='item'?'item':'all';ui.modal.historyRefreshError='';const itemId=ui.modal.itemId;const scope=ui.modal.historyScope;renderModal();void refreshActivityFor(itemId,scope);return;}
  if(ui.modal&&(ui.modal.kind==='new-child'||ui.modal.kind==='edit'||ui.modal.kind==='new-parent')&&ev.target.id==='formType'){
   const typeEl=$('#formType');let type=typeEl?.value||ui.modal.type;

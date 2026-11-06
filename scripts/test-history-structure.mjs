@@ -106,8 +106,16 @@ assert.ok(sortContext.compareByDateMode(freshRestored,oldItem,'updated')<0,'An i
 assert.deepEqual(Array.from(sortContext.sortChildrenByDate([oldItem,freshRestored]),x=>x.id),['restored-task','old-task'],'Child ordering reflects fresh restoration timestamps.');
 
 
-assert.equal(html.split("['due',tr('dueDate')]").length-1,2,'The workspace and child Date list controls must append the translated Due date option.');
-assert.ok(html.includes("ui.accountAssignedDateMode==='due'")&&html.includes("ui.accountSearchDateMode==='due'"),'Profile Assigned Items and Search Date lists must append Due date.');
+const dateModeHelperStart=html.indexOf('function dateModeOptions(){');
+const dateModeHelperEnd=html.indexOf('\nfunction applyTheme(',dateModeHelperStart);
+assert.ok(dateModeHelperStart>=0&&dateModeHelperEnd>dateModeHelperStart,'The shared Date-list options helper must exist.');
+const dateModeHelperSource=html.slice(dateModeHelperStart,dateModeHelperEnd);
+const dateModeContext={tr:key=>key,esc:value=>String(value??'')};
+vm.runInNewContext(dateModeHelperSource+';this.dateModeOptions=dateModeOptions;this.dateModeOptionsMarkup=dateModeOptionsMarkup;',dateModeContext);
+assert.deepEqual(Array.from(dateModeContext.dateModeOptions(),option=>option[0]),['updated','last-created','created','due'],'Due date must be appended after the existing Updated/Created modes.');
+const dueModeOptionMarkup=dateModeContext.dateModeOptionsMarkup('due');
+assert.ok(dueModeOptionMarkup.lastIndexOf('value="due"')>dueModeOptionMarkup.lastIndexOf('value="created"')&&dueModeOptionMarkup.includes('selected'),'The Due date option must render last and remain selected when active.');
+assert.ok(html.includes("setSelectOptions($('#parentSortFilter'),dateModeOptions(),ui.parentDateMode)")&&html.includes('dateModeOptionsMarkup(ui.childDateMode)')&&html.includes('dateModeOptionsMarkup(ui.accountAssignedDateMode)')&&html.includes('dateModeOptionsMarkup(ui.accountSearchDateMode)'),'Workspace parent, workspace child, Profile Assigned Items, and Profile Search Date lists must all use the same options including Due date.');
 const dueDateStart=html.indexOf('function dueDateKey(item){');
 const dueDateEnd=html.indexOf('\nfunction parentDate(item){',dueDateStart);
 const dueCompareStart=html.indexOf("function compareByDateMode(a,b,mode,source='application'){");
@@ -280,7 +288,27 @@ const syncAssigneeStart = html.indexOf('function syncAssigneeControl(type,parent
 const syncAssigneeEnd = html.indexOf("$('#modalRoot').addEventListener('change'", syncAssigneeStart);
 assert.ok(syncAssigneeStart >= 0 && syncAssigneeEnd > syncAssigneeStart, 'Assignee control synchronization must be bounded.');
 const syncAssigneeSource = html.slice(syncAssigneeStart, syncAssigneeEnd);
-assert.ok(syncAssigneeSource.includes('parentChanged||typeChanged||!selected.length') && syncAssigneeSource.includes('parentCreatorAssigneeId(parent)'), 'Changing the new child form to Follow-up must default to the immediate parent creator.');
+assert.ok(syncAssigneeSource.includes("modal?.kind==='new-child'&&type==='followup'&&!selected.length") && syncAssigneeSource.includes('parentCreatorAssigneeId(parent)') && !syncAssigneeSource.includes('parentChanged||typeChanged||!selected.length'), 'New Follow-ups may default to their parent creator only when no assignee has already been selected.');
+const followupPickerStart=html.indexOf('function assigneeControlMarkup(');
+const followupPickerEnd=html.indexOf('\nfunction updateAssigneePicker(',followupPickerStart);
+const submittedFollowupStart=html.indexOf('function submittedAssigneeIds(');
+const submittedFollowupEnd=html.indexOf('\nfunction submittedAssigneeMode(',submittedFollowupStart);
+assert.ok(followupPickerStart>=0&&followupPickerEnd>followupPickerStart&&submittedFollowupStart>=0&&submittedFollowupEnd>submittedFollowupStart,'Could not isolate the shared assignee picker and submission helpers.');
+const followupPickerSource=html.slice(followupPickerStart,followupPickerEnd);
+const followupUsers=[{id:'u1'},{id:'u2'},{id:'u3'}];
+const followupPickerContext={assignableUsers:()=>followupUsers,isAssignableUserId:id=>followupUsers.some(user=>user.id===String(id)),person:id=>({name:String(id),role:'User'}),esc:value=>String(value??''),tr:key=>key,icon:()=>''};
+const followupPickerMarkup=vm.runInNewContext(followupPickerSource+';assigneeControlMarkup("followup",["u2","u3"],"selected");',followupPickerContext);
+assert.ok(followupPickerMarkup.includes('value="u2" checked')&&followupPickerMarkup.includes('value="u3" checked'),'The Follow-up picker must render multiple independently checked assignees.');
+const submittedFollowupContext={assignableUsers:()=>followupUsers,isAssignableUserId:id=>followupUsers.some(user=>user.id===String(id)),formData:{get:key=>key==='assigneeMode'?'selected':'',getAll:key=>key==='assigneeIds'?['u2','u3']:[]}};
+const submittedFollowupIds=vm.runInNewContext(html.slice(submittedFollowupStart,submittedFollowupEnd)+';submittedAssigneeIds("followup",formData);',submittedFollowupContext);
+assert.deepEqual(Array.from(submittedFollowupIds),['u2','u3'],'Submitting a Follow-up must preserve every selected assignee.');
+const followupSyncContext={rendered:'',$:selector=>selector==='#formAssigneeControl'?{set innerHTML(value){followupSyncContext.rendered=value;}}:{classList:{remove(){}}},currentModalItem:()=>null,ui:{modal:{kind:'new-child',parentId:'project-1'}},currentAssigneeSelection:()=>['u2','u3'],currentAssigneeMode:()=> 'selected',itemAssigneeIds:()=>[],allItem:()=>({id:'project-1'}),parentCreatorAssigneeId:()=> 'u1',assigneeControlMarkup:(type,ids,mode)=>JSON.stringify({type,ids:Array.from(ids),mode})};
+vm.runInNewContext(syncAssigneeSource+';syncAssigneeControl("followup",true,false);',followupSyncContext);
+assert.deepEqual(JSON.parse(followupSyncContext.rendered).ids,['u2','u3'],'Changing a Follow-up parent must not silently replace an existing multi-assignee selection.');
+followupSyncContext.currentAssigneeSelection=()=>[];
+followupSyncContext.currentAssigneeMode=()=> 'none';
+vm.runInNewContext(syncAssigneeSource+';syncAssigneeControl("followup",true,false);',followupSyncContext);
+assert.deepEqual(JSON.parse(followupSyncContext.rendered).ids,['u1'],'A new Follow-up with no current assignee may still default to its immediate parent creator.');
 
 const submitStart = html.indexOf('function handleItemSubmit(form){');
 const submitEnd = html.indexOf('\nfunction ', submitStart + 10);
@@ -328,6 +356,7 @@ const followupOrderCardEnd=html.indexOf('\nfunction childTreeFiltered(',followup
 assert.ok(followupOrderCardStart>=0&&followupOrderCardEnd>followupOrderCardStart,'The child card renderer must exist.');
 const followupOrderCardSource=html.slice(followupOrderCardStart,followupOrderCardEnd);
 assert.ok(followupOrderCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")>=0&&followupOrderCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")<followupOrderCardSource.indexOf('item.dueDate?'), 'Child cards must display the Assignee label before the Due date.');
+assert.ok(followupOrderCardSource.includes('class="meta-piece child-due-date"')&&html.includes('.child-meta>.child-assignee{order:3}')&&html.includes('.child-meta>.child-due-date{order:4}'),'Child-card visual ordering must keep the complete Assignee label immediately before the Due date regardless of responsive wrapping.');
 
 const assignedRowStart=html.indexOf('function accountAssignedItemRow(item){');
 const assignedRowEnd=html.indexOf('\nfunction filteredAccountAssignedItems(',assignedRowStart);

@@ -3607,7 +3607,61 @@ function renderItemMutationView({refreshSidebar=true}={}){
  renderDetail();
  renderModal();
 }
-function userOptions(current,includeNone=true){return `${includeNone?`<option value="" ${!current||String(current)==='root'?'selected':''}>${esc(tr('none'))}</option>`:''}${data.users.filter(raw=>String(raw.id)!=='root').map(raw=>{const u=person(raw.id);return `<option value="${esc(u.id)}" ${u.id===current?'selected':''}>${esc(u.name)} — ${esc(u.role)}</option>`;}).join('')}`;}
+
+function assignableUsers(){
+ return (data.users||[]).filter(raw=>{
+  const id=String(raw?.id||raw?.userId||'');
+  return Boolean(id)&&id!=='root'&&raw.enabled!==false;
+ });
+}
+function isAssignableUserId(value){
+ const id=String(value??'');
+ return Boolean(id)&&id!=='root'&&assignableUsers().some(raw=>String(raw.id||raw.userId||'')===id);
+}
+function itemAssigneeIds(item){
+ const raw=Array.isArray(item?.assigneeIds)?item.assigneeIds:[item?.ownerId];
+ const ids=[...new Set(raw.map(value=>String(value??'').trim()).filter(isAssignableUserId))];
+ return item?.type==='followup'?ids.slice(0,1):ids;
+}
+function parentCreatorAssigneeId(parent){
+ const creator=String(parent?.createdByUserId||parent?.createdBy||'');
+ return isAssignableUserId(creator)?creator:'';
+}
+function assigneeMarkup(item,labelKey='assignedTo',extraClass=''){
+ const ids=itemAssigneeIds(item);
+ const people=ids.map(id=>'<span class="assigned-person-chip">'+userAvatar(id)+'<span class="assigned-person">'+roleLabel(id)+'</span></span>').join('');
+ return '<span class="owner-pill assigned-owner '+esc(extraClass)+'">'+icon('user',14)+'<span class="assigned-label">'+esc(tr(labelKey))+':</span>'+(people?'<span class="assigned-person-list">'+people+'</span>':'<span class="assigned-person">'+esc(tr('noAssignee'))+'</span>')+'</span>';
+}
+function assigneeControlMarkup(type,selectedIds=[]){
+ const valid=[...new Set((selectedIds||[]).map(String).filter(isAssignableUserId))];
+ if(type==='followup'){
+  const owner=valid[0]||'';
+  return '<select id="formOwner" name="ownerId" aria-label="'+esc(tr('assignedTo'))+'">'+userOptions(owner,true)+'</select>';
+ }
+ const selected=new Set(valid);
+ const rows=assignableUsers().map(raw=>{
+  const id=String(raw.id||raw.userId),u=person(id);
+  return '<label class="assignee-check-option" for="formAssignee-'+esc(id)+'"><input id="formAssignee-'+esc(id)+'" type="checkbox" name="assigneeIds" value="'+esc(id)+'" '+(selected.has(id)?'checked':'')+'><span class="assignee-check-copy"><strong>'+esc(u.name)+'</strong><small>'+esc(u.role)+'</small></span></label>';
+ }).join('');
+ return '<div class="assignee-checklist" role="group" aria-label="'+esc(tr('assignedTo'))+'">'+(rows||'<span class="assignee-check-empty">'+esc(tr('noAssignee'))+'</span>')+'</div>';
+}
+function currentAssigneeSelection(){
+ const checks=$('#formAssigneeControl input[name="assigneeIds"]:checked').map(input=>String(input.value||''));
+ if(checks.length)return checks;
+ const select=$('#formAssigneeControl select[name="ownerId"]');
+ return select&&select.value?[String(select.value)]:[];
+}
+function submittedAssigneeIds(type,formData){
+ const raw=type==='followup'?[formData.get('ownerId')]:formData.getAll('assigneeIds');
+ const ids=[...new Set((raw||[]).map(value=>String(value??'').trim()).filter(isAssignableUserId))];
+ return type==='followup'?ids.slice(0,1):ids;
+}
+function sameAssigneeIds(left,right){
+ const a=[...new Set((left||[]).map(String))].sort(),b=[...new Set((right||[]).map(String))].sort();
+ return a.length===b.length&&a.every((id,index)=>id===b[index]);
+}
+
+function userOptions(current,includeNone=true){return `${includeNone?`<option value="" ${!current||String(current)==='root'?'selected':''}>${esc(tr('none'))}</option>`:''}${assignableUsers().map(raw=>{const u=person(raw.id);return `<option value="${esc(u.id)}" ${String(u.id)===String(current)?'selected':''}>${esc(u.name)} — ${esc(u.role)}</option>`;}).join('')}`;}
 function allowedChildTypes(parentId){const p=allItem(parentId);if(!p)return [];if(p.type==='project')return ['task','followup'];if(p.type==='job')return ['followup'];if(p.type==='task')return ['followup'];return [];}
 function parentOptions(current,childType='followup'){let candidates=childType==='task'?data.parents.filter(p=>p.type==='project'):[...data.parents,...data.children.filter(c=>c.type==='task')];candidates.sort((a,b)=>{const aa=a.type==='project'||a.type==='job'?0:1;const bb=b.type==='project'||b.type==='job'?0:1;return aa-bb||a.name.localeCompare(b.name);});return candidates.map(p=>{const root=rootParent(p);const label=p.type==='task'?`${p.name} — ${root?.name||''} (${typeName(p.type)})`:`${p.name} (${typeName(p.type)})`;return `<option dir="auto" value="${esc(p.id)}" ${p.id===current?'selected':''}>${esc(label)}</option>`;}).join('');}
 function currentModalItem(){return ui.modal?.itemId?allItem(ui.modal.itemId):null;}
@@ -3726,10 +3780,10 @@ function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.mo
    const allowedParentChildren= m.kind==='new-child'?allowedChildTypes(m.parentId):[];
    let typeField='';if(m.kind==='new-parent'){const canBeJob=true;typeField=`<div class="field"><label for="formType">${esc(tr('type'))}</label><select id="formType" name="type"><option value="project" ${type==='project'?'selected':''}>${esc(tr('project'))}</option><option value="job" ${type==='job'?'selected':''} ${!canBeJob?'disabled':''}>${esc(tr('job'))}</option></select></div>`;}else if(m.kind==='new-child'){typeField=`<div class="field"><label for="formType">${esc(tr('type'))}</label><select id="formType" name="type">${allowedParentChildren.map(tp=>`<option value="${tp}" ${type===tp?'selected':''}>${esc(typeName(tp))}</option>`).join('')}</select></div>`;}else if(isParent){const canBeJob=item.type==='job'||!hasDirectChildType(item.id,'task');typeField=`<div class="field"><label for="formType">${esc(tr('type'))}</label><select id="formType" name="type"><option value="project" ${type==='project'?'selected':''}>${esc(tr('project'))}</option><option value="job" ${type==='job'?'selected':''} ${!canBeJob?'disabled':''}>${esc(tr('job'))}</option></select>${!canBeJob?`<div class="modal-note">${esc(ui.lang==='ar'?'لا يمكن تحويل مشروع يحتوي على مهام إلى عمل مؤقت.':'A project with tasks cannot be changed to a job.')}</div>`:''}</div>`;}else{let allowed=allowedChildTypes(item.parentId);if(item.type==='task'&&childrenOf(item.id).length)allowed=['task'];typeField=`<div class="field"><label for="formType">${esc(tr('type'))}</label><select id="formType" name="type">${allowed.map(tp=>`<option value="${tp}" ${type===tp?'selected':''}>${esc(typeName(tp))}</option>`).join('')}</select></div>`;}
    let relationshipField='';if(m.kind==='new-child'){relationshipField=`<div class="field full"><label for="formParent">${esc(tr('chooseParent'))}</label><select id="formParent" name="parentId" required>${parentOptions(m.parentId,type)}</select></div>`;}
-   const status=item?.status||'not-started';const priority=item?.priority||'medium';const ownerId=item?(item.ownerId??''):currentUser().id;const name=item?.name||'';const description=item?.description||'';const dueDate=item?.dueDate||'';
+   const status=item?.status||'not-started';const priority=item?.priority||'medium';const selectedAssigneeIds=item?itemAssigneeIds(item):(type==='followup'?[parentCreatorAssigneeId(parent)]:[currentUser().id]).filter(isAssignableUserId);const ownerId=selectedAssigneeIds[0]||'';const name=item?.name||'';const description=item?.description||'';const dueDate=item?.dueDate||'';
    const nameField=`<div class="field"><label for="formName">${esc(tr('name'))} *</label><input id="formName" name="name" dir="auto" required maxlength="180" placeholder="${esc(tr('namePlaceholder'))}" value="${esc(name)}"></div>`;
    const formLead=m.kind==='new-child'?`${typeField}${nameField}${relationshipField}`:`${typeField}${relationshipField}${nameField}`;
-   content=`<form id="itemForm" data-modal-kind="${esc(m.kind)}" data-item-id="${esc(item?.id||'')}" class="form-grid ${isChild?'child-item-form':''}">${formLead}<div class="field"><label for="formStatus">${esc(tr('statusLabel'))}</label><select id="formStatus" name="status">${[['not-started',tr('notStarted')],['in-progress',tr('inProgress')],['on-hold',tr('onHold')],['completed',tr('completed')]].map(([v,l])=>`<option value="${v}" ${status===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div>${isChild?`<div class="field"><label for="formPriority">${esc(tr('priorityLabel'))}</label><select id="formPriority" name="priority">${[['urgent',tr('urgent')],['high',tr('high')],['medium',tr('medium')],['low',tr('low')]].map(([v,l])=>`<option value="${v}" ${priority===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div>`:''}<div class="field assignee-field" id="formOwnerField"><label for="formOwner">${esc(tr('assignedTo'))}</label><select id="formOwner" name="ownerId">${userOptions(ownerId,true)}</select></div><div class="field"><label for="formDueDate">${esc(tr('dueDate'))}</label><input type="date" id="formDueDate" name="dueDate" value="${esc(dueDate)}"></div><div class="field full"><label for="formDescription">${esc(tr('description'))}</label><textarea id="formDescription" name="description" dir="auto" maxlength="3000" placeholder="${esc(tr('descriptionPlaceholder'))}">${esc(description)}</textarea></div><div class="form-tip full">${icon('info',14)}<span>${esc(isChild?tr('childRelationshipHint'):tr('parentRelationshipHint'))}</span></div></form>`;
+   content=`<form id="itemForm" data-modal-kind="${esc(m.kind)}" data-item-id="${esc(item?.id||'')}" class="form-grid ${isChild?'child-item-form':''}">${formLead}<div class="field"><label for="formStatus">${esc(tr('statusLabel'))}</label><select id="formStatus" name="status">${[['not-started',tr('notStarted')],['in-progress',tr('inProgress')],['on-hold',tr('onHold')],['completed',tr('completed')]].map(([v,l])=>`<option value="${v}" ${status===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div>${isChild?`<div class="field"><label for="formPriority">${esc(tr('priorityLabel'))}</label><select id="formPriority" name="priority">${[['urgent',tr('urgent')],['high',tr('high')],['medium',tr('medium')],['low',tr('low')]].map(([v,l])=>`<option value="${v}" ${priority===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div>`:''}<div class="field assignee-field" id="formOwnerField"><label>${esc(tr('assignedTo'))}</label><div id="formAssigneeControl">${assigneeControlMarkup(type,selectedAssigneeIds)}</div></div><div class="field"><label for="formDueDate">${esc(tr('dueDate'))}</label><input type="date" id="formDueDate" name="dueDate" value="${esc(dueDate)}"></div><div class="field full"><label for="formDescription">${esc(tr('description'))}</label><textarea id="formDescription" name="description" dir="auto" maxlength="3000" placeholder="${esc(tr('descriptionPlaceholder'))}">${esc(description)}</textarea></div><div class="form-tip full">${icon('info',14)}<span>${esc(isChild?tr('childRelationshipHint'):tr('parentRelationshipHint'))}</span></div></form>`;
    footer=`<div class="modal-footer${!isNew?' item-edit-footer':''}">${!isNew?`<button class="btn btn-danger" type="button" data-action="delete-from-modal" data-id="${esc(item.id)}">${icon('trash',14)} ${esc(tr('deleteAction'))}</button>`:`<span class="modal-note">* ${esc(tr('requiredField'))}</span>`}<div class="right"><button class="btn" type="button" data-action="close-modal">${esc(tr('cancel'))}</button><button class="btn btn-primary" type="submit" form="itemForm">${icon('save',14)} ${esc(isNew?tr('create'):tr('save'))}</button></div></div>`;
  } else if(m.kind==='history'){
   wide=true;const item=allItem(m.itemId)||m.itemSnapshot||null;title=tr('historyTitle');subtitle=item?.name||'';
@@ -4051,7 +4105,21 @@ $('#parentDateTo').addEventListener('change',ev=>{ui.parentDateTo=ev.target.valu
 $('#clearParentFilters').addEventListener('click',clearParentFilters);
 $('#mainContent').addEventListener('input',ev=>{if(ev.target.id==='childQuery'){ui.childQuery=ev.target.value;const parent=data.parents.find(p=>p.id===ui.selectedParentId);if(parent){const list=$('#childItemsList');if(list)list.innerHTML=renderChildList(parent);updateNotCompletedMetricCount(parent);}syncOverviewMetricPressed();}});
 $('#mainContent').addEventListener('change',ev=>{if(ev.target.id==='childTypeFilter'){ui.childType=ev.target.value;ui.childScope='all';}else if(ev.target.id==='childStatusFilter'){ui.childStatus=ev.target.value;}else if(ev.target.id==='childPriorityFilter'){ui.childPriority=ev.target.value;}else if(ev.target.id==='childSortFilter'){ui.childDateMode=ev.target.value;}else if(ev.target.id==='childDateFrom'){ui.childDateFrom=ev.target.value;}else if(ev.target.id==='childDateTo'){ui.childDateTo=ev.target.value;}else return;const parent=data.parents.find(p=>p.id===ui.selectedParentId);if(parent){const list=$('#childItemsList');if(list)list.innerHTML=renderChildList(parent);updateNotCompletedMetricCount(parent);}syncOverviewMetricPressed();});
-function syncAssigneeControl(type){const select=$('#formOwner');if(!select)return;const item=currentModalItem();const owner=select.value??(item?.ownerId??'');select.innerHTML=userOptions(owner,true);select.value=owner;select.disabled=false;$('#formOwnerField')?.classList.remove('required-assignee');}
+function syncAssigneeControl(type,parentChanged=false){
+ const host=$('#formAssigneeControl');if(!host)return;
+ const item=currentModalItem(),modal=ui.modal;let selected=currentAssigneeSelection();
+ if(!selected.length&&item)selected=itemAssigneeIds(item);
+ if(type==='followup'){
+  const parent=allItem($('#formParent')?.value||modal?.parentId||item?.parentId||'');let owner=selected[0]||'';
+  if(modal?.kind==='new-child'&&parentChanged)owner=parentCreatorAssigneeId(parent);
+  else if(modal?.kind==='new-child'&&!owner)owner=parentCreatorAssigneeId(parent);
+  host.innerHTML=assigneeControlMarkup(type,owner?[owner]:[]);
+ }else{
+  if(!selected.length&&!item&&modal?.kind!=='edit')selected=[currentUser().id];
+  host.innerHTML=assigneeControlMarkup(type,selected);
+ }
+ $('#formOwnerField')?.classList.remove('required-assignee');
+}
 $('#modalRoot').addEventListener('change',ev=>{
  if(ui.modal?.kind==='history'&&ev.target.id==='historyScopeFilter'){ui.modal.historyScope=ev.target.value==='item'?'item':'all';ui.modal.historyRefreshError='';const itemId=ui.modal.itemId;const scope=ui.modal.historyScope;renderModal();void refreshActivityFor(itemId,scope);return;}
  if(ui.modal&&(ui.modal.kind==='new-child'||ui.modal.kind==='edit'||ui.modal.kind==='new-parent')&&ev.target.id==='formType'){
@@ -4063,7 +4131,7 @@ $('#modalRoot').addEventListener('change',ev=>{
   const typeEl=$('#formType');const parentEl=$('#formParent');let type=typeEl?.value||ui.modal.type;let parentId=parentEl?.value||ui.modal.parentId;
   if(ev.target.id==='formParent'){const allowed=allowedChildTypes(parentId);if(!allowed.includes(type))type=allowed[0]||'followup';typeEl.innerHTML=allowed.map(tp=>`<option value="${tp}" ${tp===type?'selected':''}>${esc(typeName(tp))}</option>`).join('');}
   parentEl.innerHTML=parentOptions(parentId,type);if(![...parentEl.options].some(o=>o.value===parentId)){const allowedParent=allItem(parentId);const fallback=type==='task'?(allowedParent?.type==='project'?parentId:(data.parents.find(p=>p.type==='project')?.id||'')):(rootParent(allowedParent)?.id||defaultWorkspaceParentId(data.parents));parentId=fallback;parentEl.innerHTML=parentOptions(parentId,type);}parentEl.value=parentId;ui.modal.type=type;ui.modal.parentId=parentId;
-  syncAssigneeControl(type);
+  syncAssigneeControl(type,ev.target.id==='formParent');
  }
 });
 $('#modalRoot').addEventListener('input',ev=>{

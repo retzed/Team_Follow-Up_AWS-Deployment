@@ -231,7 +231,7 @@ const selectedDefault = html.includes("(type==='followup'?[parentCreatorAssignee
 assert.ok(selectedDefault, 'New Projects, Jobs, and Tasks must default to None.');
 const pickerCssStart = html.indexOf('<style id="assignee-picker-popover">');
 const pickerCssEnd = html.indexOf('</style>',pickerCssStart);
-assert.ok(pickerCssStart>=0&&pickerCssEnd>pickerCssStart&&html.slice(pickerCssStart,pickerCssEnd).includes('position:fixed')&&html.slice(pickerCssStart,pickerCssEnd).includes('overflow:auto'), 'The checklist popover must stay within the viewport and scroll without resizing the form.');
+assert.ok(pickerCssStart>=0&&pickerCssEnd>pickerCssStart&&html.slice(pickerCssStart,pickerCssEnd).includes('position:fixed')&&html.slice(pickerCssStart,pickerCssEnd).includes('overflow-y:auto'), 'The checklist popover must stay within the viewport and scroll without resizing the form.');
 assert.equal(submitSource.split("assigneeMode:type==='followup'?undefined:(assigneeMode||'none')").length - 1, 2, 'Both newly created parent and child records must explicitly default to None.');
 const assignedFilterStart = html.indexOf('function filteredAssignedItems(');
 const assignedFilterEnd = html.indexOf('\nfunction assignmentContextMarkup(', assignedFilterStart);

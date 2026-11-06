@@ -149,7 +149,7 @@ flowchart LR
 | FR-02 | Map an authenticated Cognito identity to exactly one enabled team profile. | Lambda resolves verified JWT subject to Users.cognitoSub; missing/duplicate/disabled mapping is denied. |
 | FR-03 | List top-level projects and jobs. | WorkspaceIndex query on Items. |
 | FR-04 | Enforce valid hierarchy: Project → Tasks and Follow-ups; Job → Follow-ups; Task → Follow-ups; Follow-up → no children. | Lambda validation and restore validation. |
-| FR-05 | Create and edit items with validated name, description, type, status, priority, assignee, and due date. | Server-side validation is implemented; status and priority enumerations are documented below. |
+| FR-05 | Create and edit items with validated name, description, type, applicable status/due date, priority, and assignees. | Projects, Jobs, and Tasks support status; Follow-ups intentionally have neither status nor due date. Task/parent due dates are optional. |
 | FR-06 | Record actor identity, timestamps, and version from trusted server-side data. | Lambda overwrites client-supplied identity/timestamp/version fields. |
 | FR-07 | Show work assigned to the signed-in member and allow search/filtering. | AssignedToIndex and API filter parameters. |
 | FR-08 | Record and retrieve item, hierarchy, and application-wide activity. | Activity writes are coupled to mutations; direct event mutation is prohibited. |
@@ -178,9 +178,10 @@ flowchart LR
 - A work-item name is required and may not exceed 200 characters.
 - Description must be text and may not exceed 5,000 characters.
 - Supported item types are **project**, **job**, **task**, and **followup**.
-- Supported statuses are **not-started**, **in-progress**, **on-hold**, and **completed**. The UI's “Not Completed” filter means any status except completed; it is a filter, not a stored status.
+- Supported statuses are **not-started**, **in-progress**, **on-hold**, and **completed** for Projects, Jobs, and Tasks. Follow-ups have no status field.
 - Child-item priorities are **low**, **medium**, **high**, and **urgent**.
-- A due date, when supplied, must use **YYYY-MM-DD**.
+- A due date, when supplied for a Project, Job, or Task, must use **YYYY-MM-DD**. Follow-ups have no due-date field; legacy values are stripped on API read/write, archive, and restore.
+- Status filters operate only on records that support status. The **Not Completed** filter excludes Follow-ups rather than treating their absent status as unfinished. Due-date sorting/filtering likewise excludes Follow-ups.
 - Projects and jobs cannot have a parent.
 - Child items require a valid parent. A Project may contain Tasks and Follow-ups; a Job or Task may contain Follow-ups only; Follow-ups cannot contain children.
 - Parent changes must not introduce a hierarchy cycle.
@@ -672,7 +673,7 @@ stateDiagram-v2
     Archived --> Active: Restore succeeds after hierarchy validation
 ~~~
 
-The stored status values are independent of the archive lifecycle. Archiving copies the item to the Archive table and removes the active record; restoring returns the item (with its retained business status) to Items after validation.
+The stored status values are independent of the archive lifecycle for Projects, Jobs, and Tasks. Follow-ups do not have a status to retain. Archiving copies the item to the Archive table and removes the active record; restoring returns the item after hierarchy validation, while legacy Follow-up status/due-date attributes are discarded.
 
 ### 5.8 Class diagram — logical domain model
 
@@ -762,7 +763,7 @@ The class diagram is a **logical design view**, not a statement that the Python 
 ### 6.1 Design goals
 
 - Keep the selected project/job and its child items easy to scan.
-- Make task/follow-up ownership and status visible without opening every record.
+- Make task/follow-up ownership and priority visible without opening every record; status and due date remain visible only on Projects, Jobs, and Tasks.
 - Make activity history searchable and understandable, including changes made by other members.
 - Keep search, assignment, edit, archive, and restore actions discoverable on small screens.
 - Maintain consistent English/Arabic labels, text direction, theme behavior, forms, and status/priority visual cues.
@@ -869,7 +870,7 @@ The exact available scope depends on the screen: item history can be limited to 
 ### 6.3 Navigation and interaction model
 
 - **Projects & Jobs list:** browse/search top-level workspaces; opening an item loads its overview and child list.
-- **Search:** filter projects/jobs and child items by supported type, status, priority, search text, and date range.
+- **Search:** filter projects/jobs and child items by supported type, priority, search text, and date range. Status filters apply to Projects, Jobs, and Tasks; Follow-ups are not status-filter matches. Due-date filtering/sorting applies only to records with a due date, never Follow-ups.
 - **Assigned to me:** show work assigned to the signed-in member, with search and filters.
 - **Overview:** show selected parent details and summary counts, then direct child items.
 - **Child items:** create, open, and edit Tasks/Follow-ups subject to hierarchy rules.
@@ -895,7 +896,7 @@ Design guidance for continued UI work:
 ### 6.5 Status and priority language
 
 - Stored statuses are **Not Started**, **In Progress**, **On Hold**, and **Completed** (localized in the UI).
-- The **Not Completed** filter selects every item whose stored status is not Completed.
+- The **Not Completed** filter selects Projects, Jobs, and Tasks whose stored status is not Completed; Follow-ups are excluded because they do not have a status.
 - Task/follow-up priority values are **Low**, **Medium**, **High**, and **Urgent**. Priority is a work-ordering signal, not an authorization level.
 
 ## 7. Technology stack and integrations
@@ -1116,7 +1117,7 @@ Run these checks in a dedicated test environment after the API and frontend have
 
 1. **Authentication:** valid sign-in, invalid credentials, password reset, supported challenge flow, sign-out, and session renewal.
 2. **Identity mapping:** missing/unsupported custom team ID, missing/duplicate Cognito-sub mapping, disabled profile, and valid one-to-one mapping.
-3. **Work-item CRUD:** create each permitted item type; edit content, assignee, status, priority, and due date; verify server-controlled attribution/time/version.
+3. **Work-item CRUD:** create each permitted item type; edit content and assignment; verify status/due-date controls and persistence on Projects, Jobs, and Tasks, and verify Follow-ups omit both fields (including after Task ↔ Follow-up conversion); verify server-controlled attribution/time/version.
 4. **Hierarchy validation:** reject parentless children, child on a Project/Job, Task under a Job, non-Follow-up under a Task, invalid parent types, self-parenting, and cycles.
 5. **Concurrency:** update a record from two browser sessions and confirm a stale version receives 409 instead of overwriting a newer version.
 6. **Activity:** verify create/update/status/assignment/archive/restore events; item, hierarchy, and application scope; newest-first order; and rejection of direct event mutation.
@@ -1382,7 +1383,7 @@ Closing Search clears a queued sidebar query timer and increments `sidebarQueryS
 
 ### Assigned Items filters and mobile date fields (29 October 2026)
 
-The **Assigned Items** tab retains its query, type, status, date-mode, From and To filters, plus Clear. The status option `Not completed` is last. The protected `root` profile is omitted from assignee selectors; if an existing item was assigned to root, the editor's selector falls back to its empty option so the item can be reassigned. The root account is not made selectable by the UI.
+The **Assigned Items** tab retains its query, type, status, date-mode, From and To filters, plus Clear. Status choices apply only to Projects, Jobs, and Tasks; Follow-ups remain visible when status is All and are excluded when a specific status is selected. Due-date mode excludes Follow-ups. The status option `Not completed` is last. The protected `root` profile is omitted from assignee selectors; if an existing item was assigned to root, the editor's selector falls back to its empty option so the item can be reassigned. The root account is not made selectable by the UI.
 
 In mobile layouts, From and To remain side by side in one complete row in both Account Search and Assigned Items, with each field constrained to half the available filter width. The default selected Project/Job also loads its root-scoped activity timeline during startup, so opening its activity view does not need a second request just to populate the selected parent history.
 

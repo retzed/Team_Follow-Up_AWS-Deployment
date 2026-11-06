@@ -3165,7 +3165,7 @@ function sortChildrenByDate(items){const mode=childDateSortMode();return [...ite
 function childCard(item,parent,{nested=false,filteredNested=null}={}){
  const kids= item.type==='task' ? sortChildrenByDate(filteredNested??childrenOf(item.id)) : [];
  const expanded=ui.expanded.has(item.id);
- return `<article class="child-card ${nested?'nested-followup':''}" id="card-${esc(item.id)}"><div class="child-card-inner"><div class="child-top"><span class="child-icon">${typeIcon(item.type)}</span><div class="child-main"><div class="child-title-row"><span class="child-title" dir="auto">${esc(item.name)}</span><span class="type-pill">${esc(typeName(item.type))}</span></div><p class="child-description" dir="auto">${esc(item.description||tr('noDescription'))}</p><div class="child-meta">${statusPill(item.status)}${item.priority?priorityPill(item.priority):''}${item.dueDate?`<span class="meta-piece">${icon('calendar',13)} ${esc(fmtDate(item.dueDate,{month:'short',day:'numeric',year:'numeric'}))}</span>`:''}<span class="owner-pill assigned-owner child-assignee">${icon('user',14)}<span class="assigned-label">${esc(tr('assignee'))}:</span>${item.ownerId?userAvatar(item.ownerId):''}<span class="assigned-person">${roleLabel(item.ownerId)}</span></span></div></div><div class="child-actions"><button class="icon-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',14)}</button>${pinActionMarkup(item.id)}</div></div>${item.type==='task'?`<button class="nested-toggle" type="button" data-action="toggle-nested" data-id="${esc(item.id)}" aria-expanded="${expanded}"><span class="left">${icon('chevron',13)} ${esc(tr('openFollowups'))} (${kids.length})</span><span>${expanded?esc(ui.lang==='ar'?'إخفاء':'Hide'):esc(ui.lang==='ar'?'عرض':'View')}</span></button><div class="nested-list" ${expanded?'':'hidden'}>${kids.length?kids.map(k=>childCard(k,parent,{nested:true})).join(''):`<div class="empty-state">${esc(tr('noChildItems'))}</div>`}${!rootChildrenReady(parent.id)?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}${rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):''}${!nested?`<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button>`:''}</div>`:''}</div></article>`;
+ return `<article class="child-card ${nested?'nested-followup':''}" id="card-${esc(item.id)}"><div class="child-card-inner"><div class="child-top"><span class="child-icon">${typeIcon(item.type)}</span><div class="child-main"><div class="child-title-row"><span class="child-title" dir="auto">${esc(item.name)}</span><span class="type-pill">${esc(typeName(item.type))}</span></div><p class="child-description" dir="auto">${esc(item.description||tr('noDescription'))}</p><div class="child-meta">${item.priority?priorityPill(item.priority):''}${statusPill(item.status)}${item.dueDate?`<span class="meta-piece">${icon('calendar',13)} ${esc(fmtDate(item.dueDate,{month:'short',day:'numeric',year:'numeric'}))}</span>`:''}<span class="owner-pill assigned-owner child-assignee">${icon('user',14)}<span class="assigned-label">${esc(tr('assignee'))}:</span>${item.ownerId?userAvatar(item.ownerId):''}<span class="assigned-person">${roleLabel(item.ownerId)}</span></span></div></div><div class="child-actions"><button class="icon-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',14)}</button>${pinActionMarkup(item.id)}</div></div>${item.type==='task'?`<button class="nested-toggle" type="button" data-action="toggle-nested" data-id="${esc(item.id)}" aria-expanded="${expanded}"><span class="left">${icon('chevron',13)} ${esc(tr('openFollowups'))} (${kids.length})</span><span>${expanded?esc(ui.lang==='ar'?'إخفاء':'Hide'):esc(ui.lang==='ar'?'عرض':'View')}</span></button><div class="nested-list" ${expanded?'':'hidden'}>${kids.length?kids.map(k=>childCard(k,parent,{nested:true})).join(''):`<div class="empty-state">${esc(tr('noChildItems'))}</div>`}${!rootChildrenReady(parent.id)?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}${rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):''}${!nested?`<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button>`:''}</div>`:''}</div></article>`;
 }
 function renderOverview(parent,summary=null){const all=summary?.all||allDescendants(parent.id);const countsReady=rootChildrenReady(parent.id);const totalTasks=all.filter(c=>c.type==='task').length;const directFollowups=childrenOf(parent.id).filter(c=>c.type==='followup').length;const notCompleted=countNotCompletedForCurrentFilter(parent,all);const tasksActive=ui.childScope==='all'&&ui.childType==='task';const followupsActive=ui.childType==='followup'||ui.childScope==='direct-followups';const notCompletedActive=ui.childStatus==='not-completed';
  return `<div class="content-body"><div class="summary-grid">${parent.type==='project'?`<button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="tasks" type="button" aria-pressed="${tasksActive}"><div class="summary-tile-head"><span>${esc(tr('openTasks'))}</span>${icon('clipboard',15)}</div><div class="summary-value">${countValueMarkup(totalTasks,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr('inThisProject'))}</div></button>`:`<button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="urgent" type="button" aria-pressed="${ui.childPriority==='urgent'}"><div class="summary-tile-head"><span>${esc(tr('urgent'))}</span>${icon('alert-triangle',15)}</div><div class="summary-value">${countValueMarkup(all.filter(c=>c.priority==='urgent').length,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr('inThisJob'))}</div></button>`}<button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="direct-followups" type="button" aria-pressed="${followupsActive}"><div class="summary-tile-head"><span>${esc(tr('openFollowups'))}</span>${icon('message',15)}</div><div class="summary-value">${countValueMarkup(directFollowups,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr(parent.type==='job'?'inThisJob':'inThisProject'))}</div></button><button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="not-completed" type="button" aria-pressed="${notCompletedActive}"><div class="summary-tile-head"><span>${esc(tr('notCompletedItems'))}</span>${icon('clock',15)}</div><div class="summary-value" id="notCompletedMetricCount">${countValueMarkup(notCompleted,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr(parent.type==='job'?'inThisJob':'inThisProject'))}</div></button></div><div class="section-heading" id="childrenSection"><div><h3>${esc(tr(parent.type==='job'?'jobItems':'projectItems'))}</h3><p>${esc(tr(parent.type==='job'?'jobItemsHint':'projectItemsHint'))}</p></div><div class="head-actions"><button class="btn btn-small" data-action="new-child" data-parent-id="${esc(parent.id)}" data-type="followup" type="button">${icon('plus',13)} ${esc(tr('newFollowup'))}</button>${parent.type==='project'?`<button class="btn btn-small btn-primary" data-action="new-child" data-parent-id="${esc(parent.id)}" data-type="task" type="button">${icon('plus',13)} ${esc(tr('newTask'))}</button>`:''}</div></div><div class="child-search-section"><button class="child-search-toggle" data-action="toggle-child-search" type="button" aria-controls="childSearchToolbar" aria-expanded="${ui.childSearchExpanded?'true':'false'}"><span class="child-search-toggle-title">${icon('search',14)}<span>${esc(tr('childSearchFilters'))}</span></span><span class="child-search-toggle-chevron ${ui.childSearchExpanded?'expanded':''}">${icon('chevron',13)}</span></button><div class="child-toolbar ${ui.childSearchExpanded?'expanded':''}" id="childSearchToolbar"><div class="child-filter-field child-search-field"><label class="child-filter-label" for="childQuery">${esc(tr('sidebarSearch'))}</label><div class="searchbox child-search-box"><span>${icon('search',15)}</span><input id="childQuery" type="search" autocomplete="off" value="${esc(ui.childQuery)}" placeholder="${esc(tr('searchChildren'))}"></div><button class="subtle-btn clear-text-action child-clear-button child-mobile-clear-button" data-action="clear-child-filters" type="button" aria-label="${esc(tr('clear'))}" title="${esc(tr('clear'))}">${icon('filter',13)} ${esc(tr('clear'))}</button></div><div class="child-filter-field"><label class="child-filter-label" for="childTypeFilter">${esc(tr('type'))}</label><select class="child-filter-control" id="childTypeFilter" aria-label="${esc(tr('type'))}">${[['all',tr('allTypes')],['task',tr('task')],['followup',tr('followup')]].map(([v,l])=>`<option value="${v}" ${ui.childType===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div><div class="child-filter-field"><label class="child-filter-label" for="childStatusFilter">${esc(tr('status'))}</label><select class="child-filter-control" id="childStatusFilter" aria-label="${esc(tr('status'))}">${[['all',tr('allStatuses')],['not-started',tr('notStarted')],['in-progress',tr('inProgress')],['on-hold',tr('onHold')],['completed',tr('completed')],['not-completed',tr('notCompleted')]].map(([v,l])=>`<option value="${v}" ${ui.childStatus===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div><div class="child-filter-field"><label class="child-filter-label" for="childPriorityFilter">${esc(tr('priority'))}</label><select class="child-filter-control" id="childPriorityFilter" aria-label="${esc(tr('priority'))}">${[['all',tr('allPriorities')],['urgent',tr('urgent')],['high',tr('high')],['medium',tr('medium')],['low',tr('low')]].map(([v,l])=>`<option value="${v}" ${ui.childPriority===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div><div class="child-filter-field"><label class="child-filter-label" for="childSortFilter">${esc(tr('dateList'))}</label><select class="child-filter-control" id="childSortFilter" aria-label="${esc(tr('dateList'))}">${[['updated',tr('lastUpdated')],['last-created',tr('lastCreated')],['created',tr('createdOldest')]].map(([v,l])=>`<option value="${v}" ${ui.childDateMode===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div><div class="child-date-row"><div class="child-filter-field"><label class="child-filter-label" for="childDateFrom">${esc(tr('from'))}</label><input class="date-input" id="childDateFrom" type="date" aria-label="${esc(tr('from'))}" value="${esc(ui.childDateFrom)}"></div><div class="child-filter-field"><label class="child-filter-label" for="childDateTo">${esc(tr('to'))}</label><input class="date-input" id="childDateTo" type="date" aria-label="${esc(tr('to'))}" value="${esc(ui.childDateTo)}"></div></div><div class="child-filter-actions"><span class="child-filter-label filter-action-spacer" aria-hidden="true">&nbsp;</span><button class="subtle-btn clear-text-action child-clear-button" data-action="clear-child-filters" type="button" aria-label="${esc(tr('clear'))}" title="${esc(tr('clear'))}">${icon('filter',13)} ${esc(tr('clear'))}</button></div></div></div><div id="childItemsList" class="children-list">${renderChildList(parent)}</div><div class="detail-footer"><button class="btn btn-small" data-action="history" data-item-id="${esc(parent.id)}" type="button">${icon('activity',13)} ${esc(tr('viewAllHistory'))}</button></div></div>`;}
@@ -3196,7 +3196,7 @@ function renderChildList(parent){
  const cards=roots.map(({item,nested})=>childCard(item,parent,{filteredNested:nested})).join('');
  return cards+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):error?loadErrorMarkup(error):'');
 }
-function treeActivity(parent){const roots=childrenOf(parent.id).sort(newestCreatedFirst);const ready=rootChildrenReady(parent.id);const rootMeta=`<div class="tree-created-meta tree-root-created-meta">${creatorLabel(parent)}</div>`;if(!roots.length&&!ready)return rootMeta+rootPendingMarkup(parent.id,'children',tr('loadingItems'));if(!roots.length)return rootMeta+`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`;const markup=roots.map(item=>{if(item.type==='task'){const nested=childrenOf(item.id).sort(newestCreatedFirst);return `<div class="tree-task-wrap"><div class="tree-task-row">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-title" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div><div class="tree-task-controls">${statusPill(item.status)}<button class="subtle-btn tree-task-edit" data-action="edit-item" data-id="${esc(item.id)}" type="button">${icon('edit',12)} ${esc(tr('edit'))}</button></div></div><div class="tree-created-meta">${creatorLabel(item)}</div><details class="tree-item"><summary>${icon('chevron',13)}<span class="tree-title tree-followups-label">${esc(tr('openFollowups'))}</span><span class="tree-count" title="${esc(tr('openFollowups'))}">${nested.length}${!ready?` ${icon('spinner',10)}`:''}</span>${icon('chevron',13)}</summary><div class="tree-contents">${nested.length?nested.map(c=>`<div class="tree-child-row"><div class="tree-child-main">${typeIcon(c.type)}<span class="tree-child-name" dir="auto">${esc(c.name)}</span>${statusPill(c.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(c.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(c)}</div></div>`).join(''):`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`}${!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button></div></details></div>`;}return `<div class="tree-direct"><div class="tree-direct-main">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-child-name" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div>${statusPill(item.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(item)}</div></div>`;}).join('');return rootMeta+markup+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):'');}
+function treeActivity(parent){const roots=childrenOf(parent.id).sort(newestCreatedFirst);const ready=rootChildrenReady(parent.id);const rootMeta=`<div class="tree-created-meta tree-root-created-meta">${creatorLabel(parent)}</div>`;if(!roots.length&&!ready)return rootMeta+rootPendingMarkup(parent.id,'children',tr('loadingItems'));if(!roots.length)return rootMeta+`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`;const markup=roots.map(item=>{if(item.type==='task'){const nested=childrenOf(item.id).sort(newestCreatedFirst);return `<div class="tree-task-wrap"><div class="tree-task-row">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-title" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div><div class="tree-task-controls">${statusPill(item.status)}<button class="subtle-btn tree-task-edit" data-action="edit-item" data-id="${esc(item.id)}" type="button">${icon('edit',12)} ${esc(tr('edit'))}</button></div></div><div class="tree-created-meta">${creatorLabel(item)}</div><details class="tree-item"><summary class="tree-followups-summary">${icon('chevron',13)}<span class="tree-title tree-followups-label" dir="auto">${esc(tr('openFollowups'))}</span><span class="tree-count" title="${esc(tr('openFollowups'))}">${nested.length}${!ready?` ${icon('spinner',10)}`:''}</span>${icon('chevron',13)}</summary><div class="tree-contents">${nested.length?nested.map(c=>`<div class="tree-child-row"><div class="tree-child-main">${typeIcon(c.type)}<span class="tree-child-name" dir="auto">${esc(c.name)}</span>${statusPill(c.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(c.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(c)}</div></div>`).join(''):`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`}${!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button></div></details></div>`;}return `<div class="tree-direct"><div class="tree-direct-main">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-child-name" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div>${statusPill(item.status)}<button class="subtle-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(item)}</div></div>`;}).join('');return rootMeta+markup+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):'');}
 function timelineEvents(parent,limit=8){
  const ready=rootActivityReady(parent.id),error=rootLoadingError(parent.id,'activity');
  if(!ready&&!error)return `<div class="timeline-empty">${esc(tr('activityNotLoaded'))}</div>`;
@@ -3793,7 +3793,7 @@ function renderModal(preserveExisting=true){const root=$('#modalRoot');if(!ui.mo
     const archiveTimes=`<div class="archive-item-times"><span>${icon('clock',11)} ${esc(tr('lastUpdatedLabel'))}: ${esc(fmtDateTime(item.updatedAt))}${updatedId?` · ${esc(person(updatedId).name)}`:''}</span>${archivedAt?`<span>${icon('archive',11)} ${esc(tr('archivedAt'))}: ${esc(fmtDateTime(archivedAt))}${archivedBy?` · ${esc(person(archivedBy).name)}`:''}</span>`:''}</div>`;
     const childRows=childrenByParent.get(id)||[];
     const nested=childRows.length?`<details class="archive-disclosure archive-nested-disclosure" data-archive-node="item:${esc(id)}" ${expandedNodes.has(`item:${id}`)?'open':''}><summary class="archive-disclosure-summary"><span class="archive-disclosure-label">${esc(item.type==='task'?tr('archiveFollowupsLabel'):tr('archiveChildItemsLabel'))}</span><span class="archive-disclosure-count">${childRows.length}</span><span class="archive-chevron">${icon('chevron',13)}</span></summary><div class="archive-nested-rows">${childRows.map(child=>renderNode(child,depth+1)).join('')}</div></details>`:'';
-    return `<div class="archive-tree-node" style="--archive-depth:${Math.min(depth,6)}"><article class="child-card archive-child-card ${selectedClass} ${depth?'nested-followup':''}"><div class="child-card-inner"><div class="child-top"><input class="archive-select archive-child-select" type="checkbox" data-archive-id="${esc(id)}" ${selected.has(id)?'checked':''} aria-label="${esc(item.name)}"><span class="child-icon">${typeIcon(item.type)}</span><div class="child-main"><div class="child-title-row"><span class="child-title" dir="auto">${esc(item.name)}</span><span class="type-pill">${esc(typeName(item.type))}</span></div><div class="created-label child-created-label"><span class="creator-line">${userAvatar(createdId)}<span>${esc(tr('createdBy'))} ${esc(person(createdId).name)} · ${esc(fmtDateTime(item.createdAt))}</span></span></div>${showParentContext?`<div class="archive-parent-context">${icon('corner-down-right',11)} <span>${esc(typeName(parent.type||'task'))}: <bdi dir="auto">${esc(parent.name)}</bdi></span></div>`:''}<p class="child-description" dir="auto">${esc(item.description||tr('noDescription'))}</p><div class="child-meta">${statusPill(item.status)}${item.priority?priorityPill(item.priority):''}${due}<span class="owner-pill assigned-owner child-assignee">${icon('user',14)}<span class="assigned-label">${esc(tr('assignee'))}:</span>${assigneeId?userAvatar(assigneeId):''}<span class="assigned-person">${roleLabel(assigneeId)}</span></span></div>${archiveTimes}</div></div></div></article>${nested}</div>`;
+    return `<div class="archive-tree-node" style="--archive-depth:${Math.min(depth,6)}"><article class="child-card archive-child-card ${selectedClass} ${depth?'nested-followup':''}"><div class="child-card-inner"><div class="child-top"><input class="archive-select archive-child-select" type="checkbox" data-archive-id="${esc(id)}" ${selected.has(id)?'checked':''} aria-label="${esc(item.name)}"><span class="child-icon">${typeIcon(item.type)}</span><div class="child-main"><div class="child-title-row"><span class="child-title" dir="auto">${esc(item.name)}</span><span class="type-pill">${esc(typeName(item.type))}</span></div><div class="created-label child-created-label"><span class="creator-line">${userAvatar(createdId)}<span>${esc(tr('createdBy'))} ${esc(person(createdId).name)} · ${esc(fmtDateTime(item.createdAt))}</span></span></div>${showParentContext?`<div class="archive-parent-context">${icon('corner-down-right',11)} <span>${esc(typeName(parent.type||'task'))}: <bdi dir="auto">${esc(parent.name)}</bdi></span></div>`:''}<p class="child-description" dir="auto">${esc(item.description||tr('noDescription'))}</p><div class="child-meta">${item.priority?priorityPill(item.priority):''}${statusPill(item.status)}${due}<span class="owner-pill assigned-owner child-assignee">${icon('user',14)}<span class="assigned-label">${esc(tr('assignee'))}:</span>${assigneeId?userAvatar(assigneeId):''}<span class="assigned-person">${roleLabel(assigneeId)}</span></span></div>${archiveTimes}</div></div></div></article>${nested}</div>`;
    };
    const rootNodes=visibleItems.filter(item=>{const pid=String(item.parentId||'');return pid===String(group.rootId)||!visibleIds.has(pid);});
    let rootRowsMarkup=rootNodes.map(item=>renderNode(item,0)).join('');
@@ -6775,6 +6775,215 @@ body.signin-open .scroll-to-top {
     letter-spacing: normal !important;
     writing-mode: horizontal-tb !important;
     text-orientation: mixed !important;
+  }
+}
+</style>
+
+<style id="child-item-mobile-metadata-and-hierarchy-layout-fix-v2">
+/* Child cards: keep priority visually before status, then reserve a full
+   phone-width row for the assignee so its label does not compete with badges. */
+@media (max-width: 700px) {
+  #mainContent .child-meta {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  #mainContent .child-meta > .child-assignee {
+    display: flex !important;
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    justify-content: flex-start !important;
+    align-self: stretch !important;
+  }
+
+  /* Give hierarchy titles a real content column. Status and Edit move below
+     the title on phones instead of squeezing the title between controls. */
+  .tree-task-wrap,
+  .tree-task-wrap .tree-item,
+  .tree-task-wrap .tree-contents,
+  .tree-task-wrap .tree-child-row,
+  .tree-task-wrap .tree-child-main,
+  .tree-direct,
+  .tree-direct-main {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .tree-task-wrap .tree-followups-summary {
+    display: grid !important;
+    grid-template-columns: 18px minmax(120px, 1fr) auto 18px !important;
+    align-items: center !important;
+    column-gap: 7px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    list-style: none !important;
+  }
+  .tree-task-wrap .tree-followups-summary::marker {
+    content: "" !important;
+  }
+  .tree-task-wrap .tree-followups-summary::-webkit-details-marker {
+    display: none !important;
+  }
+  .tree-task-wrap .tree-followups-summary > svg:first-child {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px !important;
+  }
+  .tree-task-wrap .tree-followups-summary > .tree-followups-label {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+  }
+  .tree-task-wrap .tree-followups-summary > .tree-count {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    white-space: nowrap !important;
+    flex: none !important;
+  }
+  .tree-task-wrap .tree-followups-summary > svg:last-child {
+    grid-column: 4 !important;
+    grid-row: 1 !important;
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px !important;
+    justify-self: end !important;
+  }
+
+  .tree-task-row {
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: 22px minmax(0, 1fr) !important;
+  }
+  .tree-task-row > .tree-name-type {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .tree-task-row > .tree-name-type > .tree-title {
+    display: block !important;
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+  .tree-task-row > .tree-task-controls {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .tree-task-wrap .tree-child-main {
+    display: grid !important;
+    grid-template-columns: 20px minmax(0, 1fr) 32px !important;
+    grid-template-rows: auto auto !important;
+    align-items: center !important;
+    column-gap: 7px !important;
+    row-gap: 6px !important;
+  }
+  .tree-task-wrap .tree-child-main > svg:first-child {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .tree-task-wrap .tree-child-main > .tree-child-name {
+    grid-column: 2 / 4 !important;
+    grid-row: 1 !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    line-height: 1.45 !important;
+  }
+  .tree-task-wrap .tree-child-main > .status-pill {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    justify-self: start !important;
+    max-width: 100% !important;
+  }
+  .tree-task-wrap .tree-child-main > button {
+    grid-column: 3 !important;
+    grid-row: 2 !important;
+    justify-self: end !important;
+    margin: 0 !important;
+  }
+
+  .tree-task-wrap .tree-direct-main {
+    display: grid !important;
+    grid-template-columns: 20px minmax(0, 1fr) 32px !important;
+    grid-template-rows: auto auto !important;
+    align-items: center !important;
+    column-gap: 7px !important;
+    row-gap: 6px !important;
+  }
+  .tree-task-wrap .tree-direct-main > svg:first-child {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .tree-task-wrap .tree-direct-main > .tree-name-type {
+    grid-column: 2 / 4 !important;
+    grid-row: 1 !important;
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .tree-task-wrap .tree-direct-main > .tree-name-type > .tree-child-name {
+    display: block !important;
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    line-height: 1.45 !important;
+  }
+  .tree-task-wrap .tree-direct-main > .tree-name-type > .tree-direct-type {
+    flex: 0 0 auto !important;
+  }
+  .tree-task-wrap .tree-direct-main > .status-pill {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    justify-self: start !important;
+    max-width: 100% !important;
+  }
+  .tree-task-wrap .tree-direct-main > button {
+    grid-column: 3 !important;
+    grid-row: 2 !important;
+    justify-self: end !important;
+    margin: 0 !important;
   }
 }
 </style>

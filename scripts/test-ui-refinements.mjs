@@ -119,7 +119,7 @@ assert.ok(html.includes("matchesItemStatusFilter(item,filter)"), 'Status filteri
 assert.ok(html.includes("child.type!=='task'||child.status==='completed'"), 'Not Completed metrics must count Tasks only and must not infer a Follow-up status.');
 assert.ok(html.includes("item.type==='followup'?'':'<span class=\"account-assigned-due\""), 'Assigned Items must not render a due date for Follow-ups.');
 assert.ok(html.includes("isParent||item.type==='task'?' data-history-scope=\"item\"'"), 'Assigned-item Task history must open scoped to the selected item.');
-assert.ok(/left:50%\\s*!important/.test(html) && /transform:translateX\\(-50%\\)\\s*!important/.test(html), 'The scroll-to-top button must be horizontally centered.');
+assert.ok(/left:50%\s*!important/.test(html) && /transform:translateX\(-50%\)\s*!important/.test(html), 'The scroll-to-top button must be horizontally centered.');
 
 assert.ok(html.includes("function dateModeOptionsMarkup(current,includeDue=true)") && html.includes("filter(([value])=>includeDue||value!=='due')"), 'Due-date filter options must be removable when the selected item type does not support due dates.');
 assert.ok(html.includes("ui.childType==='followup'?'disabled':''") && html.includes("ui.accountAssignedType==='followup'?'disabled':''"), 'Status filters must be disabled when Follow-up is the selected type.');

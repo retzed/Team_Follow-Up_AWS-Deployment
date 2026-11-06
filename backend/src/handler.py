@@ -454,14 +454,23 @@ def validate_item(event, item, previous=None):
     item['status']=item.get('status') or 'not-started'
     if item['status'] not in allowed_statuses:
         raise ValueError('Status is not supported.')
-    owner_id=item.get('ownerId') or None
-    if owner_id is not None:
-        owner=USERS.get_item(Key={'userId':str(owner_id)}).get('Item')
-        if not owner or not owner.get('enabled',True):
-            raise ValueError('Assignee must be an enabled team member.')
-        item['ownerId']=str(owner_id)
+    if 'assigneeIds' in item and item.get('assigneeIds') is not None:
+        raw_assignee_ids=item.get('assigneeIds')
+        if not isinstance(raw_assignee_ids,list):
+            raise ValueError('assigneeIds must be a list of user IDs.')
     else:
-        item['ownerId']=None
+        raw_assignee_ids=[item.get('ownerId')] if item.get('ownerId') else []
+    requested_assignee_ids=[]
+    for value in raw_assignee_ids or []:
+        user_id=str(value or '').strip()
+        if not user_id:
+            continue
+        if user_id=='root':
+            raise ValueError('The root/system user cannot be assigned to work items.')
+        if user_id not in requested_assignee_ids:
+            requested_assignee_ids.append(user_id)
+    if len(requested_assignee_ids)>100:
+        raise ValueError('At most 100 team members can be assigned to one item.')
     due_date=item.get('dueDate')
     if due_date and not re.fullmatch(r'\d{4}-\d{2}-\d{2}',str(due_date)):
         raise ValueError('Due date must use YYYY-MM-DD format.')
@@ -483,6 +492,7 @@ def validate_item(event, item, previous=None):
     kind=item.get('type')
     parent_id=item.get('parentId')
     item_id=str(item.get('itemId') or '')
+    parent=None
     if kind in ('task','followup'):
         item['priority']=item.get('priority') or 'medium'
         if item['priority'] not in {'low','medium','high','urgent'}:
@@ -532,6 +542,29 @@ def validate_item(event, item, previous=None):
                 raise ValueError('A task containing follow-ups cannot be converted to a follow-up.')
     else:
         raise ValueError('Item type must be project, job, task, or followup.')
+    if kind=='followup':
+        if previous is None and not requested_assignee_ids and parent:
+            parent_creator=str(parent.get('createdByUserId') or parent.get('createdBy') or '').strip()
+            if parent_creator and parent_creator!='root':
+                creator_record=USERS.get_item(Key={'userId':parent_creator}).get('Item')
+                if creator_record and creator_record.get('enabled',True):
+                    requested_assignee_ids=[parent_creator]
+        elif previous is not None:
+            previous_ids=item_assignee_ids(previous)
+            current_owner=str(item.get('ownerId') or '').strip()
+            if current_owner!=str(previous.get('ownerId') or '') and item_assignee_ids({'type':'followup','assigneeIds':item.get('assigneeIds',previous_ids)})==previous_ids:
+                requested_assignee_ids=[current_owner] if current_owner else []
+        if len(requested_assignee_ids)>1:
+            raise ValueError('A follow-up can be assigned to only one team member.')
+    normalized_assignee_ids=[]
+    for user_id in requested_assignee_ids:
+        owner=USERS.get_item(Key={'userId':str(user_id)}).get('Item')
+        if not owner or not owner.get('enabled',True):
+            raise ValueError('Assignee must be an enabled team member.')
+        if str(user_id) not in normalized_assignee_ids:
+            normalized_assignee_ids.append(str(user_id))
+    item['assigneeIds']=normalized_assignee_ids
+    item['ownerId']=normalized_assignee_ids[0] if normalized_assignee_ids else None
     return index_work_item(item),profile
 
 

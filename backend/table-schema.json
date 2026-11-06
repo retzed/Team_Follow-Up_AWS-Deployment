@@ -49,6 +49,8 @@
         "parentId",
         "rootParentId",
         "ownerId",
+        "assigneeIds",
+        "assigneeMode",
         "assignedTo",
         "workspaceKey",
         "createdByUserId",

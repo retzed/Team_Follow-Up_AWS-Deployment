@@ -266,6 +266,13 @@ const accountUserMatchEnd = html.indexOf('function accountSearchResultsMarkup(',
 assert.ok(accountUserMatchStart >= 0 && accountUserMatchEnd > accountUserMatchStart, 'Account search assignee matching helper must exist.');
 assert.ok(html.slice(accountUserMatchStart, accountUserMatchEnd).includes('item.assigneeIds'), 'Search user filters must recognize every assigned team member.');
 
+const accountSearchRendererStart=html.indexOf('function accountSearchResultsMarkup(){');
+const accountSearchRendererEnd=html.indexOf('function refreshAccountSearchResults(',accountSearchRendererStart);
+assert.ok(accountSearchRendererStart>=0&&accountSearchRendererEnd>accountSearchRendererStart,'Profile Search must keep its own result filtering and rendering function.');
+const accountSearchRendererSource=html.slice(accountSearchRendererStart,accountSearchRendererEnd);
+assert.ok(accountSearchRendererSource.includes('displayRows.map(accountAssignedItemRow)')&&accountSearchRendererSource.includes("ui.lang==='ar'&&item.nameArabic"),'Profile Search parent results must reuse the Assigned Items row renderer while preserving Arabic parent names.');
+assert.ok(accountSearchRendererSource.includes('class="account-item-list"')&&!accountSearchRendererSource.includes('<article class="parent-card">'),'Profile Search parent results must use the Assigned Items card layout instead of the legacy parent-card template.');
+
 assert.ok(html.includes('function mobileSearchToggleMarkup()') && html.includes('mobileSearchToggle.innerHTML=mobileSearchToggleMarkup()') && html.includes('mobileToggle.innerHTML=mobileSearchToggleMarkup()'), 'The Projects & Jobs search toggle must render its state chevron in mobile and workspace layouts.');
 const workspaceFixStart = html.indexOf('<style id="workspace-assignees-hierarchy-toggle-and-scroll-fixes">');
 const workspaceFixEnd = html.indexOf('</style>', workspaceFixStart);

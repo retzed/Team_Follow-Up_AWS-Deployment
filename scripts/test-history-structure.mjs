@@ -207,7 +207,7 @@ assert.ok(submitSource.includes('item.assigneeIds=assigneeIds') && submitSource.
 const assignedFilterStart = html.indexOf('function filteredAssignedItems(');
 const assignedFilterEnd = html.indexOf('\nfunction assignmentContextMarkup(', assignedFilterStart);
 assert.ok(assignedFilterStart >= 0 && assignedFilterEnd > assignedFilterStart, 'Assigned Items filter must exist.');
-assert.ok(html.slice(assignedFilterStart, assignedFilterEnd).includes('itemAssigneeIds(item).includes(String(ui.actingUserId||\\'\\'))'), 'Secondary assignees must see the item in Assigned Items.');
+assert.ok(html.slice(assignedFilterStart, assignedFilterEnd).includes("itemAssigneeIds(item).includes(String(ui.actingUserId||''))"), 'Secondary assignees must see the item in Assigned Items.');
 const accountUserMatchStart = html.indexOf('function accountSearchUserMatches(');
 const accountUserMatchEnd = html.indexOf('function accountSearchResultsMarkup(', accountUserMatchStart);
 assert.ok(accountUserMatchStart >= 0 && accountUserMatchEnd > accountUserMatchStart, 'Account search assignee matching helper must exist.');

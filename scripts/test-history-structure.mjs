@@ -105,6 +105,31 @@ const oldItem={id:'old-task',updatedAt:'2026-10-13T10:00:00.000Z',createdAt:'202
 assert.ok(sortContext.compareByDateMode(freshRestored,oldItem,'updated')<0,'An item with newer canonical activity sorts ahead even if its stored updatedAt is stale.');
 assert.deepEqual(Array.from(sortContext.sortChildrenByDate([oldItem,freshRestored]),x=>x.id),['restored-task','old-task'],'Child ordering reflects fresh restoration timestamps.');
 
+
+assert.equal(html.split("['due',tr('dueDate')]").length-1,2,'The workspace and child Date list controls must append the translated Due date option.');
+assert.ok(html.includes("ui.accountAssignedDateMode==='due'")&&html.includes("ui.accountSearchDateMode==='due'"),'Profile Assigned Items and Search Date lists must append Due date.');
+const dueDateStart=html.indexOf('function dueDateKey(item){');
+const dueDateEnd=html.indexOf('\nfunction parentDate(item){',dueDateStart);
+const compareStart=html.indexOf("function compareByDateMode(a,b,mode,source='application'){");
+const compareEnd=html.indexOf('\nfunction parentDateForMode(',compareStart);
+const matchesDateStart=html.indexOf('function matchesDate(item,mode,from,to,source=',compareEnd);
+const matchesDateEnd=html.indexOf('function matchesStatusFilter(',matchesDateStart);
+const childSortModeStart=html.indexOf('function childDateSortMode(mode=ui.childDateMode){');
+const childSortStart=html.indexOf('function sortChildrenByDate(items){',childSortModeStart);
+const childSortEnd=html.indexOf('\nfunction childCard(',childSortStart);
+assert.ok(dueDateStart>=0&&dueDateEnd>dueDateStart&&compareStart>=0&&compareEnd>compareStart&&matchesDateStart>=0&&matchesDateEnd>matchesDateStart&&childSortModeStart>=0&&childSortEnd>childSortStart,'Could not isolate Due date parsing, filtering, and ordering helpers.');
+const dueSortContext={activityTimestamp:(item,mode)=>Date.parse(mode==='updated'?(item.latestActivityAt||item.updatedAt):(item.createdAt))||0,dateKey:value=>String(value||'').slice(0,10),ui:{childDateMode:'due'}};
+vm.runInNewContext(html.slice(dueDateStart,dueDateEnd)+html.slice(compareStart,compareEnd)+html.slice(matchesDateStart,matchesDateEnd)+';this.compareByDateMode=compareByDateMode;this.matchesDate=matchesDate;'+html.slice(childSortModeStart,childSortEnd)+';this.childDateSortMode=childDateSortMode;this.sortChildrenByDate=sortChildrenByDate;',dueSortContext);
+const dueItems=[{id:'later',dueDate:'2026-12-01'},{id:'no-due'},{id:'nearest',dueDate:'2026-11-10'},{id:'middle',dueDate:'2026-11-20'}];
+assert.deepEqual(Array.from(dueItems.slice().sort((a,b)=>dueSortContext.compareByDateMode(a,b,'due')),item=>item.id),['nearest','middle','later','no-due'],'Due date sorting must place the nearest due date first and undated items last.');
+assert.deepEqual(Array.from(dueItems.filter(item=>dueSortContext.matchesDate(item,'due','2026-11-01','2026-11-30')),item=>item.id),['nearest','middle'],'Due date range filtering must include only items whose due dates fall within the selected range.');
+assert.equal(dueSortContext.matchesDate({id:'no-due'},'due','',''),false,'Items without a due date must be excluded when Due date mode is selected.');
+assert.deepEqual(Array.from(dueSortContext.sortChildrenByDate(dueItems),item=>item.id),['nearest','middle','later','no-due'],'Child lists must use nearest-due-date-first ordering when Due date mode is selected.');
+const dueTreeStart=html.indexOf('function childTreeFiltered(parent){');
+const dueTreeEnd=html.indexOf('\nfunction renderChildList(',dueTreeStart);
+assert.ok(dueTreeStart>=0&&dueTreeEnd>dueTreeStart&&html.slice(dueTreeStart,dueTreeEnd).includes("ui.childDateMode==='due'"),'Due date mode must activate child filtering so nested follow-ups without due dates cannot leak into the results.');
+assert.ok(html.includes("if(ui.parentDateMode==='due'){sidebarQuerySequence++;return;}"),'The workspace must keep due-date sorting local and invalidate stale Updated/Created API query responses.');
+
 const css = html.slice(html.indexOf('<style id="history-layout-revision">'), html.indexOf('</style>', html.indexOf('<style id="history-layout-revision">')));
 assert.ok(css.includes('.application-history-table{min-width:1080px!important}'));
 assert.ok(html.includes('.application-history-table{width:100%!important;min-width:1120px!important;table-layout:fixed!important}'),'The final app-wide history sizing reserves room for wider Parent and Child columns.');
@@ -188,16 +213,31 @@ const assigneeControlStart = html.indexOf('function assigneeControlMarkup(type,s
 const assigneeControlEnd = html.indexOf('\nfunction updateAssigneePicker(', assigneeControlStart);
 assert.ok(assigneeControlStart >= 0 && assigneeControlEnd > assigneeControlStart, 'The type-aware assignee control renderer must exist.');
 const assigneeControlSource = html.slice(assigneeControlStart, assigneeControlEnd);
-assert.ok(assigneeControlSource.includes("if(type==='followup')") && assigneeControlSource.includes('<select id="formOwner"') && assigneeControlSource.includes('required'), 'Follow-ups must use one required single-assignee select.');
+assert.ok(!assigneeControlSource.includes("if(type==='followup')") && !assigneeControlSource.includes('<select id="formOwner"') && assigneeControlSource.includes('name="assigneeIds"') && assigneeControlSource.includes('type="checkbox"'), 'Follow-ups must use the same multi-assignee checklist as other items.');
 assert.ok(assigneeControlSource.includes('name="assigneeIds"') && assigneeControlSource.includes('type="checkbox"'), 'Projects, jobs, and Tasks must use a multi-assignee checklist.');
 assert.ok(assigneeControlSource.includes('data-assignee-mode="all"') && assigneeControlSource.includes('data-assignee-mode="none"') && assigneeControlSource.includes('name="assigneeMode"'), 'The checklist must persist distinct All Users and None modes.');
+
+const assigneeIdsStart=html.indexOf('function itemAssigneeIds(item){');
+const assigneeIdsEnd=html.indexOf('\nfunction parentCreatorAssigneeId(',assigneeIdsStart);
+assert.ok(assigneeIdsStart>=0&&assigneeIdsEnd>assigneeIdsStart,'The canonical assignee ID helper must exist.');
+const assigneeIdsSource=html.slice(assigneeIdsStart,assigneeIdsEnd);
+assert.ok(assigneeIdsSource.includes('return ids;')&&!assigneeIdsSource.includes('slice(0,1)'),'Follow-up assignee IDs must not be truncated to the primary owner.');
+const submittedIdsStart=html.indexOf('function submittedAssigneeIds(type,formData){');
+const submittedIdsEnd=html.indexOf('\nfunction sameAssigneeIds(',submittedIdsStart);
+assert.ok(submittedIdsStart>=0&&submittedIdsEnd>submittedIdsStart,'The submitted multi-assignee helper must exist.');
+const submittedIdsSource=html.slice(submittedIdsStart,submittedIdsEnd);
+assert.ok(submittedIdsSource.includes("formData.getAll('assigneeIds')")&&submittedIdsSource.includes("mode==='all'")&&!submittedIdsSource.includes('slice(0,1)'),'Follow-up form submissions must preserve every selected assignee and All Users selection.');
+const assigneeSyncStart=html.indexOf('function syncAssigneeControl(type,parentChanged=false,typeChanged=false){');
+const assigneeSyncEnd=html.indexOf('\nfunction positionAssigneeMenu(',assigneeSyncStart);
+assert.ok(assigneeSyncStart>=0&&assigneeSyncEnd>assigneeSyncStart,'The shared assignee-control refresh function must exist.');
+assert.ok(html.slice(assigneeSyncStart,assigneeSyncEnd).includes('assigneeControlMarkup(type,selected,mode)'),'Changing item type or parent must re-render the shared multi-assignee picker.');
 assert.ok(assigneeControlSource.includes('class="assignee-picker-menu" hidden') && assigneeControlSource.includes('data-assignee-menu-toggle'), 'The checklist must open as a collapsed popover rather than expanding the form.');
 const assigneeMarkupStart = html.indexOf('function assigneeMarkup(');
 const assigneeMarkupEnd = html.indexOf('\nfunction assigneeControlMarkup(', assigneeMarkupStart);
 assert.ok(assigneeMarkupStart >= 0 && assigneeMarkupEnd > assigneeMarkupStart, 'The shared per-item Assignee label renderer must exist.');
 const assigneeMarkupSource = html.slice(assigneeMarkupStart, assigneeMarkupEnd);
 assert.ok(assigneeMarkupSource.includes('ids.length>1') && assigneeMarkupSource.includes("peopleMarkup(ids[0])") && assigneeMarkupSource.includes("(ids.length-1)"), 'More than one assignee must display only the first assignee followed by + (assignee count minus one).');
-assert.ok(assigneeMarkupSource.includes("const clickable=ids.length>1") && assigneeMarkupSource.includes('role="button" tabindex="0"') && assigneeMarkupSource.includes('data-assignee-popup'), 'Multi-assignee labels must be keyboard-accessible clickable controls without replacing their existing pill wrapper.');
+assert.ok(assigneeMarkupSource.includes("const clickable=ids.length>1&&!allUsers") && assigneeMarkupSource.includes('role="button" tabindex="0"') && assigneeMarkupSource.includes('data-assignee-popup'), 'Multi-assignee labels must be keyboard-accessible clickable controls without replacing their existing pill wrapper.');
 assert.ok(assigneeMarkupSource.includes('data-assignee-ids=') && assigneeMarkupSource.includes('JSON.stringify(ids)'), 'The label must retain its exact selected assignee IDs for the details popup.');
 const assigneePopupStart = html.indexOf('function toggleAssigneeDetailsPopup(');
 const assigneePopupEnd = html.indexOf('\nfunction handleAssigneePopupDocumentClick(', assigneePopupStart);
@@ -246,8 +286,8 @@ const submitStart = html.indexOf('function handleItemSubmit(form){');
 const submitEnd = html.indexOf('\nfunction ', submitStart + 10);
 assert.ok(submitStart >= 0 && submitEnd > submitStart, 'The item form submit handler must exist.');
 const submitSource = html.slice(submitStart, submitEnd);
-assert.ok(submitSource.includes("type==='followup'&&!assigneeIds.length") && submitSource.includes("tr('assigneeRequired')"), 'Only Follow-ups require one individual assignee; Projects, Jobs, and Tasks may be unassigned.');
-assert.ok(submitSource.includes('submittedAssigneeMode(type,fd)') && submitSource.includes("assigneeMode:type==='followup'?undefined:(assigneeMode||'none')"), 'New Projects, Jobs, and Tasks must explicitly persist None unless another assignment mode is selected.');
+assert.ok(submitSource.includes("type==='followup'&&!assigneeIds.length") && submitSource.includes("tr('assigneeRequired')"), 'Follow-ups require at least one assignee; Projects, Jobs, and Tasks may remain unassigned.');
+assert.ok(submitSource.includes('submittedAssigneeMode(type,fd)') && submitSource.includes("assigneeMode:assigneeMode||'none'"), 'New Projects, Jobs, and Tasks must explicitly persist None unless another assignment mode is selected.');
 assert.ok(submitSource.includes('item.assigneeIds=assigneeIds') && submitSource.includes('item.ownerId=ownerId'), 'The canonical assignee list and legacy primary owner must both be persisted.');
 
 assert.ok(html.includes("mode==='all'?tr('allUsersOption')") && html.includes("allUsersOption:'All Users'"), 'All Users must have a dedicated picker label without changing Activity history filtering.');
@@ -256,7 +296,7 @@ assert.ok(selectedDefault, 'New Projects, Jobs, and Tasks must default to None.'
 const pickerCssStart = html.indexOf('<style id="assignee-picker-popover">');
 const pickerCssEnd = html.indexOf('</style>',pickerCssStart);
 assert.ok(pickerCssStart>=0&&pickerCssEnd>pickerCssStart&&html.slice(pickerCssStart,pickerCssEnd).includes('position:fixed')&&html.slice(pickerCssStart,pickerCssEnd).includes('overflow-y:auto'), 'The checklist popover must stay within the viewport and scroll without resizing the form.');
-assert.equal(submitSource.split("assigneeMode:type==='followup'?undefined:(assigneeMode||'none')").length - 1, 2, 'Both newly created parent and child records must explicitly default to None.');
+assert.equal(submitSource.split("assigneeMode:assigneeMode||'none'").length - 1, 2, 'Both newly created parent and child records must explicitly default to None.');
 const assignedFilterStart = html.indexOf('function filteredAssignedItems(');
 const assignedFilterEnd = html.indexOf('\nfunction assignmentContextMarkup(', assignedFilterStart);
 assert.ok(assignedFilterStart >= 0 && assignedFilterEnd > assignedFilterStart, 'Assigned Items filter must exist.');
@@ -281,6 +321,13 @@ const workspaceFixCss = html.slice(workspaceFixStart, workspaceFixEnd);
 assert.ok(workspaceFixCss.includes('grid-template-columns:22px minmax(132px,1fr)') && workspaceFixCss.includes('minmax(132px,1fr)') && workspaceFixCss.includes('overflow-wrap:break-word !important;') && workspaceFixCss.includes('writing-mode:horizontal-tb !important;'), 'Hierarchy rows must preserve a usable text column and horizontal text flow on phones.');
 assert.ok(workspaceFixCss.includes('.mobile-search-toggle[aria-expanded="true"]') && workspaceFixCss.includes('.mobile-search-toggle[aria-expanded="false"]') && workspaceFixCss.includes('mobile-search-toggle-state svg'), 'The search toggle must visually distinguish expanded and collapsed states.');
 assert.ok(workspaceFixCss.includes('position:fixed !important; top:86px !important; bottom:auto !important;') && workspaceFixCss.includes('top:78px !important;'), 'The scroll-to-top button must stay at the top edge of the workspace below the sticky header.');
+
+
+const childCardStart=html.indexOf('function childCard(item,parent');
+const childCardEnd=html.indexOf('\nfunction childTreeFiltered(',childCardStart);
+assert.ok(childCardStart>=0&&childCardEnd>childCardStart,'The child card renderer must exist.');
+const childCardSource=html.slice(childCardStart,childCardEnd);
+assert.ok(childCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")>=0&&childCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")<childCardSource.indexOf('item.dueDate?'), 'Child cards must display the Assignee label before the Due date.');
 
 const assignedRowStart=html.indexOf('function accountAssignedItemRow(item){');
 const assignedRowEnd=html.indexOf('\nfunction filteredAccountAssignedItems(',assignedRowStart);

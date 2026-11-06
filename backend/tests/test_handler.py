@@ -1169,6 +1169,7 @@ class MultiAssigneeTests(unittest.TestCase):
             })
         self.assertEqual(item["assigneeIds"], ["u2"])
         self.assertEqual(item["ownerId"], "u2")
+        self.assertEqual(item["assigneeMode"], "selected")
 
     def test_followup_allows_multiple_assignees_and_root_assignment_is_rejected(self):
         parent = {
@@ -1260,6 +1261,7 @@ class MultiAssigneeTests(unittest.TestCase):
             })
         self.assertEqual(item["assigneeIds"], ["u3"])
         self.assertEqual(item["ownerId"], "u3")
+        self.assertEqual(item["assigneeMode"], "selected")
 
     def test_new_followup_defaults_to_creator_of_job_parent(self):
         parent = {
@@ -1280,6 +1282,8 @@ class MultiAssigneeTests(unittest.TestCase):
                 "name": "Follow-up under Job",
             })
         self.assertEqual(item["assigneeIds"], ["u4"])
+        self.assertEqual(item["ownerId"], "u4")
+        self.assertEqual(item["assigneeMode"], "selected")
 
     def test_validate_item_rejects_system_role_even_when_id_is_not_root(self):
         with (

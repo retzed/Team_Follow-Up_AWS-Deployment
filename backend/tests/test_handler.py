@@ -1203,6 +1203,52 @@ class MultiAssigneeTests(unittest.TestCase):
                     "name": "Root assignment", "assigneeIds": ["root"],
                 })
 
+    def test_followup_edit_preserves_multiple_assignees_when_primary_changes(self):
+        parent = {
+            "itemId": "project-edit",
+            "type": "project",
+            "createdByUserId": "u1",
+            "rootParentId": "project-edit",
+        }
+        previous = {
+            "itemId": "followup-edit",
+            "type": "followup",
+            "parentId": "project-edit",
+            "rootParentId": "project-edit",
+            "name": "Existing follow-up",
+            "status": "not-started",
+            "priority": "medium",
+            "assigneeMode": "selected",
+            "assigneeIds": ["u2", "u3"],
+            "ownerId": "u2",
+            "createdByUserId": "u1",
+            "createdAt": "2026-11-06T08:00:00.000Z",
+            "version": 1,
+        }
+
+        def user_lookup(**kwargs):
+            user_id = kwargs["Key"]["userId"]
+            return {"Item": {"userId": user_id, "enabled": True}}
+
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+            patch.object(handler.USERS, "get_item", side_effect=user_lookup),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "followup-edit",
+                "type": "followup",
+                "parentId": "project-edit",
+                "name": "Existing follow-up",
+                "assigneeMode": "selected",
+                "assigneeIds": ["u3", "u4"],
+                "ownerId": "u3",
+            }, previous=previous)
+
+        self.assertEqual(item["assigneeIds"], ["u3", "u4"])
+        self.assertEqual(item["ownerId"], "u3")
+        self.assertEqual(item["assigneeMode"], "selected")
+
 
     def test_validate_item_allows_multiple_assignees_for_tasks(self):
         parent = {

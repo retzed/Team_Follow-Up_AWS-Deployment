@@ -556,6 +556,8 @@ def validate_item(event, item, previous=None):
                 requested_assignee_ids=[current_owner] if current_owner else []
         if len(requested_assignee_ids)>1:
             raise ValueError('A follow-up can be assigned to only one team member.')
+    if not requested_assignee_ids:
+        raise ValueError('At least one enabled team member must be assigned to each work item.')
     normalized_assignee_ids=[]
     for user_id in requested_assignee_ids:
         owner=USERS.get_item(Key={'userId':str(user_id)}).get('Item')

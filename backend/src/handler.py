@@ -214,7 +214,7 @@ def item_name_write_operations(item, previous=None):
 
 
 def index_work_item(x):
-    """Materialize only the secondary-index attributes present on TeamFollowUp-Items."""
+    """Materialize existing table indexes and canonical multi-assignee fields."""
     x=dict(x)
     item_id=str(x.get('itemId') or x.get('id') or '')
     if not item_id:
@@ -225,9 +225,6 @@ def index_work_item(x):
     x['updatedByUserId']=x.get('updatedByUserId') or x.get('updatedBy') or ''
     x.pop('activityEvents',None)
 
-    # The existing WorkspaceIndex lists top-level Projects/Jobs by createdAt.
-    # ParentIdIndex lists children by parentId/createdAt. AssignedToIndex uses
-    # assignedTo/updatedAt; ownerId remains the public business-facing field.
     top=x.get('type') in ('project','job')
     if top:
         x.pop('parentId',None)
@@ -236,13 +233,15 @@ def index_work_item(x):
     else:
         x.pop('workspaceKey',None)
 
-    owner_id=x.get('ownerId')
-    if owner_id:
-        x['assignedTo']=str(owner_id)
+    ids=item_assignee_ids(x)
+    x['assigneeIds']=ids
+    x['ownerId']=ids[0] if ids else None
+    if x['ownerId']:
+        # Keep the existing GSI for the primary assignee and legacy data.
+        x['assignedTo']=str(x['ownerId'])
     else:
         x.pop('assignedTo',None)
 
-    # Drop fields from the previous, un-deployed SAM-only index design.
     for key in ('listPK','updatedSort','createdSort','rootPK','rootUpdatedSort',
                 'assigneePK','assigneeUpdatedSort','assigneeCreatedSort'):
         x.pop(key,None)
@@ -275,12 +274,80 @@ def activity_item(e):
     return x
 
 
+
+def item_assignee_ids(item):
+    """Return canonical enabled-user candidate IDs, retaining legacy ownerId rows."""
+    if not isinstance(item, dict):
+        return []
+    raw = item.get('assigneeIds') if isinstance(item.get('assigneeIds'), list) else [item.get('ownerId')]
+    ids = []
+    for value in raw or []:
+        user_id = str(value or '').strip()
+        if user_id and user_id != 'root' and user_id not in ids:
+            ids.append(user_id)
+    if item.get('type') == 'followup':
+        ids = ids[:1]
+    return ids
+
+
+def assignment_index_operations(item, previous=None):
+    """Maintain one durable Realtime-table lookup row per assignee and work item."""
+    def keyed_records(row):
+        if not isinstance(row, dict):
+            return {}
+        item_id = str(row.get('itemId') or row.get('id') or '').strip()
+        if not item_id:
+            return {}
+        updated_at = str(row.get('updatedAt') or '')
+        sort_key = updated_at + '#' + item_id
+        return {
+            user_id: {
+                'partitionKey': 'ASSIGNEE#' + user_id,
+                'sortKey': sort_key,
+                'itemId': item_id,
+                'assigneeUserId': user_id,
+                'updatedAt': updated_at,
+            }
+            for user_id in item_assignee_ids(row)
+        }
+
+    old_records = keyed_records(previous)
+    new_records = keyed_records(item)
+    writes = []
+    for user_id, record in old_records.items():
+        if new_records.get(user_id) != record:
+            writes.append({
+                'Delete': {
+                    'TableName': REALTIME_TABLE.name,
+                    'Key': av_map({
+                        'partitionKey': record['partitionKey'],
+                        'sortKey': record['sortKey'],
+                    }),
+                }
+            })
+    for user_id, record in new_records.items():
+        if old_records.get(user_id) != record:
+            writes.append({
+                'Put': {
+                    'TableName': REALTIME_TABLE.name,
+                    'Item': av_map(record),
+                }
+            })
+    return writes
+
+
+def assignment_index_delete_operations(item):
+    return assignment_index_operations(None, previous=item)
+
+
 def public_item(x):
     y=dict(x)
     y['id']=y.get('itemId')
     y.pop('itemId',None)
     y['createdBy']=y.get('createdByUserId') or y.get('createdBy','')
     y['updatedBy']=y.get('updatedByUserId') or y.get('updatedBy','')
+    y['assigneeIds']=item_assignee_ids(y)
+    y['ownerId']=y['assigneeIds'][0] if y['assigneeIds'] else None
     for k in ('createdByUserId','updatedByUserId','listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK','assigneeUpdatedSort','assigneeCreatedSort','workspaceKey','assignedTo','deletedAt'):
         y.pop(k,None)
     return y
@@ -643,11 +710,28 @@ def query_work_items(qs):
     elif qs.get('rootParentId'):
         rows=query_root_rows(qs['rootParentId'],include_root=True)
     elif qs.get('assigneeUserId'):
-        rows=all_pages(
+        user_id=str(qs['assigneeUserId'])
+        by_id={}
+        # Legacy/primary assignments remain covered by AssignedToIndex.
+        for row in all_pages(
             WORK,
             IndexName='AssignedToIndex',
-            KeyConditionExpression=Key('assignedTo').eq(str(qs['assigneeUserId'])),
+            KeyConditionExpression=Key('assignedTo').eq(user_id),
+        ):
+            by_id[str(row.get('itemId') or '')]=row
+        # Every additional assignee has a durable lookup row in the existing Realtime table.
+        assignment_rows=all_pages(
+            REALTIME_TABLE,
+            KeyConditionExpression=Key('partitionKey').eq('ASSIGNEE#'+user_id),
         )
+        for assignment in assignment_rows:
+            item_id=str(assignment.get('itemId') or '')
+            if not item_id or item_id in by_id:
+                continue
+            row=WORK.get_item(Key={'itemId':item_id},ConsistentRead=True).get('Item')
+            if row:
+                by_id[item_id]=row
+        rows=list(by_id.values())
     else:
         raise ValueError('Choose a supported work-item query.')
 
@@ -1026,13 +1110,11 @@ def make_realtime_change(item, previous=None, affected_items=None, change_kind='
             root_ids.add(root_id)
         if parent_id:
             parent_ids.add(parent_id)
-        owner_id = str(row.get('ownerId') or '').strip()
-        if owner_id:
-            assignee_ids.add(owner_id)
+        for assignee_id in item_assignee_ids(row):
+            assignee_ids.add(assignee_id)
     for row in descendant_assignees:
-        owner_id = str(row.get('ownerId') or '').strip()
-        if owner_id:
-            assignee_ids.add(owner_id)
+        for assignee_id in item_assignee_ids(row):
+            assignee_ids.add(assignee_id)
     change_id = 'chg_' + uuid.uuid4().hex
     occurred_at = now()
     # Keep the durable cursor more precise than the display timestamp so
@@ -1616,7 +1698,7 @@ def lambda_handler(event, context):
             clean,actor=validate_item(event,item)
             normalized_events=build_audit_events(clean,profile,'create',events,at=clean.get('createdAt'))
             change_event=make_realtime_change(clean,change_kind='created')
-            name_writes=item_name_write_operations(clean)
+            name_writes=item_name_write_operations(clean) + assignment_index_operations(clean)
             try:
                 commit_item_with_events(clean,normalized_events,condition='create',change_event=change_event,name_writes=name_writes)
             except ClientError as exc:
@@ -1641,7 +1723,7 @@ def lambda_handler(event, context):
             normalized_events=build_audit_events(clean,profile,'update',events,previous=old,at=clean.get('updatedAt'))
             try:
                 change_event=make_realtime_change(clean,previous=old,change_kind='updated')
-                name_writes=item_name_write_operations(clean,previous=old)
+                name_writes=item_name_write_operations(clean,previous=old) + assignment_index_operations(clean,previous=old)
                 commit_item_with_events(clean,normalized_events,condition='version',expected_version=expected,change_event=change_event,name_writes=name_writes)
             except ValueError:
                 raise

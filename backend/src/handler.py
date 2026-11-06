@@ -285,8 +285,6 @@ def item_assignee_ids(item):
         user_id = str(value or '').strip()
         if user_id and user_id.casefold() != 'root' and user_id not in ids:
             ids.append(user_id)
-    if item.get('type') == 'followup':
-        ids = ids[:1]
     return ids
 
 
@@ -516,9 +514,19 @@ def validate_item(event, item, previous=None):
             assignment_mode='selected' if requested_assignee_ids else 'none'
         item['assigneeMode']=assignment_mode
     elif kind == 'followup':
-        if assignment_mode == 'all':
-            raise ValueError('Follow-ups can be assigned to only one team member.')
-        item.pop('assigneeMode',None)
+        if assignment_mode == 'none':
+            requested_assignee_ids=[]
+        elif assignment_mode == 'all':
+            requested_assignee_ids=[]
+            for team_user in scan_pages(USERS):
+                user_id=str(team_user.get('userId') or team_user.get('id') or '').strip()
+                role=str(team_user.get('role') or team_user.get('roleName') or '').strip().casefold()
+                is_system=any(team_user.get(flag) is True for flag in ('isRoot','isSystem','isSystemUser','systemUser'))
+                if user_id and user_id.casefold()!='root' and team_user.get('enabled',True) and role!='root' and not is_system and user_id not in requested_assignee_ids:
+                    requested_assignee_ids.append(user_id)
+        else:
+            assignment_mode='selected' if requested_assignee_ids else 'none'
+        item['assigneeMode']=assignment_mode
     if len(requested_assignee_ids)>20 and assignment_mode!='all':
         raise ValueError('At most 20 team members can be assigned to one item.')
     parent_id=item.get('parentId')
@@ -585,8 +593,6 @@ def validate_item(event, item, previous=None):
             current_owner=str(item.get('ownerId') or '').strip()
             if current_owner!=str(previous.get('ownerId') or '') and item_assignee_ids({'type':'followup','assigneeIds':item.get('assigneeIds',previous_ids)})==previous_ids:
                 requested_assignee_ids=[current_owner] if current_owner else []
-        if len(requested_assignee_ids)>1:
-            raise ValueError('A follow-up can be assigned to only one team member.')
     if kind=='followup' and not requested_assignee_ids:
         raise ValueError('A follow-up must be assigned to an enabled team member.')
     normalized_assignee_ids=[]
@@ -664,8 +670,10 @@ def build_audit_events(item, actor, event_kind, supplied_events=None, previous=N
         descendants=max(0,count-1)
         return [make('delete',f'Deleted {item_type}: {item_name}',{'bulkOperation':'delete-subtree' if descendants else 'delete-item','affectedCount':count,'affectedDescendantCount':descendants})]
     before=public_item(previous or {})
-    fields=[('name','name'),('description','description'),('type','type'),('priority','priority'),('ownerId','assignee'),('dueDate','due date')]
+    fields=[('name','name'),('description','description'),('type','type'),('priority','priority'),('assigneeIds','assignee'),('dueDate','due date')]
     changed=[label for field,label in fields if before.get(field)!=item.get(field)]
+    if before.get('assigneeMode')!=item.get('assigneeMode') and 'assignee' not in changed:
+        changed.append('assignee')
     events=[]
     old_status=before.get('status')
     new_status=item.get('status')

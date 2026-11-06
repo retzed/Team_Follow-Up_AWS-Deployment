@@ -175,3 +175,49 @@ assert.ok(html.includes('class="tree-followups-summary"'), 'The Follow-ups discl
 assert.ok(childHierarchyFixCss.includes('grid-template-columns: 18px minmax(120px, 1fr) auto 18px !important;') && childHierarchyFixCss.includes('white-space: nowrap !important;') && childHierarchyFixCss.includes('text-overflow: ellipsis !important;'), 'The hierarchy Follow-ups label must retain a usable text column instead of wrapping one character per line.');
 assert.ok(childHierarchyFixCss.includes('.tree-task-wrap .tree-child-main > .tree-child-name') && childHierarchyFixCss.includes('grid-column: 2 / 4 !important;') && childHierarchyFixCss.includes('overflow-wrap: anywhere !important;'), 'Nested hierarchy item names must receive a full-width title row with controls moved below on mobile.');
 assert.ok(childHierarchyFixCss.includes('.tree-task-wrap .tree-direct-main > .tree-name-type') && childHierarchyFixCss.includes('grid-template-rows: auto auto !important;'), 'Direct hierarchy item names must have a dedicated title row before status and Edit controls.');
+
+
+// Workspace assignment rules and mobile hierarchy must remain consistent across views.
+const assignableStart = html.indexOf('function assignableUsers(){');
+const assignableEnd = html.indexOf('\nfunction isAssignableUserId(', assignableStart);
+assert.ok(assignableStart >= 0 && assignableEnd > assignableStart, 'Assignable-user filtering must exist as a bounded helper.');
+const assignableSource = html.slice(assignableStart, assignableEnd);
+assert.ok(assignableSource.includes("id!=='root'") && assignableSource.includes("toLowerCase()==='root'") && assignableSource.includes('systemFlag'), 'Root/system identities must be excluded from every assignee selector.');
+
+const assigneeControlStart = html.indexOf('function assigneeControlMarkup(type,selectedIds=[]){');
+const assigneeControlEnd = html.indexOf('\nfunction currentAssigneeSelection(', assigneeControlStart);
+assert.ok(assigneeControlStart >= 0 && assigneeControlEnd > assigneeControlStart, 'The type-aware assignee control renderer must exist.');
+const assigneeControlSource = html.slice(assigneeControlStart, assigneeControlEnd);
+assert.ok(assigneeControlSource.includes("if(type==='followup')") && assigneeControlSource.includes('<select id="formOwner"') && assigneeControlSource.includes('required'), 'Follow-ups must use one required single-assignee select.');
+assert.ok(assigneeControlSource.includes('name="assigneeIds"') && assigneeControlSource.includes('type="checkbox"'), 'Projects, jobs, and Tasks must use a multi-assignee checklist.');
+
+const syncAssigneeStart = html.indexOf('function syncAssigneeControl(type,parentChanged=false,typeChanged=false){');
+const syncAssigneeEnd = html.indexOf("$('#modalRoot').addEventListener('change'", syncAssigneeStart);
+assert.ok(syncAssigneeStart >= 0 && syncAssigneeEnd > syncAssigneeStart, 'Assignee control synchronization must be bounded.');
+const syncAssigneeSource = html.slice(syncAssigneeStart, syncAssigneeEnd);
+assert.ok(syncAssigneeSource.includes('parentChanged||typeChanged||!owner') && syncAssigneeSource.includes('parentCreatorAssigneeId(parent)'), 'Changing the new child form to Follow-up must default to the immediate parent creator.');
+
+const submitStart = html.indexOf('function handleItemSubmit(form){');
+const submitEnd = html.indexOf('\nfunction ', submitStart + 10);
+assert.ok(submitStart >= 0 && submitEnd > submitStart, 'The item form submit handler must exist.');
+const submitSource = html.slice(submitStart, submitEnd);
+assert.ok(submitSource.includes('if(!assigneeIds.length)') && submitSource.includes("tr('assigneeRequired')"), 'Saving an item without a valid assignee must be blocked.');
+assert.ok(submitSource.includes('item.assigneeIds=assigneeIds') && submitSource.includes('item.ownerId=ownerId'), 'The canonical assignee list and legacy primary owner must both be persisted.');
+
+const assignedFilterStart = html.indexOf('function filteredAssignedItems(');
+const assignedFilterEnd = html.indexOf('\nfunction assignmentContextMarkup(', assignedFilterStart);
+assert.ok(assignedFilterStart >= 0 && assignedFilterEnd > assignedFilterStart, 'Assigned Items filter must exist.');
+assert.ok(html.slice(assignedFilterStart, assignedFilterEnd).includes('itemAssigneeIds(item).includes(String(ui.actingUserId||\\'\\'))'), 'Secondary assignees must see the item in Assigned Items.');
+const accountUserMatchStart = html.indexOf('function accountSearchUserMatches(');
+const accountUserMatchEnd = html.indexOf('function accountSearchResultsMarkup(', accountUserMatchStart);
+assert.ok(accountUserMatchStart >= 0 && accountUserMatchEnd > accountUserMatchStart, 'Account search assignee matching helper must exist.');
+assert.ok(html.slice(accountUserMatchStart, accountUserMatchEnd).includes('item.assigneeIds'), 'Search user filters must recognize every assigned team member.');
+
+assert.ok(html.includes('function mobileSearchToggleMarkup()') && html.includes('mobileSearchToggle.innerHTML=mobileSearchToggleMarkup()') && html.includes('mobileToggle.innerHTML=mobileSearchToggleMarkup()'), 'The Projects & Jobs search toggle must render its state chevron in mobile and workspace layouts.');
+const workspaceFixStart = html.indexOf('<style id="workspace-assignees-hierarchy-toggle-and-scroll-fixes">');
+const workspaceFixEnd = html.indexOf('</style>', workspaceFixStart);
+assert.ok(workspaceFixStart >= 0 && workspaceFixEnd > workspaceFixStart, 'The final workspace hierarchy and toggle stylesheet must exist.');
+const workspaceFixCss = html.slice(workspaceFixStart, workspaceFixEnd);
+assert.ok(workspaceFixCss.includes('grid-template-columns:22px minmax(132px,1fr)') && workspaceFixCss.includes('minmax(132px,1fr)') && workspaceFixCss.includes('overflow-wrap:break-word !important;') && workspaceFixCss.includes('writing-mode:horizontal-tb !important;'), 'Hierarchy rows must preserve a usable text column and horizontal text flow on phones.');
+assert.ok(workspaceFixCss.includes('.mobile-search-toggle[aria-expanded="true"]') && workspaceFixCss.includes('.mobile-search-toggle[aria-expanded="false"]') && workspaceFixCss.includes('mobile-search-toggle-state svg'), 'The search toggle must visually distinguish expanded and collapsed states.');
+assert.ok(workspaceFixCss.includes('.scroll-to-top { position:fixed !important; top:86px !important; bottom:auto !important;') && workspaceFixCss.includes('top:78px !important;'), 'The scroll-to-top button must stay at the top edge of the workspace below the sticky header.');

@@ -296,10 +296,11 @@ const assignedGroupsEnd=html.indexOf('\nfunction accountAssignedSectionMarkup(',
 assert.ok(assignedVisibilityStart>=0&&assignedGroupsEnd>assignedVisibilityStart,'Assigned Items must define explicit section visibility and grouping rules.');
 const assignedGroupsSource=html.slice(assignedVisibilityStart,assignedGroupsEnd);
 function assignedGroupsFor(type,priority){
- const rows=[
+ const allRows=[
   {id:'t1',type:'task'},{id:'f1',type:'followup'},
   {id:'p1',type:'project'},{id:'j1',type:'job'}
  ];
+ const rows=allRows.filter(item=>(type==='all'||item.type===type)&&(priority==='all'||item.type==='task'||item.type==='followup'));
  return vm.runInNewContext(assignedGroupsSource+'; accountAssignedSections(rows);',{
   ui:{accountAssignedType:type,accountAssignedPriority:priority},rows
  });

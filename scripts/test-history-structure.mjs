@@ -196,7 +196,7 @@ const assigneeMarkupStart = html.indexOf('function assigneeMarkup(');
 const assigneeMarkupEnd = html.indexOf('\nfunction assigneeControlMarkup(', assigneeMarkupStart);
 assert.ok(assigneeMarkupStart >= 0 && assigneeMarkupEnd > assigneeMarkupStart, 'The shared per-item Assignee label renderer must exist.');
 const assigneeMarkupSource = html.slice(assigneeMarkupStart, assigneeMarkupEnd);
-assert.ok(assigneeMarkupSource.includes('ids.length>2') && assigneeMarkupSource.includes("peopleMarkup(ids[0])") && assigneeMarkupSource.includes("(ids.length-1)"), 'More than two assignees must display the first assignee followed by + (assignee count minus one).');
+assert.ok(assigneeMarkupSource.includes('ids.length>1') && assigneeMarkupSource.includes("peopleMarkup(ids[0])") && assigneeMarkupSource.includes("(ids.length-1)"), 'More than one assignee must display only the first assignee followed by + (assignee count minus one).');
 assert.ok(assigneeMarkupSource.includes("const clickable=ids.length>1") && assigneeMarkupSource.includes('role="button" tabindex="0"') && assigneeMarkupSource.includes('data-assignee-popup'), 'Multi-assignee labels must be keyboard-accessible clickable controls without replacing their existing pill wrapper.');
 assert.ok(assigneeMarkupSource.includes('data-assignee-ids=') && assigneeMarkupSource.includes('JSON.stringify(ids)'), 'The label must retain its exact selected assignee IDs for the details popup.');
 const assigneePopupStart = html.indexOf('function toggleAssigneeDetailsPopup(');

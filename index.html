@@ -3641,7 +3641,7 @@ function assigneeMarkup(item,labelKey='assignedTo',extraClass=''){
  const ids=itemAssigneeIds(item);
  const allUsers=item?.type!=='followup'&&item?.assigneeMode==='all';
  const peopleMarkup=id=>'<span class="assigned-person-chip">'+userAvatar(id)+'<span class="assigned-person">'+roleLabel(id)+'</span></span>';
- const people=ids.length>2
+ const people=ids.length>1
   ?peopleMarkup(ids[0])+'<span class="assignee-overflow-count">+'+(ids.length-1)+'</span>'
   :ids.map(peopleMarkup).join('');
  const assigned=allUsers

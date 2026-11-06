@@ -276,8 +276,8 @@ def activity_item(e):
 
 
 def item_assignee_ids(item):
-    """Return canonical enabled-user candidate IDs, retaining legacy ownerId rows."""
-    if not isinstance(item, dict):
+    """Return canonical assignee IDs, retaining legacy ownerId rows."""
+    if not isinstance(item, dict) or str(item.get('assigneeMode') or '') == 'none':
         return []
     raw = item.get('assigneeIds') if isinstance(item.get('assigneeIds'), list) else [item.get('ownerId')]
     ids = []
@@ -291,7 +291,7 @@ def item_assignee_ids(item):
 
 
 def assignment_index_operations(item, previous=None):
-    """Maintain one durable Realtime-table lookup row per assignee and work item."""
+    """Maintain durable per-user and All Users assignment lookup records."""
     def keyed_records(row):
         if not isinstance(row, dict):
             return {}
@@ -300,6 +300,16 @@ def assignment_index_operations(item, previous=None):
             return {}
         updated_at = str(row.get('updatedAt') or '')
         sort_key = updated_at + '#' + item_id
+        if row.get('assigneeMode') == 'all':
+            return {
+                'ALL_USERS': {
+                    'partitionKey': 'ASSIGNEE#ALL_USERS',
+                    'sortKey': sort_key,
+                    'itemId': item_id,
+                    'assigneeUserId': 'ALL_USERS',
+                    'updatedAt': updated_at,
+                }
+            }
         return {
             user_id: {
                 'partitionKey': 'ASSIGNEE#' + user_id,
@@ -469,8 +479,6 @@ def validate_item(event, item, previous=None):
             raise ValueError('The root/system user cannot be assigned to work items.')
         if user_id not in requested_assignee_ids:
             requested_assignee_ids.append(user_id)
-    if len(requested_assignee_ids)>20:
-        raise ValueError('At most 20 team members can be assigned to one item.')
     due_date=item.get('dueDate')
     if due_date and not re.fullmatch(r'\d{4}-\d{2}-\d{2}',str(due_date)):
         raise ValueError('Due date must use YYYY-MM-DD format.')
@@ -490,6 +498,29 @@ def validate_item(event, item, previous=None):
     item['updatedAt']=now()
     item['version']=int((previous or {}).get('version',0))+1
     kind=item.get('type')
+    assignment_mode=str(item.get('assigneeMode') or '').strip().lower()
+    if assignment_mode not in ('', 'all', 'selected', 'none'):
+        raise ValueError('Assignee mode is not supported.')
+    if kind in ('project', 'job', 'task'):
+        if assignment_mode == 'none':
+            requested_assignee_ids=[]
+        elif assignment_mode == 'all':
+            requested_assignee_ids=[]
+            for team_user in scan_pages(USERS):
+                user_id=str(team_user.get('userId') or team_user.get('id') or '').strip()
+                role=str(team_user.get('role') or team_user.get('roleName') or '').strip().casefold()
+                is_system=any(team_user.get(flag) is True for flag in ('isRoot','isSystem','isSystemUser','systemUser'))
+                if user_id and user_id.casefold()!='root' and team_user.get('enabled',True) and role!='root' and not is_system and user_id not in requested_assignee_ids:
+                    requested_assignee_ids.append(user_id)
+        else:
+            assignment_mode='selected' if requested_assignee_ids else 'none'
+        item['assigneeMode']=assignment_mode
+    elif kind == 'followup':
+        if assignment_mode == 'all':
+            raise ValueError('Follow-ups can be assigned to only one team member.')
+        item.pop('assigneeMode',None)
+    if len(requested_assignee_ids)>20 and assignment_mode!='all':
+        raise ValueError('At most 20 team members can be assigned to one item.')
     parent_id=item.get('parentId')
     item_id=str(item.get('itemId') or '')
     parent=None
@@ -556,8 +587,8 @@ def validate_item(event, item, previous=None):
                 requested_assignee_ids=[current_owner] if current_owner else []
         if len(requested_assignee_ids)>1:
             raise ValueError('A follow-up can be assigned to only one team member.')
-    if not requested_assignee_ids:
-        raise ValueError('At least one enabled team member must be assigned to each work item.')
+    if kind=='followup' and not requested_assignee_ids:
+        raise ValueError('A follow-up must be assigned to an enabled team member.')
     normalized_assignee_ids=[]
     for user_id in requested_assignee_ids:
         owner=USERS.get_item(Key={'userId':str(user_id)}).get('Item')
@@ -757,12 +788,17 @@ def query_work_items(qs):
             KeyConditionExpression=Key('assignedTo').eq(user_id),
         ):
             by_id[str(row.get('itemId') or '')]=row
-        # Every additional assignee has a durable lookup row in the existing Realtime table.
+        # Additional assignees have durable lookup rows in Realtime. Items assigned
+        # to All Users are indexed once and included for every enabled team member.
         assignment_rows=all_pages(
             REALTIME_TABLE,
             KeyConditionExpression=Key('partitionKey').eq('ASSIGNEE#'+user_id),
         )
-        for assignment in assignment_rows:
+        all_user_rows=all_pages(
+            REALTIME_TABLE,
+            KeyConditionExpression=Key('partitionKey').eq('ASSIGNEE#ALL_USERS'),
+        )
+        for assignment in [*assignment_rows, *all_user_rows]:
             item_id=str(assignment.get('itemId') or '')
             if not item_id or item_id in by_id:
                 continue
@@ -1150,9 +1186,13 @@ def make_realtime_change(item, previous=None, affected_items=None, change_kind='
             parent_ids.add(parent_id)
         for assignee_id in item_assignee_ids(row):
             assignee_ids.add(assignee_id)
+        if row.get('assigneeMode') == 'all':
+            assignee_ids.add('ALL_USERS')
     for row in descendant_assignees:
         for assignee_id in item_assignee_ids(row):
             assignee_ids.add(assignee_id)
+        if row.get('assigneeMode') == 'all':
+            assignee_ids.add('ALL_USERS')
     change_id = 'chg_' + uuid.uuid4().hex
     occurred_at = now()
     # Keep the durable cursor more precise than the display timestamp so

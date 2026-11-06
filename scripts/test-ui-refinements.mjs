@@ -119,4 +119,4 @@ assert.ok(html.includes("matchesItemStatusFilter(item,filter)"), 'Status filteri
 assert.ok(html.includes("child.type!=='task'||child.status==='completed'"), 'Not Completed metrics must count Tasks only and must not infer a Follow-up status.');
 assert.ok(html.includes("item.type==='followup'?'':'<span class=\"account-assigned-due\""), 'Assigned Items must not render a due date for Follow-ups.');
 assert.ok(html.includes("isParent||item.type==='task'?' data-history-scope=\"item\"'"), 'Assigned-item Task history must open scoped to the selected item.');
-assert.ok(html.includes('id="scroll-to-top-centered"') || html.includes('left:50%!important;right:auto!important'), 'The scroll-to-top button must be horizontally centered.');
+assert.ok(html.includes('left:50% !important') && html.includes('transform:translateX(-50%) !important'), 'The scroll-to-top button must be horizontally centered.');

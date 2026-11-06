@@ -3037,7 +3037,7 @@ function countNotCompletedForCurrentFilter(parent,descendants=null){
  }).length;
 }
 function updateNotCompletedMetricCount(parent){const el=$('#notCompletedMetricCount');if(el&&parent){el.innerHTML=countValueMarkup(countNotCompletedForCurrentFilter(parent),rootChildrenReady(parent.id),parent.id,'children');}}
-function syncOverviewMetricPressed(){if(ui.tab!=='overview')return;const task=$('#mainContent [data-action="overview-filter"][data-filter="tasks"]');const urgent=$('#mainContent [data-action="overview-filter"][data-filter="urgent"]');const followup=$('#mainContent [data-action="overview-filter"][data-filter="direct-followups"]');const unfinished=$('#mainContent [data-action="overview-filter"][data-filter="not-completed"]');task?.setAttribute('aria-pressed',String(ui.childScope==='all'&&ui.childType==='task'));urgent?.setAttribute('aria-pressed',String(ui.childPriority==='urgent'));followup?.setAttribute('aria-pressed',String(ui.childType==='followup'||ui.childScope==='direct-followups'));unfinished?.setAttribute('aria-pressed',String(ui.childStatus==='not-completed'));}
+function syncOverviewMetricPressed(){if(ui.tab!=='overview')return;const task=$('#mainContent [data-action="overview-filter"][data-filter="tasks"]');const urgent=$('#mainContent [data-action="overview-filter"][data-filter="urgent"]');const followup=$('#mainContent [data-action="overview-filter"][data-filter="direct-followups"]');const unfinished=$('#mainContent [data-action="overview-filter"][data-filter="not-completed"]');task?.setAttribute('aria-pressed',String(ui.childScope==='all'&&ui.childType==='task'));urgent?.setAttribute('aria-pressed',String(ui.childPriority==='urgent'));followup?.setAttribute('aria-pressed',String(ui.childType==='followup'||ui.childScope==='direct-followups'));unfinished?.setAttribute('aria-pressed',String(ui.childStatus==='not-completed'));if(unfinished)unfinished.disabled=ui.childType==='followup';}
 function spinnerMarkup(label=tr('loadingData'),compact=false){return `<div class="data-loading-state${compact?' compact':''}" role="status" aria-live="polite"><span class="loading-spinner" aria-hidden="true"></span><span class="loading-copy">${esc(label)}</span></div>`;}
 function inlineSpinnerMarkup(){return `<span class="loading-count" role="status" aria-label="${esc(tr('loadingData'))}"><span class="loading-spinner inline" aria-hidden="true"></span></span>`;}
 function loadErrorMarkup(message=''){return `<div class="data-loading-error" role="alert"><span>${esc(message||tr('loadFailed'))}</span><button class="btn btn-small" type="button" data-action="retry-data-load">${esc(tr('retry'))}</button></div>`;}
@@ -4247,7 +4247,7 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
    if(ui.childType==='followup'||ui.childScope==='direct-followups'){ui.childType='all';ui.childScope='all';}
    else{ui.childType='followup';ui.childScope='direct-followups';}
   }else if(filter==='not-completed'){
-   ui.childStatus=ui.childStatus==='not-completed'?'all':'not-completed';
+   if(ui.childType!=='followup')ui.childStatus=ui.childStatus==='not-completed'?'all':'not-completed';
   }else if(filter==='urgent'){
    ui.childPriority=ui.childPriority==='urgent'?'all':'urgent';
   }

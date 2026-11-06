@@ -174,6 +174,25 @@ class HandlerHelperTests(unittest.TestCase):
         for key in ("itemId", "listPK", "updatedSort", "rootPK", "assigneePK", "workspaceKey", "assignedTo"):
             self.assertNotIn(key, row)
 
+    def test_archive_record_strips_legacy_followup_status_and_due_date(self):
+        root = {"itemId": "project-1", "type": "project", "name": "Project"}
+        archived = handler.make_archive_record(
+            {
+                "itemId": "followup-legacy",
+                "type": "followup",
+                "name": "Legacy follow-up",
+                "parentId": "project-1",
+                "rootParentId": "project-1",
+                "status": "completed",
+                "dueDate": "2026-11-10",
+            },
+            "2026-11-07T00:00:00.000Z",
+            "u1",
+            row_cache={"project-1": root},
+        )
+        self.assertNotIn("status", archived)
+        self.assertNotIn("dueDate", archived)
+
     def test_public_followup_omits_legacy_status_and_due_date(self):
         row = handler.public_item({
             "itemId": "followup-legacy",

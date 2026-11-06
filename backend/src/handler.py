@@ -469,8 +469,8 @@ def validate_item(event, item, previous=None):
             raise ValueError('The root/system user cannot be assigned to work items.')
         if user_id not in requested_assignee_ids:
             requested_assignee_ids.append(user_id)
-    if len(requested_assignee_ids)>100:
-        raise ValueError('At most 100 team members can be assigned to one item.')
+    if len(requested_assignee_ids)>20:
+        raise ValueError('At most 20 team members can be assigned to one item.')
     due_date=item.get('dueDate')
     if due_date and not re.fullmatch(r'\d{4}-\d{2}-\d{2}',str(due_date)):
         raise ValueError('Due date must use YYYY-MM-DD format.')
@@ -1579,9 +1579,9 @@ def lambda_handler(event, context):
                     'affectedDescendantCount':desc_count})
             # Each item needs two actions (restore + archive delete). A root summary
             # is included with the chunk containing that root's last selected item.
-            # With 30 items per chunk, each transaction uses at most 60 item actions
-            # plus 30 summary-event actions, below DynamoDB's 100-action limit.
-            chunk_size=30
+            # Each item may have up to 20 assignment-index puts, plus the item restore
+            # and archive delete. Three items per transaction stay safely below 100 actions.
+            chunk_size=3
             for start in range(0,len(ordered),chunk_size):
                 chunk=ordered[start:start+chunk_size]
                 writes=[]
@@ -1599,6 +1599,7 @@ def lambda_handler(event, context):
                       {'Put':{'TableName':WORK.name,'Item':av_map(item),'ConditionExpression':'attribute_not_exists(#itemId)','ExpressionAttributeNames':{'#itemId':'itemId'}}},
                       {'Delete':{'TableName':ARCHIVE.name,'Key':av_map({'archiveId':item_id}),'ConditionExpression':'attribute_exists(#archiveId)','ExpressionAttributeNames':{'#archiveId':'archiveId'}}}
                     ])
+                    writes.extend(assignment_index_operations(item))
                     prepared.append(item)
                 chunk_end=start+len(chunk)
                 included=set(restored_ids)
@@ -1813,7 +1814,7 @@ def lambda_handler(event, context):
             normalized_events=build_audit_events(old,profile,'delete',supplied,at=archived_at,affected_count=len(collected))
             change_event=make_realtime_change(old,previous=old,affected_items=[row for row,_ in collected],change_kind='deleted',deleted=True)
             completed=[]
-            chunk_size=40
+            chunk_size=3
             try:
                 for start in range(0,len(collected),chunk_size):
                     chunk=collected[start:start+chunk_size]
@@ -1825,6 +1826,7 @@ def lambda_handler(event, context):
                           {'Put':{'TableName':ARCHIVE.name,'Item':av_map(archive_row),'ConditionExpression':'attribute_not_exists(#archiveId)','ExpressionAttributeNames':{'#archiveId':'archiveId'}}},
                           {'Delete':{'TableName':WORK.name,'Key':av_map({'itemId':row_id}),'ConditionExpression':'#version = :expected','ExpressionAttributeNames':{'#version':'version'},'ExpressionAttributeValues':{':expected':SERIALIZER.serialize(expected_versions[row_id])}}}
                         ])
+                        writes.extend(assignment_index_delete_operations(row))
                     is_final=start+len(chunk)>=len(collected)
                     if is_final:
                         for event_row in normalized_events:
@@ -1847,6 +1849,7 @@ def lambda_handler(event, context):
                               {'Put':{'TableName':WORK.name,'Item':av_map(row),'ConditionExpression':'attribute_not_exists(#itemId)','ExpressionAttributeNames':{'#itemId':'itemId'}}},
                               {'Delete':{'TableName':ARCHIVE.name,'Key':av_map({'archiveId':row_id}),'ConditionExpression':'attribute_exists(#archiveId)','ExpressionAttributeNames':{'#archiveId':'archiveId'}}}
                             ])
+                            rollback.extend(assignment_index_operations(row))
                         if rollback:
                             ddb.meta.client.transact_write_items(TransactItems=rollback)
                 except ClientError:

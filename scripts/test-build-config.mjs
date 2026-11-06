@@ -127,6 +127,39 @@ const valid = build({
 assert.equal(valid.status, 0, `AWS-configured build should succeed: ${valid.stderr}`);
 
 const output = await readFile('dist/index.html', 'utf8');
+const bundledFontFiles = [
+  'inter-latin-variable.woff2',
+  'inter-latin-ext-variable.woff2',
+  'manrope-latin-variable.woff2',
+  'manrope-latin-ext-variable.woff2',
+  'source-sans-3-latin-variable.woff2',
+  'source-sans-3-latin-ext-variable.woff2',
+  'noto-sans-arabic-variable.woff2',
+  'ibm-plex-mono-regular.woff2',
+  'ibm-plex-mono-semibold.woff2'
+];
+for (const fontFile of bundledFontFiles) {
+  assert.ok(output.includes(`./assets/fonts/${fontFile}`), `built HTML must reference the local font asset ${fontFile}`);
+  const fontBytes = await readFile(`dist/assets/fonts/${fontFile}`);
+  assert.equal(fontBytes.subarray(0, 4).toString('ascii'), 'wOF2', `build artifact must contain a valid WOFF2 file: ${fontFile}`);
+}
+for (const licenseFile of [
+  'LICENSE-Inter.txt',
+  'LICENSE-Manrope.txt',
+  'LICENSE-Source-Sans-3.txt',
+  'LICENSE-Noto-Sans-Arabic.txt',
+  'LICENSE-IBM-Plex-Mono.txt'
+]) {
+  const licenseText = await readFile(`dist/assets/fonts/${licenseFile}`, 'utf8');
+  assert.ok(licenseText.includes('SIL OPEN FONT LICENSE Version 1.1'), `build artifact must retain the font license: ${licenseFile}`);
+}
+const fontReadme = await readFile('dist/assets/fonts/README.md', 'utf8');
+assert.ok(fontReadme.includes('Offline and deployment behavior'), 'build artifact must include the bundled-font deployment notes');
+assert.ok(output.includes('id="followup-typography"'), 'AWS artifact must include the typography stylesheet');
+for (const fontRole of ['--font-ui', '--font-item', '--font-body', '--font-data']) {
+  assert.ok(output.includes(fontRole), `AWS artifact must include the ${fontRole} typography role`);
+}
+assert.ok(!/(?:fonts\\.googleapis\\.com|fonts\\.gstatic\\.com|use\\.typekit\\.net)/i.test(output), 'AWS artifact must not depend on external font providers');
 assert.ok(output.includes("$('#workspaceEyebrow').hidden=ui.page==='account';"), 'account page hides the duplicate MY ACCOUNT eyebrow while keeping the bold title');
 assert.ok(output.includes("cpu:'CPU'"), 'CPU profile-icon label uses the standard uppercase spelling');
 assert.ok(output.includes("user:'<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21v-2a8 8 0 0 1 16 0v2\"/>',") && output.includes("'profile-user':'<path d=\"M4 21v-.8c0-2.5 2-4.2 5.2-4.8") && output.includes("{value:'profile-user'}") && !output.includes("{value:'user'}") && output.includes("const profileName=name==='user'?'profile-user':name") && output.includes("raw.icon||roleIcons[raw.role]||'profile-user'") && output.includes("${icon('user',14)}"), 'The original User glyph is reserved for UI controls; the refined bust is a profile-only option with legacy user values mapped to it');

@@ -356,6 +356,10 @@ def public_item(x):
     y['updatedBy']=y.get('updatedByUserId') or y.get('updatedBy','')
     y['assigneeIds']=item_assignee_ids(y)
     y['ownerId']=y['assigneeIds'][0] if y['assigneeIds'] else None
+    if y.get('type')=='followup':
+        # Legacy rows may still carry these fields; Follow-ups no longer expose them.
+        y.pop('status',None)
+        y.pop('dueDate',None)
     for k in ('createdByUserId','updatedByUserId','listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK','assigneeUpdatedSort','assigneeCreatedSort','workspaceKey','assignedTo','deletedAt'):
         y.pop(k,None)
     return y
@@ -404,6 +408,9 @@ def make_archive_record(item, archived_at, actor_user_id, row_cache=None):
     parent_name=(parent_row or {}).get('name') or (parent_row or {}).get('archiveParentName') or raw.get('archiveParentName') or ''
     for key in ('id','deletedAt','listPK','updatedSort','createdSort','rootPK','rootUpdatedSort','assigneePK','assigneeUpdatedSort','assigneeCreatedSort','workspaceKey','assignedTo'):
         raw.pop(key,None)
+    if raw.get('type')=='followup':
+        raw.pop('status',None)
+        raw.pop('dueDate',None)
     raw['archiveId']=item_id
     raw['archiveRootId']=root_id
     raw['archiveRootName']=root_name
@@ -458,10 +465,15 @@ def validate_item(event, item, previous=None):
     if len(description)>5000:
         raise ValueError('Description cannot exceed 5000 characters.')
     item['description']=description
-    allowed_statuses={'not-started','in-progress','on-hold','completed'}
-    item['status']=item.get('status') or 'not-started'
-    if item['status'] not in allowed_statuses:
-        raise ValueError('Status is not supported.')
+    kind=item.get('type')
+    if kind=='followup':
+        item.pop('status',None)
+        item.pop('dueDate',None)
+    else:
+        allowed_statuses={'not-started','in-progress','on-hold','completed'}
+        item['status']=item.get('status') or 'not-started'
+        if item['status'] not in allowed_statuses:
+            raise ValueError('Status is not supported.')
     if 'assigneeIds' in item and item.get('assigneeIds') is not None:
         raw_assignee_ids=item.get('assigneeIds')
         if not isinstance(raw_assignee_ids,list):
@@ -478,7 +490,7 @@ def validate_item(event, item, previous=None):
         if user_id not in requested_assignee_ids:
             requested_assignee_ids.append(user_id)
     due_date=item.get('dueDate')
-    if due_date and not re.fullmatch(r'\d{4}-\d{2}-\d{2}',str(due_date)):
+    if kind!='followup' and due_date and not re.fullmatch(r'\d{4}-\d{2}-\d{2}',str(due_date)):
         raise ValueError('Due date must use YYYY-MM-DD format.')
     # Clients may edit business fields, but never control server-owned IDs/timestamps,
     # creator/editor identity, index keys, deletion state, or concurrency versions.
@@ -495,7 +507,6 @@ def validate_item(event, item, previous=None):
     item['updatedByUserId']=profile['userId']
     item['updatedAt']=now()
     item['version']=int((previous or {}).get('version',0))+1
-    kind=item.get('type')
     assignment_mode=str(item.get('assigneeMode') or '').strip().lower()
     if assignment_mode not in ('', 'all', 'selected', 'none'):
         raise ValueError('Assignee mode is not supported.')
@@ -674,12 +685,14 @@ def build_audit_events(item, actor, event_kind, supplied_events=None, previous=N
     before=public_item(previous or {})
     fields=[('name','name'),('description','description'),('type','type'),('priority','priority'),('assigneeIds','assignee'),('dueDate','due date')]
     changed=[label for field,label in fields if before.get(field)!=item.get(field)]
+    if before.get('type')=='followup' or item.get('type')=='followup':
+        changed=[label for label in changed if label!='due date']
     if before.get('assigneeMode')!=item.get('assigneeMode') and 'assignee' not in changed:
         changed.append('assignee')
     events=[]
     old_status=before.get('status')
     new_status=item.get('status')
-    if old_status!=new_status:
+    if before.get('type')!='followup' and item.get('type')!='followup' and old_status!=new_status:
         labels={'not-started':'Not started','in-progress':'In progress','on-hold':'On hold','completed':'Completed'}
         events.append(make('status',f'Status changed from {labels.get(old_status,old_status)} to {labels.get(new_status,new_status)}.'))
     if changed:
@@ -826,16 +839,16 @@ def query_work_items(qs):
             rows=[row for row in rows if row.get(key)==value]
     status=qs.get('status')
     if status and status!='all':
-        rows=[row for row in rows if (row.get('status')!='completed' if status=='not-completed' else row.get('status')==status)]
+        rows=[row for row in rows if row.get('type')!='followup' and (row.get('status')!='completed' if status=='not-completed' else row.get('status')==status)]
     search=str(qs.get('q') or '').lower()
     if search:
         rows=[row for row in rows if search in str(row.get('name','')).lower() or search in str(row.get('description','')).lower()]
     start=qs.get('from')
     end=qs.get('to')
     if start:
-        rows=[row for row in rows if str(row.get(date_field,''))[:10]>=start]
+        rows=[row for row in rows if (date_field!='dueDate' or row.get('type')!='followup') and str(row.get(date_field,''))[:10]>=start]
     if end:
-        rows=[row for row in rows if str(row.get(date_field,''))[:10]<=end]
+        rows=[row for row in rows if (date_field!='dueDate' or row.get('type')!='followup') and str(row.get(date_field,''))[:10]<=end]
     rows.sort(key=lambda row:(str(row.get(date_field) or ''),str(row.get('itemId') or '')),reverse=(direction!='asc'))
     offset=max(0,int(qs.get('offset',0)))
     limit=max(1,min(250,int(qs.get('limit',100))))
@@ -1646,6 +1659,9 @@ def lambda_handler(event, context):
                     item_id=str(item['itemId'])
                     for key in ('archiveId','archiveRootId','archiveRootName','archiveRootType','archiveParentId','archiveParentName','archivedAt','archivedByUserId','archivePK','archiveSort','archiveRootPK','archiveRootSort','deletedAt'):
                         item.pop(key,None)
+                    if item.get('type')=='followup':
+                        item.pop('status',None)
+                        item.pop('dueDate',None)
                     item['updatedAt']=at
                     item['updatedByUserId']=actor_id
                     item['version']=int(item.get('version',0))+1

@@ -335,3 +335,56 @@ assert.ok(html.includes("assignedTasksFollowups:'Tasks & Follow-ups'")&&html.inc
 assert.ok(html.includes("assignedTasksFollowups:'المهام والمتابعات'")&&html.includes("assignedProjectsJobs:'المشروعات والأعمال المؤقتة'"), 'The two Assigned Items section headings must be translated in Arabic.');
 assert.ok(html.includes('id="account-assigned-sections-layout"')&&html.includes('.account-item-row .account-item-actions'), 'The new section metadata styling must leave the shared, existing action-row layout in place.');
 
+const pinnedSectionsStart=html.indexOf('function accountPinnedSections(rows){');
+const pinnedSectionsEnd=html.indexOf('\nfunction orderedPinnedItems(',pinnedSectionsStart);
+assert.ok(pinnedSectionsStart>=0&&pinnedSectionsEnd>pinnedSectionsStart,'Pinned Items must have its own unfiltered section grouper.');
+const pinnedSectionsSource=html.slice(pinnedSectionsStart,pinnedSectionsEnd);
+function pinnedGroupsFor(rows){
+ return vm.runInNewContext(pinnedSectionsSource+'; accountPinnedSections(rows);',{rows});
+}
+const pinnedGroups=pinnedGroupsFor([
+ {id:'f1',type:'followup'},{id:'p1',type:'project'},
+ {id:'j1',type:'job'},{id:'t1',type:'task'}
+]);
+assert.deepEqual(pinnedGroups.taskFollowups.map(x=>x.id),['f1','t1'],'Pinned Tasks & Follow-ups must include both child types without applying Assigned Items filters.');
+assert.deepEqual(pinnedGroups.projectsJobs.map(x=>x.id),['p1','j1'],'Pinned Projects & Jobs must include both parent types without applying Assigned Items filters.');
+
+const pinOrderStart=html.indexOf('function orderedPinnedItems(ids,found){');
+const pinOrderEnd=html.indexOf('\nfunction accountAssignedResultsMarkup(',pinOrderStart);
+assert.ok(pinOrderStart>=0&&pinOrderEnd>pinOrderStart,'Pinned display ordering must be isolated in a testable helper.');
+const pinOrderSource=html.slice(pinOrderStart,pinOrderEnd);
+const pinOrderResult=vm.runInNewContext(pinOrderSource+'; orderedPinnedItems(ids,found);',{
+ ids:['oldest','middle','newest','stale'],
+ found:new Map([
+  ['oldest',{id:'oldest'}],['middle',{id:'middle'}],['newest',{id:'newest'}]
+ ])
+});
+assert.deepEqual(pinOrderResult.validIds,['oldest','middle','newest'],'Stale pin cleanup must preserve the persisted oldest-to-newest pin sequence.');
+assert.deepEqual(pinOrderResult.rows.map(x=>x.id),['newest','middle','oldest'],'Pinned Items must render newest pins first based on the append-ordered pin-date list.');
+
+const pinnedLoaderStart=html.indexOf('async function loadAccountPinnedItems(){');
+const pinnedLoaderEnd=html.indexOf('\nasync function ',pinnedLoaderStart+20);
+assert.ok(pinnedLoaderStart>=0&&pinnedLoaderEnd>pinnedLoaderStart,'Pinned Items loading must remain isolated.');
+const pinnedLoaderSource=html.slice(pinnedLoaderStart,pinnedLoaderEnd);
+assert.ok(pinnedLoaderSource.includes('hydrateAccountAssignedParentNames(rows,api,hydration)')&&pinnedLoaderSource.includes('orderedPinnedItems(ids,found)'), 'Pinned child rows must resolve immediate parent names and use pin-order display sequencing.');
+assert.ok(pinnedLoaderSource.includes('updateMyPins(orderedPins.validIds)'), 'Stale-pin cleanup must persist the original sequence, not the reversed display order.');
+
+const pinnedPanelStart=html.indexOf('const pinnedSections=accountPinnedSections(ui.accountPinnedRows);');
+const pinnedPanelEnd=html.indexOf("\n }\n if(ui.accountTab==='search')",pinnedPanelStart);
+assert.ok(pinnedPanelStart>=0&&pinnedPanelEnd>pinnedPanelStart,'The Pinned Items panel must render its two sections independently of search filters.');
+const pinnedPanelSource=html.slice(pinnedPanelStart,pinnedPanelEnd);
+assert.ok(pinnedPanelSource.includes("accountAssignedSectionMarkup('taskFollowups',pinnedSections.taskFollowups)")&&pinnedPanelSource.includes("accountAssignedSectionMarkup('projectsJobs',pinnedSections.projectsJobs)")&&pinnedPanelSource.includes('account-assigned-sections'), 'Pinned Items must reuse the same section headings, row renderer, and layout as Assigned Items.');
+assert.ok(!pinnedPanelSource.includes('account-search-controls')&&!pinnedPanelSource.includes('accountAssignedType')&&!pinnedPanelSource.includes('accountAssignedPriority'), 'Pinned Items must not inherit Assigned Items filters.');
+
+const assignedStyleStart=html.indexOf('<style id="account-assigned-sections-layout">');
+const assignedStyleEnd=html.indexOf('</style>',assignedStyleStart);
+assert.ok(assignedStyleStart>=0&&assignedStyleEnd>assignedStyleStart,'The shared Assigned/Pinned row styles must exist.');
+const assignedStyleSource=html.slice(assignedStyleStart,assignedStyleEnd);
+for(const status of ['status-not-started','status-in-progress','status-on-hold','status-completed']){
+ assert.ok(assignedStyleSource.includes('status-pill.'+status),'Account item rows must explicitly restore the default '+status+' text/background colors.');
+}
+for(const priority of ['priority-urgent','priority-high','priority-medium','priority-low']){
+ assert.ok(assignedStyleSource.includes('priority-pill.'+priority),'Account item rows must explicitly restore the default '+priority+' text/background colors.');
+}
+assert.ok(assignedStyleSource.includes('color-mix(in srgb,var(--amber) 68%,var(--muted))')&&assignedStyleSource.includes('color-mix(in srgb,var(--amber-bg) 70%,var(--panel-2))'), 'On Hold must use a dimmed amber treatment distinct from Medium priority.');
+

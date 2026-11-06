@@ -387,8 +387,10 @@ assert.ok(managerSource.includes('realtimeItemOverlay') && managerSource.include
   'a recently changed item survives stale parent, child, and assignee-index responses');
 assert.ok(managerSource.includes('if(missing.length)throw new Error('),
   'a temporarily missing strong read must be retried instead of interpreted as deletion');
-assert.ok(managerSource.includes('for(const item of resolvedById.values())') && managerSource.includes('ownerId||' + "'')===currentUserId"),
-  'Assigned Items is updated from the exact changed record without waiting for its eventually-consistent GSI');
+assert.ok(managerSource.includes('for(const item of resolvedById.values())') && managerSource.includes("item.assigneeMode==='all'") && managerSource.includes('item.assigneeIds') && managerSource.includes('item.ownerId'),
+  'Assigned Items is updated from exact changed records and respects selected, All Users, and None modes');
+assert.ok(managerSource.includes("assigneeIds.has('ALL_USERS')"),
+  'All Users changes notify every signed-in user about their Assigned Items view');
 assert.ok(managerSource.includes('rememberRealtimeChange(change)'),
   'successfully applied changes are deduplicated after their item data is merged');
 assert.ok(managerSource.includes('api.queryActivityForItems') && managerSource.includes('mergeActivityEventsIntoWorkspace(activityEvents)'),

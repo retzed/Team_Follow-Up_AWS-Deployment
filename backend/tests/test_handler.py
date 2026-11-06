@@ -953,7 +953,7 @@ class MultiAssigneeTests(unittest.TestCase):
                 "type": "followup",
                 "assigneeIds": ["u2", "u3"],
             }),
-            ["u2"],
+            ["u2", "u3"],
         )
 
     def test_index_work_item_keeps_first_assignee_in_legacy_owner_index(self):
@@ -984,6 +984,21 @@ class MultiAssigneeTests(unittest.TestCase):
         )
         self.assertTrue(all(write["Put"]["TableName"] == handler.REALTIME_TABLE.name for write in writes))
         self.assertTrue(all(write["Put"]["Item"]["sortKey"]["S"].endswith("#task-multi") for write in writes))
+
+    def test_followup_assignment_index_writes_one_lookup_per_assignee(self):
+        writes = handler.assignment_index_operations({
+            "itemId": "followup-multi",
+            "type": "followup",
+            "assigneeMode": "selected",
+            "ownerId": "u2",
+            "assigneeIds": ["u2", "u3"],
+            "updatedAt": "2026-11-06T08:00:00.000Z",
+        })
+        self.assertEqual(len(writes), 2)
+        self.assertEqual(
+            {write["Put"]["Item"]["partitionKey"]["S"] for write in writes},
+            {"ASSIGNEE#u2", "ASSIGNEE#u3"},
+        )
 
     def test_all_users_assignment_index_uses_global_marker_and_removes_it_on_mode_change(self):
         all_users = {
@@ -1104,6 +1119,36 @@ class MultiAssigneeTests(unittest.TestCase):
         self.assertEqual(item["assigneeIds"], ["u2", "u3"])
         self.assertEqual(item["ownerId"], "u2")
 
+    def test_followup_all_users_mode_resolves_enabled_team_roster(self):
+        parent = {
+            "itemId": "project-all",
+            "type": "project",
+            "createdByUserId": "u1",
+            "rootParentId": "project-all",
+        }
+        roster = [
+            {"userId": "u2", "enabled": True},
+            {"userId": "u3", "enabled": True},
+            {"userId": "u4", "enabled": False},
+            {"userId": "root", "enabled": True, "role": "Root"},
+        ]
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+            patch.object(handler, "scan_pages", return_value=roster),
+            patch.object(handler.USERS, "get_item", side_effect=lambda **kwargs: {
+                "Item": {"userId": kwargs["Key"]["userId"], "enabled": True}
+            }),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "followup-all", "type": "followup",
+                "parentId": "project-all", "name": "All team follow-up",
+                "assigneeMode": "all", "assigneeIds": [],
+            })
+        self.assertEqual(item["assigneeMode"], "all")
+        self.assertEqual(item["assigneeIds"], ["u2", "u3"])
+        self.assertEqual(item["ownerId"], "u2")
+
     def test_new_followup_defaults_to_creator_of_its_immediate_parent(self):
         parent = {
             "itemId": "project-creator",
@@ -1125,24 +1170,31 @@ class MultiAssigneeTests(unittest.TestCase):
         self.assertEqual(item["assigneeIds"], ["u2"])
         self.assertEqual(item["ownerId"], "u2")
 
-    def test_followup_rejects_multiple_assignees_and_root_assignment_is_rejected(self):
+    def test_followup_allows_multiple_assignees_and_root_assignment_is_rejected(self):
         parent = {
             "itemId": "project-creator",
             "type": "project",
             "createdByUserId": "u2",
             "rootParentId": "project-creator",
         }
+
+        def user_lookup(**kwargs):
+            user_id = kwargs["Key"]["userId"]
+            return {"Item": {"userId": user_id, "enabled": True}}
+
         with (
             patch.object(handler, "current_profile", return_value={"userId": "u1"}),
             patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
-            patch.object(handler.USERS, "get_item", return_value={"Item": {"userId": "u2", "enabled": True}}),
+            patch.object(handler.USERS, "get_item", side_effect=user_lookup),
         ):
-            with self.assertRaisesRegex(ValueError, "only one"):
-                handler.validate_item({}, {
-                    "itemId": "followup-many", "type": "followup",
-                    "parentId": "project-creator", "name": "Follow-up",
-                    "assigneeIds": ["u2", "u3"],
-                })
+            item, _ = handler.validate_item({}, {
+                "itemId": "followup-many", "type": "followup",
+                "parentId": "project-creator", "name": "Follow-up",
+                "assigneeMode": "selected", "assigneeIds": ["u2", "u3"],
+            })
+        self.assertEqual(item["assigneeIds"], ["u2", "u3"])
+        self.assertEqual(item["ownerId"], "u2")
+        self.assertEqual(item["assigneeMode"], "selected")
         with patch.object(handler, "current_profile", return_value={"userId": "u1"}):
             with self.assertRaisesRegex(ValueError, "root/system"):
                 handler.validate_item({}, {

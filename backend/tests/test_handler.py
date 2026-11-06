@@ -922,5 +922,165 @@ class ItemNameUniquenessTests(unittest.TestCase):
 
 
 
+
+
+class MultiAssigneeTests(unittest.TestCase):
+    def test_item_assignee_ids_preserves_multi_assignment_and_filters_root(self):
+        self.assertEqual(
+            handler.item_assignee_ids({
+                "type": "task",
+                "ownerId": "u1",
+                "assigneeIds": ["u2", "root", "u3", "u2"],
+            }),
+            ["u2", "u3"],
+        )
+        self.assertEqual(
+            handler.item_assignee_ids({"type": "project", "ownerId": "u4"}),
+            ["u4"],
+        )
+        self.assertEqual(
+            handler.item_assignee_ids({
+                "type": "followup",
+                "assigneeIds": ["u2", "u3"],
+            }),
+            ["u2"],
+        )
+
+    def test_index_work_item_keeps_first_assignee_in_legacy_owner_index(self):
+        row = handler.index_work_item({
+            "id": "task-multi",
+            "type": "task",
+            "parentId": "project-1",
+            "ownerId": "u2",
+            "assigneeIds": ["u2", "u3"],
+            "updatedAt": "2026-11-06T08:00:00.000Z",
+        })
+        self.assertEqual(row["assigneeIds"], ["u2", "u3"])
+        self.assertEqual(row["ownerId"], "u2")
+        self.assertEqual(row["assignedTo"], "u2")
+
+    def test_assignment_index_writes_one_durable_lookup_per_assignee(self):
+        writes = handler.assignment_index_operations({
+            "itemId": "task-multi",
+            "type": "task",
+            "ownerId": "u2",
+            "assigneeIds": ["u2", "u3"],
+            "updatedAt": "2026-11-06T08:00:00.000Z",
+        })
+        self.assertEqual(len(writes), 2)
+        self.assertEqual(
+            {write["Put"]["Item"]["partitionKey"]["S"] for write in writes},
+            {"ASSIGNEE#u2", "ASSIGNEE#u3"},
+        )
+        self.assertTrue(all(write["Put"]["TableName"] == handler.REALTIME_TABLE.name for write in writes))
+        self.assertTrue(all(write["Put"]["Item"]["sortKey"]["S"].endswith("#task-multi") for write in writes))
+
+    def test_assignment_index_update_moves_old_and_new_assignee_keys_atomically(self):
+        previous = {
+            "itemId": "task-multi",
+            "type": "task",
+            "ownerId": "u2",
+            "assigneeIds": ["u2"],
+            "updatedAt": "2026-11-06T08:00:00.000Z",
+        }
+        updated = {
+            **previous,
+            "ownerId": "u2",
+            "assigneeIds": ["u2", "u3"],
+            "updatedAt": "2026-11-06T08:05:00.000Z",
+        }
+        writes = handler.assignment_index_operations(updated, previous=previous)
+        self.assertEqual(len(writes), 3)
+        deleted = [write["Delete"]["Key"] for write in writes if "Delete" in write]
+        inserted = [write["Put"]["Item"] for write in writes if "Put" in write]
+        self.assertEqual(deleted[0]["partitionKey"], {"S": "ASSIGNEE#u2"})
+        self.assertEqual(
+            {row["partitionKey"]["S"] for row in inserted},
+            {"ASSIGNEE#u2", "ASSIGNEE#u3"},
+        )
+
+    def test_assigned_query_unions_legacy_primary_index_and_secondary_assignee_records(self):
+        primary = {
+            "itemId": "task-primary", "type": "task", "name": "Primary",
+            "ownerId": "u2", "assigneeIds": ["u2"], "status": "not-started",
+            "createdAt": "2026-11-06T07:00:00.000Z", "updatedAt": "2026-11-06T08:00:00.000Z",
+        }
+        secondary = {
+            "itemId": "task-secondary", "type": "task", "name": "Secondary",
+            "ownerId": "u1", "assigneeIds": ["u1", "u2"], "status": "in-progress",
+            "createdAt": "2026-11-06T07:00:00.000Z", "updatedAt": "2026-11-06T08:05:00.000Z",
+        }
+        assignment = {"itemId": "task-secondary", "partitionKey": "ASSIGNEE#u2", "sortKey": "2026-11-06T08:05:00.000Z#task-secondary"}
+        with (
+            patch.object(handler, "all_pages", side_effect=[[primary], [assignment]]),
+            patch.object(handler.WORK, "get_item", return_value={"Item": secondary}),
+        ):
+            result = handler.query_work_items({"assigneeUserId": "u2"})
+        self.assertEqual({item["id"] for item in result["items"]}, {"task-primary", "task-secondary"})
+        self.assertEqual(result["count"], 2)
+
+    def test_validate_item_allows_multiple_assignees_for_parent_items(self):
+        def user_lookup(**kwargs):
+            user_id = kwargs["Key"]["userId"]
+            return {"Item": {"userId": user_id, "enabled": True}}
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.USERS, "get_item", side_effect=user_lookup),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "project-multi", "type": "project", "name": "Multi",
+                "assigneeIds": ["u2", "u3"],
+            })
+        self.assertEqual(item["assigneeIds"], ["u2", "u3"])
+        self.assertEqual(item["ownerId"], "u2")
+
+    def test_new_followup_defaults_to_creator_of_its_immediate_parent(self):
+        parent = {
+            "itemId": "project-creator",
+            "type": "project",
+            "createdByUserId": "u2",
+            "rootParentId": "project-creator",
+        }
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+            patch.object(handler.USERS, "get_item", return_value={"Item": {"userId": "u2", "enabled": True}}),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "followup-default",
+                "type": "followup",
+                "parentId": "project-creator",
+                "name": "Follow-up",
+            })
+        self.assertEqual(item["assigneeIds"], ["u2"])
+        self.assertEqual(item["ownerId"], "u2")
+
+    def test_followup_rejects_multiple_assignees_and_root_assignment_is_rejected(self):
+        parent = {
+            "itemId": "project-creator",
+            "type": "project",
+            "createdByUserId": "u2",
+            "rootParentId": "project-creator",
+        }
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+            patch.object(handler.USERS, "get_item", return_value={"Item": {"userId": "u2", "enabled": True}}),
+        ):
+            with self.assertRaisesRegex(ValueError, "only one"):
+                handler.validate_item({}, {
+                    "itemId": "followup-many", "type": "followup",
+                    "parentId": "project-creator", "name": "Follow-up",
+                    "assigneeIds": ["u2", "u3"],
+                })
+        with patch.object(handler, "current_profile", return_value={"userId": "u1"}):
+            with self.assertRaisesRegex(ValueError, "root/system"):
+                handler.validate_item({}, {
+                    "itemId": "project-root-assignment", "type": "project",
+                    "name": "Root assignment", "assigneeIds": ["root"],
+                })
+
+
+
 if __name__ == "__main__":
     unittest.main()

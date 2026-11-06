@@ -204,7 +204,7 @@ const assigneePopupEnd = html.indexOf('\nfunction handleAssigneePopupDocumentCli
 assert.ok(assigneePopupStart >= 0 && assigneePopupEnd > assigneePopupStart, 'The per-item Assignee details popup renderer must exist.');
 const assigneePopupSource = html.slice(assigneePopupStart, assigneePopupEnd);
 assert.ok(assigneePopupSource.includes('JSON.parse(trigger.dataset.assigneeIds') && assigneePopupSource.includes('ids.map(id=>') && assigneePopupSource.includes('userAvatar(id)'), 'The popup must list every assignee with their existing avatar.');
-assert.ok(assigneePopupSource.includes('user.name||tr(\\'unknownUser\\')') && assigneePopupSource.includes('user.role||tr(\\'role\\')'), 'Each popup entry must display the teammate name and role.');
+assert.ok(assigneePopupSource.includes("user.name||tr('unknownUser')") && assigneePopupSource.includes("user.role||tr('role')"), 'Each popup entry must display the teammate name and role.');
 assert.ok(assigneePopupSource.includes("tr('assigneesTitle')") && assigneePopupSource.includes('assignee-details-list'), 'The popup must have a translated heading and a dedicated assignee list.');
 assert.ok(html.includes("assigneesTitle:'Assignees'") && html.includes("assigneesTitle:'الأعضاء المكلّفون'"), 'The popup heading must be translated in English and Arabic.');
 assert.ok(html.includes("document.addEventListener('click',handleAssigneePopupDocumentClick,true)") && html.includes("document.addEventListener('keydown',handleAssigneePopupDocumentKeydown,true)"), 'The popup must support outside-click dismissal and keyboard activation/dismissal.');

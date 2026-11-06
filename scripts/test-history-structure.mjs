@@ -184,12 +184,14 @@ assert.ok(assignableStart >= 0 && assignableEnd > assignableStart, 'Assignable-u
 const assignableSource = html.slice(assignableStart, assignableEnd);
 assert.ok(assignableSource.includes("id!=='root'") && assignableSource.includes("toLowerCase()==='root'") && assignableSource.includes('systemFlag'), 'Root/system identities must be excluded from every assignee selector.');
 
-const assigneeControlStart = html.indexOf('function assigneeControlMarkup(type,selectedIds=[]){');
-const assigneeControlEnd = html.indexOf('\nfunction currentAssigneeSelection(', assigneeControlStart);
+const assigneeControlStart = html.indexOf('function assigneeControlMarkup(type,selectedIds=[],selectionMode=\'selected\'){');
+const assigneeControlEnd = html.indexOf('\nfunction updateAssigneePicker(', assigneeControlStart);
 assert.ok(assigneeControlStart >= 0 && assigneeControlEnd > assigneeControlStart, 'The type-aware assignee control renderer must exist.');
 const assigneeControlSource = html.slice(assigneeControlStart, assigneeControlEnd);
 assert.ok(assigneeControlSource.includes("if(type==='followup')") && assigneeControlSource.includes('<select id="formOwner"') && assigneeControlSource.includes('required'), 'Follow-ups must use one required single-assignee select.');
 assert.ok(assigneeControlSource.includes('name="assigneeIds"') && assigneeControlSource.includes('type="checkbox"'), 'Projects, jobs, and Tasks must use a multi-assignee checklist.');
+assert.ok(assigneeControlSource.includes('data-assignee-mode="all"') && assigneeControlSource.includes('data-assignee-mode="none"') && assigneeControlSource.includes('name="assigneeMode"'), 'The compact checklist must persist distinct All Users and None modes.');
+assert.ok(assigneeControlSource.includes('class="assignee-picker-menu" hidden') && assigneeControlSource.includes('data-assignee-menu-toggle'), 'The checklist must open from a collapsed popover rather than expanding the form.');
 
 const syncAssigneeStart = html.indexOf('function syncAssigneeControl(type,parentChanged=false,typeChanged=false){');
 const syncAssigneeEnd = html.indexOf("$('#modalRoot').addEventListener('change'", syncAssigneeStart);
@@ -201,9 +203,16 @@ const submitStart = html.indexOf('function handleItemSubmit(form){');
 const submitEnd = html.indexOf('\nfunction ', submitStart + 10);
 assert.ok(submitStart >= 0 && submitEnd > submitStart, 'The item form submit handler must exist.');
 const submitSource = html.slice(submitStart, submitEnd);
-assert.ok(submitSource.includes('if(!assigneeIds.length)') && submitSource.includes("tr('assigneeRequired')"), 'Saving an item without a valid assignee must be blocked.');
+assert.ok(submitSource.includes("type==='followup'&&!assigneeIds.length") && submitSource.includes("tr('assigneeRequired')"), 'Only follow-ups require an individual assignee; Projects, Jobs, and Tasks may be unassigned.');
+assert.ok(submitSource.includes('submittedAssigneeMode(type,fd)') && submitSource.includes('assigneeMode:assigneeMode||undefined'), 'The selected assignment mode must be persisted on newly created parent and Task records.');
 assert.ok(submitSource.includes('item.assigneeIds=assigneeIds') && submitSource.includes('item.ownerId=ownerId'), 'The canonical assignee list and legacy primary owner must both be persisted.');
 
+assert.ok(html.includes("mode==='all'?tr('allUsersOption')") && html.includes("allUsersOption:'All Users'"), 'All Users must have a dedicated picker label without changing Activity history filtering.');
+const selectedDefault = html.includes("(type==='followup'?[parentCreatorAssigneeId(parent)]:[]).filter(isAssignableUserId)") && html.includes("(type==='followup'?'selected':'none')");
+assert.ok(selectedDefault, 'New Projects, Jobs, and Tasks must default to None.');
+const pickerCssStart = html.indexOf('<style id="assignee-picker-popover">');
+const pickerCssEnd = html.indexOf('</style>',pickerCssStart);
+assert.ok(pickerCssStart>=0&&pickerCssEnd>pickerCssStart&&html.slice(pickerCssStart,pickerCssEnd).includes('position:fixed')&&html.slice(pickerCssStart,pickerCssEnd).includes('overflow:auto'), 'The checklist popover must stay within the viewport and scroll without resizing the form.');
 const assignedFilterStart = html.indexOf('function filteredAssignedItems(');
 const assignedFilterEnd = html.indexOf('\nfunction assignmentContextMarkup(', assignedFilterStart);
 assert.ok(assignedFilterStart >= 0 && assignedFilterEnd > assignedFilterStart, 'Assigned Items filter must exist.');

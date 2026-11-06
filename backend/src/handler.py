@@ -283,7 +283,7 @@ def item_assignee_ids(item):
     ids = []
     for value in raw or []:
         user_id = str(value or '').strip()
-        if user_id and user_id != 'root' and user_id not in ids:
+        if user_id and user_id.casefold() != 'root' and user_id not in ids:
             ids.append(user_id)
     if item.get('type') == 'followup':
         ids = ids[:1]
@@ -465,7 +465,7 @@ def validate_item(event, item, previous=None):
         user_id=str(value or '').strip()
         if not user_id:
             continue
-        if user_id=='root':
+        if user_id.casefold()=='root':
             raise ValueError('The root/system user cannot be assigned to work items.')
         if user_id not in requested_assignee_ids:
             requested_assignee_ids.append(user_id)
@@ -545,7 +545,7 @@ def validate_item(event, item, previous=None):
     if kind=='followup':
         if previous is None and not requested_assignee_ids and parent:
             parent_creator=str(parent.get('createdByUserId') or parent.get('createdBy') or '').strip()
-            if parent_creator and parent_creator!='root':
+            if parent_creator and parent_creator.casefold()!='root':
                 creator_record=USERS.get_item(Key={'userId':parent_creator}).get('Item')
                 if creator_record and creator_record.get('enabled',True):
                     requested_assignee_ids=[parent_creator]
@@ -561,6 +561,9 @@ def validate_item(event, item, previous=None):
         owner=USERS.get_item(Key={'userId':str(user_id)}).get('Item')
         if not owner or not owner.get('enabled',True):
             raise ValueError('Assignee must be an enabled team member.')
+        owner_role=str(owner.get('role') or owner.get('roleName') or '').strip().casefold()
+        if owner_role=='root' or any(owner.get(flag) is True for flag in ('isRoot','isSystem','isSystemUser','systemUser')):
+            raise ValueError('The root/system user cannot be assigned to work items.')
         if str(user_id) not in normalized_assignee_ids:
             normalized_assignee_ids.append(str(user_id))
     item['assigneeIds']=normalized_assignee_ids

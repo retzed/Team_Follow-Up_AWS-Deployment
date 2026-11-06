@@ -157,6 +157,7 @@ class HandlerHelperTests(unittest.TestCase):
         row = handler.public_item(
             {
                 "itemId": "task-1",
+                "type": "task",
                 "createdByUserId": "u1",
                 "updatedByUserId": "u2",
                 "listPK": "PARENT#project-1",
@@ -172,6 +173,18 @@ class HandlerHelperTests(unittest.TestCase):
         self.assertEqual(row["updatedBy"], "u2")
         for key in ("itemId", "listPK", "updatedSort", "rootPK", "assigneePK", "workspaceKey", "assignedTo"):
             self.assertNotIn(key, row)
+
+    def test_public_followup_omits_legacy_status_and_due_date(self):
+        row = handler.public_item({
+            "itemId": "followup-legacy",
+            "type": "followup",
+            "status": "completed",
+            "dueDate": "2026-11-10",
+            "name": "Legacy follow-up",
+        })
+        self.assertNotIn("status", row)
+        self.assertNotIn("dueDate", row)
+        self.assertEqual(row["type"], "followup")
 
     def test_body_of_decodes_base64_json(self):
         raw = base64.b64encode(json.dumps({"itemIds": ["one"]}).encode()).decode()
@@ -1240,6 +1253,10 @@ class MultiAssigneeTests(unittest.TestCase):
                 "type": "followup",
                 "parentId": "project-edit",
                 "name": "Existing follow-up",
+                # Older clients may still submit these legacy fields; the API
+                # must strip them rather than persist them on a Follow-up.
+                "status": "completed",
+                "dueDate": "2026-11-10",
                 "assigneeMode": "selected",
                 "assigneeIds": ["u3", "u4"],
                 "ownerId": "u3",
@@ -1248,6 +1265,8 @@ class MultiAssigneeTests(unittest.TestCase):
         self.assertEqual(item["assigneeIds"], ["u3", "u4"])
         self.assertEqual(item["ownerId"], "u3")
         self.assertEqual(item["assigneeMode"], "selected")
+        self.assertNotIn("status", item)
+        self.assertNotIn("dueDate", item)
 
 
     def test_validate_item_allows_multiple_assignees_for_tasks(self):

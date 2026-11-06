@@ -126,3 +126,4 @@ assert.ok(html.includes("ui.childType==='followup'?'disabled':''") && html.inclu
 assert.ok(html.includes("ui.childType!=='followup')") && html.includes("ui.accountAssignedType!=='followup')"), 'Workspace and Assigned Items must omit the Due date option for Follow-ups.');
 assert.ok(html.includes("ui.accountAssignedStatus='all'") && html.includes("ui.childStatus='all'"), 'Selecting Follow-up must clear stale status filters.');
 assert.ok(html.includes("ui.accountAssignedDateMode==='due'") && html.includes("ui.childDateMode==='due'"), 'Selecting Follow-up must reset an inapplicable Due date sort to Last updated.');
+assert.ok(html.includes("unfinished.disabled=ui.childType==='followup'") && html.includes("if(ui.childType!=='followup')ui.childStatus="), 'The Not Completed metric must be disabled for Follow-ups, which have no status.');

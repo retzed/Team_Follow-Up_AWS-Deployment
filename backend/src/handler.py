@@ -420,6 +420,9 @@ def make_archive_record(item, archived_at, actor_user_id, row_cache=None):
         raw['archiveParentName']=parent_name
     raw['archivedAt']=archived_at
     raw['archivedByUserId']=actor_user_id
+    if raw.get('type')=='followup':
+        raw.pop('status',None)
+        raw.pop('dueDate',None)
     raw['archivePK']='ARCHIVE'
     raw['archiveSort']=archived_at+'#'+item_id
     raw['archiveRootPK']='ROOT#'+root_id

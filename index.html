@@ -2168,6 +2168,13 @@ $('signInForm').addEventListener('submit',handleSubmit);
   </div>
 </div>
 
+<button class="scroll-to-top" id="scrollToTopButton" type="button" aria-label="Back to top" title="Back to top" aria-hidden="true" tabindex="-1">
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+    <path d="M12 19V5"></path>
+    <path d="m5 12 7-7 7 7"></path>
+  </svg>
+</button>
+
 <div id="modalRoot"></div><div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 <script type="text/plain" id="application-bootstrap">
 /* Main UI controller for the Cognito-backed browser app. Keep remote reads/writes behind TeamFollowUpDataApi, and route user/API text through esc() before HTML interpolation. */
@@ -6560,5 +6567,150 @@ html body #accountPage button.account-search-clear-button:active {
   }
 }
 </style>
+
+<style id="theme-aware-scroll-to-top">
+/* A compact, fixed page control. All surfaces and emphasis use the active theme tokens. */
+.scroll-to-top {
+  position: fixed;
+  inset-inline-end: 20px;
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--accent);
+  box-shadow: var(--shadow);
+  -webkit-appearance: none;
+  appearance: none;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    opacity 160ms ease,
+    visibility 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+.scroll-to-top.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.scroll-to-top svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .scroll-to-top.is-visible:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-2);
+    box-shadow: var(--shadow), 0 0 0 2px var(--accent-soft);
+  }
+}
+.scroll-to-top:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow), var(--focus);
+}
+.scroll-to-top:active {
+  background: var(--accent-soft);
+  opacity: .82;
+}
+body.signin-open .scroll-to-top {
+  display: none !important;
+}
+@media (max-width: 700px) {
+  .scroll-to-top {
+    inset-inline-end: 14px;
+    bottom: max(14px, env(safe-area-inset-bottom, 0px));
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-to-top {
+    transition: none !important;
+  }
+}
+</style>
+
+<script id="scroll-to-top-behavior">
+(() => {
+  'use strict';
+  const button = document.getElementById('scrollToTopButton');
+  const app = document.getElementById('app');
+  if (!button || !app) return;
+
+  const SHOW_AFTER_PX = 360;
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  let updateFrame = 0;
+
+  function pageScrollTop() {
+    return Math.max(
+      window.scrollY || 0,
+      document.documentElement?.scrollTop || 0,
+      document.body?.scrollTop || 0
+    );
+  }
+
+  function updateVisibility() {
+    updateFrame = 0;
+    const signedIn = !app.inert && !document.body.classList.contains('signin-open');
+    const visible = signedIn && pageScrollTop() >= SHOW_AFTER_PX;
+    button.classList.toggle('is-visible', visible);
+    button.setAttribute('aria-hidden', String(!visible));
+    button.tabIndex = visible ? 0 : -1;
+
+    const label = document.documentElement.lang === 'ar'
+      ? 'العودة إلى أعلى الصفحة'
+      : 'Back to top';
+    button.setAttribute('aria-label', label);
+    button.title = label;
+  }
+
+  function scheduleVisibilityUpdate() {
+    if (updateFrame) return;
+    updateFrame = window.requestAnimationFrame(updateVisibility);
+  }
+
+  window.addEventListener('scroll', scheduleVisibilityUpdate, { passive: true });
+  window.addEventListener('resize', scheduleVisibilityUpdate, { passive: true });
+
+  button.addEventListener('click', () => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: reduceMotion?.matches ? 'auto' : 'smooth'
+    });
+  });
+
+  const authObserver = new MutationObserver(scheduleVisibilityUpdate);
+  authObserver.observe(app, {
+    attributes: true,
+    attributeFilter: ['inert', 'aria-hidden']
+  });
+  authObserver.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class']
+  });
+
+  updateVisibility();
+})();
+</script>
 </body>
 </html>

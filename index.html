@@ -3720,7 +3720,7 @@ function handleAssigneePopupDocumentKeydown(ev){
 document.addEventListener('click',handleAssigneePopupDocumentClick,true);
 document.addEventListener('keydown',handleAssigneePopupDocumentKeydown,true);
 window.addEventListener('resize',()=>{if(activeAssigneePopupTrigger){const popup=document.getElementById('assigneeDetailsPopup');positionAssigneeDetailsPopup(activeAssigneePopupTrigger,popup);}}, {passive:true});
-window.addEventListener('scroll',()=>{if(activeAssigneePopupTrigger)dismissAssigneeDetailsPopup();},true);
+window.addEventListener('scroll',ev=>{if(activeAssigneePopupTrigger&&!ev.target?.closest?.('#assigneeDetailsPopup'))dismissAssigneeDetailsPopup();},true);
 function assigneeControlMarkup(type,selectedIds=[],selectionMode='selected'){
  const valid=[...new Set((selectedIds||[]).map(String).filter(isAssignableUserId))];
  if(type==='followup'){

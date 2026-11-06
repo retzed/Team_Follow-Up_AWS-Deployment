@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const SOURCE_PATH = 'index.html';
 const OUTPUT_PATH = 'dist/index.html';
@@ -102,5 +102,7 @@ const output = source.replace(configRegex, replacement);
 
 await mkdir('dist', { recursive: true });
 await writeFile(OUTPUT_PATH, output, 'utf8');
+// Ship the locally bundled typefaces with the HTML artifact. Amplify deploys dist/ only.
+await cp('assets/fonts', 'dist/assets/fonts', { recursive: true, force: true });
 
 console.log(`Built AWS-only frontend to ${OUTPUT_PATH} (Cognito + HTTPS API + authenticated real-time WebSocket configured).`);

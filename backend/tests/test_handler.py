@@ -1081,6 +1081,100 @@ class MultiAssigneeTests(unittest.TestCase):
                 })
 
 
+    def test_validate_item_allows_multiple_assignees_for_tasks(self):
+        parent = {
+            "itemId": "project-tasks",
+            "type": "project",
+            "rootParentId": "project-tasks",
+        }
+
+        def user_lookup(**kwargs):
+            user_id = kwargs["Key"]["userId"]
+            return {"Item": {"userId": user_id, "enabled": True}}
+
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+            patch.object(handler.USERS, "get_item", side_effect=user_lookup),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "task-multi",
+                "type": "task",
+                "parentId": "project-tasks",
+                "name": "Task with multiple owners",
+                "assigneeIds": ["u2", "u3"],
+            })
+        self.assertEqual(item["assigneeIds"], ["u2", "u3"])
+        self.assertEqual(item["ownerId"], "u2")
+
+    def test_new_followup_defaults_to_creator_of_task_parent(self):
+        task = {
+            "itemId": "task-parent",
+            "type": "task",
+            "parentId": "project-root",
+            "rootParentId": "project-root",
+            "createdByUserId": "u3",
+        }
+        project = {
+            "itemId": "project-root",
+            "type": "project",
+            "rootParentId": "project-root",
+        }
+
+        def work_lookup(**kwargs):
+            parent_id = kwargs["Key"]["itemId"]
+            return {"Item": task if parent_id == "task-parent" else project}
+
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", side_effect=work_lookup),
+            patch.object(handler.USERS, "get_item", return_value={"Item": {"userId": "u3", "enabled": True}}),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "followup-under-task",
+                "type": "followup",
+                "parentId": "task-parent",
+                "name": "Follow-up under Task",
+            })
+        self.assertEqual(item["assigneeIds"], ["u3"])
+        self.assertEqual(item["ownerId"], "u3")
+
+    def test_new_followup_defaults_to_creator_of_job_parent(self):
+        parent = {
+            "itemId": "job-creator",
+            "type": "job",
+            "createdByUserId": "u4",
+            "rootParentId": "job-creator",
+        }
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+            patch.object(handler.USERS, "get_item", return_value={"Item": {"userId": "u4", "enabled": True}}),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "followup-under-job",
+                "type": "followup",
+                "parentId": "job-creator",
+                "name": "Follow-up under Job",
+            })
+        self.assertEqual(item["assigneeIds"], ["u4"])
+
+    def test_validate_item_rejects_system_role_even_when_id_is_not_root(self):
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.USERS, "get_item", return_value={
+                "Item": {"userId": "root-team-profile", "role": "Root", "enabled": True}
+            }),
+        ):
+            with self.assertRaisesRegex(ValueError, "root/system"):
+                handler.validate_item({}, {
+                    "itemId": "project-root-role",
+                    "type": "project",
+                    "name": "Cannot assign system profile",
+                    "assigneeIds": ["root-team-profile"],
+                })
+
+
 
 if __name__ == "__main__":
     unittest.main()

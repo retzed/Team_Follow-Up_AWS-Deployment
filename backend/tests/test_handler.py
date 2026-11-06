@@ -1085,6 +1085,19 @@ class MultiAssigneeTests(unittest.TestCase):
         self.assertEqual({item["id"] for item in result["items"]}, {"task-primary", "task-secondary", "task-all"})
         self.assertEqual(result["count"], 3)
 
+    def test_status_filters_exclude_followups_without_status(self):
+        rows = [
+            {"itemId": "task-completed", "type": "task", "name": "Completed task", "status": "completed"},
+            {"itemId": "task-open", "type": "task", "name": "Open task", "status": "in-progress"},
+            # Legacy records may still carry status; they must not enter status-filtered results.
+            {"itemId": "followup-legacy", "type": "followup", "name": "Legacy follow-up", "status": "completed"},
+        ]
+        with patch.object(handler, "query_children_rows", return_value=rows):
+            completed = handler.query_work_items({"parentId": "project-1", "status": "completed"})
+            not_completed = handler.query_work_items({"parentId": "project-1", "status": "not-completed"})
+        self.assertEqual({item["id"] for item in completed["items"]}, {"task-completed"})
+        self.assertEqual({item["id"] for item in not_completed["items"]}, {"task-open"})
+
     def test_validate_item_allows_multiple_assignees_for_parent_items(self):
         def user_lookup(**kwargs):
             user_id = kwargs["Key"]["userId"]

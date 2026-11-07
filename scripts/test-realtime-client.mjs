@@ -87,6 +87,8 @@ function createContext(overrides = {}) {
     rootParent: row => row?.rootParentId ? data.parents.find(parent => parent.id === row.rootParentId) || { id: row.rootParentId } : null,
     allItem: id => [...data.parents, ...data.children].find(item => String(item.id) === String(id)) || null,
     copyWorkspace: value => JSON.parse(JSON.stringify(value)),
+    recentlyArchivedItemIds: new Set(),
+    isActiveItem: item => Boolean(item && !item.deletedAt && !item.archivedAt && !item.archiveId),
     invalidateHierarchyIndex: () => {},
     renderParentList: () => { calls.parentRenders += 1; },
     renderDetail: () => { calls.detailRenders += 1; },

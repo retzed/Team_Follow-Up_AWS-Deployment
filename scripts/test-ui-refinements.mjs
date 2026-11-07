@@ -140,3 +140,4 @@ assert.ok(html.includes("class=\"account-search-field account-search-status-fiel
 assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.page==='account'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"':''"), 'Only Assigned Items Tasks should explicitly request item-only history.');
 assert.ok(html.includes('top:calc(68px + 8px + env(safe-area-inset-top,0px))'), 'The mobile back-to-top button must sit below the fixed 68px header.');
+assert.ok(html.includes("const workflowSearch=item.type==='followup'?'':[statusName(item.status,'en'),statusName(item.status,'ar')].join(' ');"), 'Workspace Assigned-list search must not match Follow-ups using legacy status values.');

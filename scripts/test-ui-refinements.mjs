@@ -393,3 +393,7 @@ assert.ok(html.includes('workspace-jump-highlight') &&
 assert.ok(finalPositionCss.includes('left:50vw!important') &&
   finalPositionCss.includes('top:calc(68px + 20px + env(safe-area-inset-top,0px))!important'),
   'The back-to-top control must be centered on desktop and lower below the mobile header.');
+
+const parentJumpStart=html.indexOf("case 'select-parent':");
+const parentJumpEnd=html.indexOf("case 'select-assigned':",parentJumpStart);
+assert.ok(parentJumpStart>=0&&parentJumpEnd>parentJumpStart&&html.slice(parentJumpStart,parentJumpEnd).includes('alignWorkspaceItemInViewport(document.querySelector(\'#mainContent .detail-banner\'))'),'Selecting a parent must use centered item navigation after its children load.');

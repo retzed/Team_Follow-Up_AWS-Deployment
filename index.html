@@ -1704,13 +1704,13 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   return {item:savedItem,activityEvents:savedEvents};
  }
  async function queryTopLevel(options={}){
-  const dateMode=options.dateMode||'updated',params=new URLSearchParams({scope:'top-level',dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
+  const dateMode=options.dateMode||'updated',params=new URLSearchParams({scope:'top-level',dateMode:dateMode,direction:options.direction||(dateMode==='created'||dateMode==='due'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
   const path='/items?'+params.toString();
   return requestCachedGet(path,'top-level-query:'+params.toString());
  }
  async function queryChildren(parentId,options={}){
-  const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
+  const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'||dateMode==='due'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
   const path='/items/'+encodeURIComponent(parentId)+'/children?'+params.toString();
   return requestCachedGet(path,'children-query:'+parentId+':'+params.toString());
@@ -1718,7 +1718,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
  async function queryRootItems(rootParentId,options={}){
   const rootId=String(rootParentId||'');if(!rootId)throw new Error('A Project or Job ID is required to load its items.');
   const dateMode=options.dateMode||'updated';
-  const params=new URLSearchParams({rootParentId:rootId,dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
+  const params=new URLSearchParams({rootParentId:rootId,dateMode,direction:options.direction||(dateMode==='created'||dateMode==='due'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
   let rows;
   if(!options.onPage){
@@ -1732,7 +1732,7 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   return {items,count:items.length,nextOffset:null};
  }
  async function queryAssigned(userId,options={}){
-  const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'?'asc':'desc')});
+  const dateMode=options.dateMode||'updated',params=new URLSearchParams({dateMode:dateMode,direction:options.direction||(dateMode==='created'||dateMode==='due'?'asc':'desc')});
   for(const [key,value] of Object.entries({type:options.type,status:options.status,priority:options.priority,q:options.query,from:options.from,to:options.to,limit:options.limit,offset:options.offset}))if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value));
   const path='/items/assigned-to-me?'+params.toString();
   return requestCachedGet(path,'assigned-query:'+params.toString());

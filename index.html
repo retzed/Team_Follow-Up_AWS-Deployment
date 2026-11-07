@@ -4265,25 +4265,47 @@ async function validateUniqueItemName(name,exceptId,form){
  try{
   const api=window.TeamFollowUpDataApi;
   if(!api||typeof api.request!=='function')throw new Error('The item-name validation API is unavailable.');
-  const hasDuplicate=async(path,pageSize)=>{
+  const isDuplicate=row=>{
+   const rowId=String(row?.id||row?.itemId||row?.archiveId||'');
+   return rowId!==String(exceptId||'')&&normalize(row?.name)===expected;
+  };
+  const readPages=async(path,pageSize,stopOnDuplicate=false)=>{
+   const items=[];
    let offset=0,pageGuard=0;
    while(true){
+    const separator=path.includes('?')?'&':'?';
     const params=new URLSearchParams({limit:String(pageSize),offset:String(offset),dateMode:'updated',direction:'desc'});
-    const result=await api.request('GET',path+'?'+params.toString());
-    const rows=Array.isArray(result?.items)?result.items:[];
-    const duplicate=rows.some(row=>{
-     const rowId=String(row?.id||row?.itemId||row?.archiveId||'');
-     return rowId!==String(exceptId||'')&&normalize(row?.name)===expected;
-    });
-    if(duplicate)return true;
+    const result=await api.request('GET',path+separator+params.toString());
+    const page=Array.isArray(result?.items)?result.items:[];
+    items.push(...page);
+    if(stopOnDuplicate&&page.some(isDuplicate))return {items,duplicate:true};
     const next=result?.nextOffset;
-    if(next===undefined||next===null)return false;
+    if(next===undefined||next===null)return {items,duplicate:false};
     const numeric=Number(next);
     if(!Number.isFinite(numeric)||numeric<=offset||++pageGuard>10000)throw new Error('Item-name validation pagination did not advance.');
     offset=numeric;
    }
   };
-  if(await hasDuplicate('/items',250)||await hasDuplicate('/archive',500)){
+  // The AWS API exposes active records by hierarchy, not through an unscoped list.
+  // Enumerate every root, then each root's full active hierarchy (including the root).
+  const parents=await readPages('/items?scope=top-level',100,true);
+  if(parents.duplicate){
+   toast(tr('nameTaken'),true);
+   focusNameAfterCheck=true;
+   return false;
+  }
+  for(const parent of parents.items){
+   const rootId=String(parent?.id||parent?.itemId||'');
+   if(!rootId)throw new Error('A top-level item is missing its identifier.');
+   const rootRows=await readPages('/items?rootParentId='+encodeURIComponent(rootId),250,true);
+   if(rootRows.duplicate){
+    toast(tr('nameTaken'),true);
+    focusNameAfterCheck=true;
+    return false;
+   }
+  }
+  const archived=await readPages('/archive',500,true);
+  if(archived.duplicate){
    toast(tr('nameTaken'),true);
    focusNameAfterCheck=true;
    return false;
@@ -4304,7 +4326,6 @@ async function validateUniqueItemName(name,exceptId,form){
   }
  }
 }
-
 async function handleItemSubmit(form){const fd=new FormData(form);const kind=form.dataset.modalKind;const currentId=form.dataset.itemId;const name=String(fd.get('name')||'').trim();if(!name){$('#formName')?.focus();toast(tr('namePlaceholder'),true);return;}const type=String(fd.get('type')||'');const status=type==='followup'?'':String(fd.get('status')||'not-started');const assigneeMode=submittedAssigneeMode(type,fd);const assigneeIds=submittedAssigneeIds(type,fd);if(type==='followup'&&!assigneeIds.length){$('#formOwnerField')?.classList.add('required-assignee');const focusTarget=$('#formAssigneeControl .assignee-picker-trigger')||$('#formAssigneeControl input[name="assigneeIds"]');focusTarget?.focus({preventScroll:true});toast(tr('assigneeRequired'),true);return;}let ownerId=assigneeIds[0]||'';const dueDate=type==='followup'?'':String(fd.get('dueDate')||'');const description=String(fd.get('description')||'').trim();
  if(!(await validateUniqueItemName(name,currentId,form)))return;
  if(kind==='new-parent'){

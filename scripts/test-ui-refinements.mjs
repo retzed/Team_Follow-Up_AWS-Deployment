@@ -143,7 +143,8 @@ const finalPositionStart=html.lastIndexOf('<style id="scroll-to-top-final-positi
 const finalPositionEnd=html.indexOf('</style>',finalPositionStart);
 assert.ok(finalPositionStart>=0&&finalPositionEnd>finalPositionStart,'The final floating-control stylesheet must exist.');
 const finalPositionCss=html.slice(finalPositionStart,finalPositionEnd);
-assert.match(finalPositionCss, /#mainContent \\.child-card \\.child-last-updated-row \\.mini-updated\\{\\s*display:inline-flex!important/,
+assert.ok(finalPositionCss.includes('#mainContent .child-card .child-last-updated-row .mini-updated{') &&
+  finalPositionCss.includes('display:inline-flex!important'),
   'Child Last updated must remain visible in its dedicated row.');
 assert.ok(html.includes('id="childStatusFilterField" class="child-filter-field"'), 'The workspace status filter must have a type-aware field wrapper.');
 assert.ok(html.includes("ui.childType==='followup'?'hidden':''"), 'The workspace status filter must be hidden for Follow-ups.');

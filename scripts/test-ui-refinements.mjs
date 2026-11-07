@@ -119,7 +119,7 @@ assert.ok(html.includes("matchesItemStatusFilter(item,filter)"), 'Status filteri
 assert.ok(html.includes("child.type!=='task'||child.status==='completed'"), 'Not Completed metrics must count Tasks only and must not infer a Follow-up status.');
 assert.ok(html.includes("item.type==='followup'?'':'<span class=\"account-assigned-due\""), 'Assigned Items must not render a due date for Follow-ups.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"'"), 'Only Assigned Items Tasks should explicitly request item-only history.');
-assert.ok(/left:50%\s*!important/.test(html) && /transform:translateX\(-50%\)\s*!important/.test(html), 'The scroll-to-top button must be horizontally centered.');
+assert.ok(/left:50vw\\s*!important/.test(html) && /transform:translate(?:3d|X)\\(/.test(html), 'The scroll-to-top button must use viewport-based horizontal centering.');
 
 assert.ok(html.includes("function dateModeOptionsMarkup(current,includeDue=true)") && html.includes("value==='due'&&!includeDue?'disabled class=") && html.includes('is-filter-inapplicable-option'), 'Due-date filter options must remain visible but dimmed and disabled when the selected item type does not support due dates.');
 assert.ok(html.includes("ui.childType==='followup'?'disabled':''") && html.includes("ui.accountAssignedType==='followup'?'disabled':''"), 'Status filters must be disabled when Follow-up is the selected type.');
@@ -156,7 +156,7 @@ assert.ok(html.includes('id="childStatusFilterField"') && html.includes("class=\
 assert.ok(html.includes("class=\"account-search-field account-search-status-field ${ui.accountAssignedType==='followup'?'is-filter-inapplicable':''}\""), 'The Assigned Items status filter must remain visible and dimmed for Follow-ups.');
 assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only, independent of the outer page state.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"':''"), 'Only Assigned Items Tasks should explicitly request item-only history.');
-assert.ok(html.includes('top:calc(68px + 8px + env(safe-area-inset-top,0px))'), 'The mobile back-to-top button must sit below the fixed 68px header.');
+assert.ok(html.includes('top:calc(68px + 20px + env(safe-area-inset-top,0px))!important'), 'The mobile back-to-top button must sit with a clear gap below the fixed 68px header.');
 assert.ok(html.includes("const workflowSearch=item.type==='followup'?'':[statusName(item.status,'en'),statusName(item.status,'ar')].join(' ');"), 'Workspace Assigned-list search must not match Follow-ups using legacy status values.');
 
 
@@ -212,10 +212,10 @@ assert.equal(typeSyncNodes.get('#formDueDateField').hidden,false);
 assert.equal(typeSyncNodes.get('#formDueDate').disabled,false,
   'Switching back to Task must restore the due-date control.');
 
-assert.ok(finalPositionCss.includes('left:50%!important') && finalPositionCss.includes('transform:translateX(-50%)!important'),
+assert.ok(finalPositionCss.includes('left:50vw!important') && finalPositionCss.includes('transform:translateX(-50%)!important'),
   'The scroll-to-top control must be horizontally centered on desktop and mobile.');
 assert.ok(finalPositionCss.includes('top:calc(76px + 10px + env(safe-area-inset-top,0px))!important') &&
-  finalPositionCss.includes('top:calc(68px + 8px + env(safe-area-inset-top,0px))!important'),
+  finalPositionCss.includes('top:calc(68px + 20px + env(safe-area-inset-top,0px))!important'),
   'The scroll-to-top control must sit below the fixed header at both desktop and mobile breakpoints.');
 
 
@@ -327,3 +327,68 @@ const assignedFilterEnd=html.indexOf('\nfunction accountAssignedSectionVisibilit
 assert.ok(assignedFilterStart>=0&&assignedFilterEnd>assignedFilterStart&&html.slice(assignedFilterStart,assignedFilterEnd).includes('.filter(item=>isActiveItem(item))'),'Assigned Items filtering must reject archived records.');
 assert.ok(html.includes('const activePinnedRows=(ui.accountPinnedRows||[]).filter(isActiveItem)'),'Pinned Items rendering must reject archived records even before a reload completes.');
 
+
+
+// Follow-up assignments are optional; an explicit None must not be rejected
+// by the item form or by any follow-up-specific submission guard.
+const itemSubmitStart=html.indexOf('async function handleItemSubmit(form){');
+const itemSubmitEnd=html.indexOf('\nfunction clearParentFilters()',itemSubmitStart);
+assert.ok(itemSubmitStart>=0&&itemSubmitEnd>itemSubmitStart,'The shared item submit handler must exist.');
+const itemSubmitSource=html.slice(itemSubmitStart,itemSubmitEnd);
+assert.ok(!itemSubmitSource.includes("if(type==='followup'&&!assigneeIds.length)"),
+  'Follow-ups must be allowed to have no assignees.');
+
+// Parent/Task status invariants are enforced in the form, mutation path, and
+// child-creation path, while the backend independently validates persisted state.
+assert.ok(html.includes("const itemHasChildren=!!(item&&childrenOf(item.id).length);const status=item?.status==='not-started'&&itemHasChildren?'in-progress':"),
+  'An item with children must not open its editor with Not started selected.');
+assert.ok(itemSubmitSource.includes("if(type!=='followup'&&childrenOf(item.id).length&&status==='not-started')status='in-progress'"),
+  'Saving an item with children must normalize Not started to In progress.');
+assert.ok(itemSubmitSource.includes("const previousParent=p.status==='not-started'?copyWorkspace(p):null") &&
+  itemSubmitSource.includes("p.status='in-progress'"),
+  'Creating any child under a Not started parent must promote the parent to In progress.');
+assert.ok(html.includes("if(previous is not None and kind!='followup' and item.get('status')=='not-started' and has_active_children(item_id))") ||
+  html.includes("has_active_children(item_id)"),
+  'The AWS backend must independently prevent a parent with active children from being Not started.');
+
+// Deleting an item must refresh the visible Assigned/Pinned account tab after
+// the archive/pin writes finish, even when no list request was active at delete time.
+assert.ok(html.includes("void Promise.all([Promise.resolve(deleteWrite),pinsWrite]).then(()=>{if(ui.page!=='account')return;if(ui.accountTab==='assigned'") &&
+  html.includes("else if(ui.accountTab==='pinned'&&!ui.accountPinnedLoading)void loadAccountPinnedItems();"),
+  'Archive completion must trigger a fresh authoritative Assigned or Pinned read for the active account tab.');
+assert.ok(!html.includes('if(wasAssignedLoading)') && !html.includes('if(wasPinnedLoading)'),
+  'Account-list refresh after delete must not depend on whether a request happened to be loading.');
+assert.ok(html.includes("(data.parents||[]).filter(item=>isActiveItem(item))") &&
+  html.includes("ui.accountAssignedRows||[]").toString(),
+  'Profile Search and Assigned Items must render from active item collections only.');
+
+// The status and due-date filters remain present but dimmed when Follow-up is selected.
+assert.ok(html.includes("class=\"child-filter-field ${ui.childType==='followup'?'is-filter-inapplicable':''}\"") &&
+  html.includes("class=\"account-search-field account-search-status-field ${ui.accountAssignedType==='followup'?'is-filter-inapplicable':''}\""),
+  'Workspace and Assigned Items keep the inapplicable Status controls visible and dimmed.');
+assert.ok(!html.includes("id=\"childStatusFilterField\" hidden") && !html.includes("id=\"accountAssignedStatus\" hidden"),
+  'Selecting Follow-up must not remove non-relevant filter controls.');
+
+// Job overview edits jump only when the edited card changes index under the
+// currently active filter; generic item jumps are centered on desktop.
+assert.ok(html.includes('function jobOverviewChildOrder(parentId){') &&
+  html.includes('const oldJobPosition=Array.isArray(oldJobOrder)?oldJobOrder.indexOf(String(item.id)):-1;') &&
+  html.includes('newJobPosition!==oldJobPosition') &&
+  html.includes('alignWorkspaceItemInViewport(movedCard)'),
+  'Job overview editing must compare pre/post filtered order and jump only when the card moves.');
+assert.ok(html.includes('function alignWorkspaceItemInViewport(target){') &&
+  html.includes('viewportCenter=usableTop+(usableBottom-usableTop)/2') &&
+  html.includes('window.scrollY+targetCenter-viewportCenter'),
+  'Item jumps must center the target in the usable desktop viewport.');
+assert.ok(html.includes('window.scrollY+rect.top-headerBottom-12'),
+  'Mobile item jumps must preserve top alignment below the fixed header.');
+assert.ok(html.includes('alignWorkspaceItemInViewport(selectedTarget)') &&
+  html.includes("alignWorkspaceItemInViewport(document.querySelector('#mainContent .detail-banner'))"),
+  'Parent, assigned, and pinned destinations must use the same item-aware navigation.');
+assert.ok(html.includes('workspace-jump-highlight') &&
+  html.includes('consistent-card-hover-and-jump-highlight') &&
+  html.includes(':hover{') ,
+  'Cards must share a consistent hover highlight and temporary jump highlight.');
+assert.ok(finalPositionCss.includes('left:50vw!important') &&
+  finalPositionCss.includes('top:calc(68px + 20px + env(safe-area-inset-top,0px))!important'),
+  'The back-to-top control must be centered on desktop and lower below the mobile header.');

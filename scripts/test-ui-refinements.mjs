@@ -133,11 +133,82 @@ assert.ok(html.includes("ui.childDateFrom='';ui.childDateTo=''") && html.include
 assert.ok(html.includes("${parent.type==='project'?`") && html.includes("data-filter=\"not-completed\""), 'Jobs must not render a Not Completed metric because their children are Follow-ups without status.');
 
 assert.ok(html.includes("item?.updatedBy||item?.updatedByUserId||item?.updatedById||item?.createdBy||item?.createdByUserId"), 'Last updated labels must resolve updater metadata across API and local item shapes.');
-assert.ok(html.includes('#mainContent .child-card .child-meta .mini-updated{display:inline-flex!important'), 'Workspace child Last updated labels must remain visibly rendered.');
+const childCardStart=html.indexOf('function childCard(');
+const childCardEnd=html.indexOf('\nfunction renderOverview',childCardStart);
+assert.ok(childCardStart>=0&&childCardEnd>childCardStart,'The workspace child-card renderer must exist.');
+const childCardSource=html.slice(childCardStart,childCardEnd);
+assert.match(childCardSource,/class="child-meta"[\s\S]*?<\/div><div class="child-last-updated-row">\$\{auditLabel\(item,'mini-updated'\)\}<\/div>/,
+  'Child Last updated must be rendered in its own row outside the metadata flex group.');
+const finalPositionStart=html.lastIndexOf('<style id="scroll-to-top-final-position">');
+const finalPositionEnd=html.indexOf('</style>',finalPositionStart);
+assert.ok(finalPositionStart>=0&&finalPositionEnd>finalPositionStart,'The final floating-control stylesheet must exist.');
+const finalPositionCss=html.slice(finalPositionStart,finalPositionEnd);
+assert.ok(finalPositionCss.includes('#mainContent .child-card .child-last-updated-row .mini-updated{display:inline-flex!important'),
+  'Child Last updated must remain visible in its dedicated row.');
 assert.ok(html.includes('id="childStatusFilterField" class="child-filter-field"'), 'The workspace status filter must have a type-aware field wrapper.');
 assert.ok(html.includes("ui.childType==='followup'?'hidden':''"), 'The workspace status filter must be hidden for Follow-ups.');
 assert.ok(html.includes("class=\"account-search-field account-search-status-field\" ${ui.accountAssignedType==='followup'?'hidden':''}"), 'The Assigned Items status filter must be hidden for Follow-ups.');
-assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.page==='account'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only.');
+assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only, independent of the outer page state.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"':''"), 'Only Assigned Items Tasks should explicitly request item-only history.');
 assert.ok(html.includes('top:calc(68px + 8px + env(safe-area-inset-top,0px))'), 'The mobile back-to-top button must sit below the fixed 68px header.');
 assert.ok(html.includes("const workflowSearch=item.type==='followup'?'':[statusName(item.status,'en'),statusName(item.status,'ar')].join(' ');"), 'Workspace Assigned-list search must not match Follow-ups using legacy status values.');
+
+
+// Follow-up workflow regression checks: status and due date exist only for
+// Projects, Jobs, and Tasks, and type changes update the form immediately.
+assert.ok(html.includes("...(type==='followup'?{}:{status,dueDate})"),
+  'New Follow-ups must omit status and dueDate from the persisted item shape.');
+assert.ok(html.includes("if(type==='followup'){delete item.status;delete item.dueDate;}"),
+  'Editing or converting an item to Follow-up must remove both Task workflow attributes.');
+assert.ok(html.includes("if(oldType==='followup'){item.status=status||'not-started';changed.push('status');item.dueDate=dueDate;if(dueDate)changed.push('due date');}"),
+  'Follow-up-to-Task conversion must restore the selected status and due date and include them in the audit change set.');
+assert.ok(html.includes("dateModeOptionsMarkup(ui.childDateMode,ui.childType!=='followup')"),
+  'Workspace child filters must omit Due date while Follow-up is selected.');
+assert.ok(html.includes("dateModeOptionsMarkup(ui.accountAssignedDateMode,ui.accountAssignedType!=='followup')"),
+  'Assigned Items filters must omit Due date while Follow-up is selected.');
+assert.ok(html.includes("class=\"account-search-controls account-assigned-controls ${ui.accountAssignedType==='followup'?'followup-filter-mode':''}\""),
+  'Assigned Items must switch to a compact filter layout when Follow-up is selected.');
+assert.ok(finalPositionCss.includes('#modalRoot #formStatusField[hidden]') &&
+  finalPositionCss.includes('#modalRoot #formDueDateField[hidden]') &&
+  finalPositionCss.includes('display:none!important'),
+  'Hidden type-specific form controls must be removed from layout, not merely disabled.');
+assert.ok(finalPositionCss.includes('#accountPage .account-assigned-controls.followup-filter-mode') &&
+  finalPositionCss.includes('"type type"'),
+  'Follow-up Assigned Items filters must reclaim the hidden Status grid slot.');
+assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned';") &&
+  html.includes("item.type==='task'?' data-history-scope=\"item\"':''"),
+  'Assigned Task activity history must explicitly open with This item only selected.');
+
+// Exercise the exact form type-change helper for both directions.
+const typeSyncStart=html.indexOf('function syncTypeSpecificFields(type){');
+const typeSyncEnd=html.indexOf('\n function syncAssigneeControl',typeSyncStart);
+assert.ok(typeSyncStart>=0&&typeSyncEnd>typeSyncStart,'The type-specific form synchronizer must exist.');
+const typeSyncNodes=new Map([
+  ['#formStatusField',{hidden:false}],
+  ['#formStatus',{disabled:false,value:'completed'}],
+  ['#formDueDateField',{hidden:false}],
+  ['#formDueDate',{disabled:false,value:'2026-11-20'}]
+]);
+const typeSyncContext={$:selector=>typeSyncNodes.get(selector)||null};
+vm.runInNewContext(html.slice(typeSyncStart,typeSyncEnd)+'\nthis.syncTypeSpecificFields=syncTypeSpecificFields;',typeSyncContext);
+typeSyncContext.syncTypeSpecificFields('followup');
+assert.equal(typeSyncNodes.get('#formStatusField').hidden,true);
+assert.equal(typeSyncNodes.get('#formStatus').disabled,true);
+assert.equal(typeSyncNodes.get('#formDueDateField').hidden,true);
+assert.equal(typeSyncNodes.get('#formDueDate').disabled,true);
+assert.equal(typeSyncNodes.get('#formDueDate').value,'',
+  'Switching to Follow-up must clear and disable the Task-only due date.');
+typeSyncContext.syncTypeSpecificFields('task');
+assert.equal(typeSyncNodes.get('#formStatusField').hidden,false);
+assert.equal(typeSyncNodes.get('#formStatus').disabled,false);
+assert.equal(typeSyncNodes.get('#formStatus').value,'not-started',
+  'Switching back to Task must restore the status control with its default.');
+assert.equal(typeSyncNodes.get('#formDueDateField').hidden,false);
+assert.equal(typeSyncNodes.get('#formDueDate').disabled,false,
+  'Switching back to Task must restore the due-date control.');
+
+assert.ok(finalPositionCss.includes('left:50%!important') && finalPositionCss.includes('transform:translateX(-50%)!important'),
+  'The scroll-to-top control must be horizontally centered on desktop and mobile.');
+assert.ok(finalPositionCss.includes('top:calc(76px + 10px + env(safe-area-inset-top,0px))!important') &&
+  finalPositionCss.includes('top:calc(68px + 8px + env(safe-area-inset-top,0px))!important'),
+  'The scroll-to-top control must sit below the fixed header at both desktop and mobile breakpoints.');

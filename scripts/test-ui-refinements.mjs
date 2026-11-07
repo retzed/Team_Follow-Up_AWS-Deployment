@@ -218,3 +218,88 @@ assert.ok(finalPositionCss.includes('left:50%!important') && finalPositionCss.in
 assert.ok(finalPositionCss.includes('top:calc(76px + 10px + env(safe-area-inset-top,0px))!important') &&
   finalPositionCss.includes('top:calc(68px + 8px + env(safe-area-inset-top,0px))!important'),
   'The scroll-to-top control must sit below the fixed header at both desktop and mobile breakpoints.');
+
+
+// Assignee labels use singular/plural forms everywhere they identify an item's
+// assignee count, and Follow-ups keep their type, priority, and parent on one row.
+assert.ok(html.includes("function assigneeLabelKey(count){return Number(count)===1?'assignee':'assignees';}"),
+  'Assignee labels must be singular for one person and plural for zero or multiple people.');
+assert.ok(html.includes("assigneeMarkup(parent)") && html.includes("const labelKey=assigneeLabelKey(ids.length);"),
+  'Parent-item assignee labels must use the same count-aware wording as child items.');
+assert.ok(html.includes('id="formAssigneeLabel"') && html.includes("tr(assigneeLabelKey(mode==='all'?assignableUsers().length:selected.length))"),
+  'The item form must update its Assignee/Assignees label as the selection changes.');
+assert.ok(!html.includes("tr('assignedTo')"),
+  'Item ownership labels must no longer render the legacy “Assigned to” wording.');
+assert.ok(html.includes('account-assigned-followup-row') &&
+  html.includes("priorityPill(item.priority||'medium')+'<span class=\\"account-assigned-meta-separator\\">·</span>"),
+  'Assigned and Pinned Follow-ups must render Type, Priority, and Parent in one metadata row.');
+assert.ok(html.includes('.account-assigned-followup-row .account-assigned-parent-name') &&
+  html.includes('text-overflow:ellipsis!important'),
+  'The single Follow-up metadata row must remain readable on narrow account cards.');
+
+// Exercise the actual global-name preflight against active and archived records.
+const nameValidationStart=html.indexOf('async function validateUniqueItemName(name,exceptId,form){');
+const nameValidationEnd=html.indexOf('\nasync function handleItemSubmit(form){',nameValidationStart);
+assert.ok(nameValidationStart>=0&&nameValidationEnd>nameValidationStart,
+  'The asynchronous, paginated item-name preflight must exist before the submit handler.');
+const nameValidationSource=html.slice(nameValidationStart,nameValidationEnd)+'\nthis.validateUniqueItemName=validateUniqueItemName;';
+async function runNameValidation(routes,name,exceptId=''){
+  const calls=[],messages=[];
+  const context={
+    window:{TeamFollowUpDataApi:{request:async(method,path)=>{
+      calls.push({method,path});
+      const pathname=String(path).split('?')[0];
+      const query=String(path).split('?')[1]||'';
+      const offset=Number(new URLSearchParams(query).get('offset')||0);
+      const route=routes[pathname];
+      if(typeof route==='function')return route(offset,method,path);
+      if(route!==undefined)return route;
+      return {items:[],nextOffset:null};
+    }}},
+    URLSearchParams,
+    $:()=>null,
+    toast:(message)=>messages.push(message),
+    tr:key=>key,
+    console:{error:()=>{}}
+  };
+  vm.runInNewContext(nameValidationSource,context);
+  const form={dataset:{},querySelectorAll:()=>[],querySelector:()=>null};
+  const valid=await context.validateUniqueItemName(name,exceptId,form);
+  return {valid,calls,messages,form};
+}
+const activeDuplicate=await runNameValidation({
+  '/items':{items:[{id:'active-1',name:'  OPS   PLAN '}],nextOffset:null}
+},'ops plan');
+assert.equal(activeDuplicate.valid,false,
+  'Case and whitespace variants must be rejected against active items.');
+assert.deepEqual(activeDuplicate.messages,['nameTaken']);
+const archivedDuplicate=await runNameValidation({
+  '/items':{items:[],nextOffset:null},
+  '/archive':{items:[{archiveId:'archived-1',name:'Ｒｅｐｏｒｔ'}],nextOffset:null}
+},'Report');
+assert.equal(archivedDuplicate.valid,false,
+  'Unicode NFKC-equivalent names must be rejected against archived items.');
+assert.ok(archivedDuplicate.calls.some(call=>call.path.startsWith('/archive?')),
+  'Name validation must include archived records, not only currently active items.');
+const selfEdit=await runNameValidation({
+  '/items':{items:[{id:'current-item',name:'Existing Name'}],nextOffset:null},
+  '/archive':{items:[],nextOffset:null}
+},' existing   name ','current-item');
+assert.equal(selfEdit.valid,true,
+  'Editing an item without changing its normalized name must exclude that item itself.');
+const paginatedDuplicate=await runNameValidation({
+  '/items':offset=>offset===0?{items:[],nextOffset:250}:{items:[{id:'late-item',name:'Later Match'}],nextOffset:null},
+  '/archive':{items:[],nextOffset:null}
+},'later match');
+assert.equal(paginatedDuplicate.valid,false,
+  'Name validation must continue through subsequent active-item pages.');
+assert.equal(paginatedDuplicate.calls.length,2);
+const unavailableCheck=await runNameValidation({
+  '/items':()=>{throw new Error('offline');}
+},'New Item');
+assert.equal(unavailableCheck.valid,false,
+  'Name validation must fail closed when the active item collection cannot be verified.');
+assert.deepEqual(unavailableCheck.messages,['nameCheckFailed']);
+assert.ok(html.includes("if(!(await validateUniqueItemName(name,currentId,form)))return;") &&
+  html.includes('rollbackFailedItemMutation(mutation,isNew,previousItem);'),
+  'The form must await global name validation and roll back optimistic writes rejected by the authoritative API.');

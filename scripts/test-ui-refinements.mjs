@@ -118,7 +118,7 @@ assert.ok(html.includes("delete item.status;delete item.dueDate;"), 'Task-to-Fol
 assert.ok(html.includes("matchesItemStatusFilter(item,filter)"), 'Status filtering must distinguish Follow-ups, which have no status.');
 assert.ok(html.includes("child.type!=='task'||child.status==='completed'"), 'Not Completed metrics must count Tasks only and must not infer a Follow-up status.');
 assert.ok(html.includes("item.type==='followup'?'':'<span class=\"account-assigned-due\""), 'Assigned Items must not render a due date for Follow-ups.');
-assert.ok(html.includes("isParent||item.type==='task'?' data-history-scope=\"item\"'"), 'Assigned-item Task history must open scoped to the selected item.');
+assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"'"), 'Only Assigned Items Tasks should explicitly request item-only history.');
 assert.ok(/left:50%\s*!important/.test(html) && /transform:translateX\(-50%\)\s*!important/.test(html), 'The scroll-to-top button must be horizontally centered.');
 
 assert.ok(html.includes("function dateModeOptionsMarkup(current,includeDue=true)") && html.includes("filter(([value])=>includeDue||value!=='due')"), 'Due-date filter options must be removable when the selected item type does not support due dates.');
@@ -131,3 +131,12 @@ assert.ok(html.includes("function renderOverview(parent,summary=null){if(ui.chil
 assert.ok(html.includes('data-filter="not-completed" ${ui.childType===\'followup\'?\'disabled\':\'\'} type="button"'), 'The Not Completed metric must be disabled in the initial Follow-up view.');
 assert.ok(html.includes("ui.childDateFrom='';ui.childDateTo=''") && html.includes("ui.accountAssignedDateFrom='';ui.accountAssignedDateTo='';"), 'Switching from Due date to a supported Follow-up date mode must clear stale Due-date ranges.');
 assert.ok(html.includes("${parent.type==='project'?`") && html.includes("data-filter=\"not-completed\""), 'Jobs must not render a Not Completed metric because their children are Follow-ups without status.');
+
+assert.ok(html.includes("item?.updatedBy||item?.updatedByUserId||item?.updatedById||item?.createdBy||item?.createdByUserId"), 'Last updated labels must resolve updater metadata across API and local item shapes.');
+assert.ok(html.includes('#mainContent .child-card .child-meta .mini-updated{display:inline-flex!important'), 'Workspace child Last updated labels must remain visibly rendered.');
+assert.ok(html.includes('id="childStatusFilterField" class="child-filter-field"'), 'The workspace status filter must have a type-aware field wrapper.');
+assert.ok(html.includes("ui.childType==='followup'?'hidden':''"), 'The workspace status filter must be hidden for Follow-ups.');
+assert.ok(html.includes("class=\"account-search-field account-search-status-field\" ${ui.accountAssignedType==='followup'?'hidden':''}"), 'The Assigned Items status filter must be hidden for Follow-ups.');
+assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.page==='account'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only.');
+assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"':''"), 'Only Assigned Items Tasks should explicitly request item-only history.');
+assert.ok(html.includes('top:calc(68px + 8px + env(safe-area-inset-top,0px))'), 'The mobile back-to-top button must sit below the fixed 68px header.');

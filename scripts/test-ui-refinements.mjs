@@ -173,7 +173,7 @@ assert.ok(html.includes("dateModeOptionsMarkup(ui.childDateMode,ui.childType!=='
 assert.ok(html.includes("dateModeOptionsMarkup(ui.accountAssignedDateMode,ui.accountAssignedType!=='followup')"),
   'Assigned Items filters must keep Due date visible but disabled while Follow-up is selected.');
 assert.ok(html.includes("class=\"account-search-controls account-assigned-controls ${ui.accountAssignedType==='followup'?'followup-filter-mode':''}\""),
-assert.ok(html.includes('class="account-search-controls account-assigned-controls ${ui.accountAssignedType===\'followup\'?\'followup-filter-mode\':\'\'}"'), 'Assigned Items must retain its Follow-up-specific filter layout.');
+assert.ok(html.includes('followup-filter-mode') && html.includes('account-assigned-controls'), 'Assigned Items must retain its Follow-up-specific filter layout.');
 assert.ok(finalPositionCss.includes('#modalRoot #formStatusField[hidden]') &&
   finalPositionCss.includes('#modalRoot #formDueDateField[hidden]') &&
   finalPositionCss.includes('display:none!important'),

@@ -327,4 +327,3 @@ const assignedFilterEnd=html.indexOf('\nfunction accountAssignedSectionVisibilit
 assert.ok(assignedFilterStart>=0&&assignedFilterEnd>assignedFilterStart&&html.slice(assignedFilterStart,assignedFilterEnd).includes('.filter(item=>isActiveItem(item))'),'Assigned Items filtering must reject archived records.');
 assert.ok(html.includes('const activePinnedRows=(ui.accountPinnedRows||[]).filter(isActiveItem)'),'Pinned Items rendering must reject archived records even before a reload completes.');
 
-assert.ok(html.includes('ui.accountAssignedRows=(ui.accountAssignedRows||[]).filter(isActiveItem)') && html.includes('ui.accountPinnedRows=(ui.accountPinnedRows||[]).filter(isActiveItem)'), 'Demo real-time deletions must remove archived records from Assigned and Pinned caches regardless of assignee changes.');

@@ -538,7 +538,9 @@ def validate_item(event, item, previous=None):
             assignment_mode='selected' if requested_assignee_ids else 'none'
         item['assigneeMode']=assignment_mode
     elif kind == 'followup':
-        if assignment_mode == 'none':
+        # An explicit None is a user choice. If the client omits assigneeMode,
+        # preserve the existing new-Follow-up default to its parent creator.
+        if assignment_mode == 'none' and 'assigneeMode' in item:
             requested_assignee_ids=[]
         elif assignment_mode == 'all':
             requested_assignee_ids=[]
@@ -549,7 +551,10 @@ def validate_item(event, item, previous=None):
                 if user_id and user_id.casefold()!='root' and team_user.get('enabled',True) and role!='root' and not is_system and user_id not in requested_assignee_ids:
                     requested_assignee_ids.append(user_id)
         else:
-            assignment_mode='selected' if requested_assignee_ids else 'none'
+            assignment_mode='selected' if requested_assignee_ids else ''
+        item['assigneeMode']=assignment_mode
+    if kind=='followup':
+        assignment_mode=assignment_mode or 'none'
         item['assigneeMode']=assignment_mode
     if len(requested_assignee_ids)>20 and assignment_mode!='all':
         raise ValueError('At most 20 team members can be assigned to one item.')

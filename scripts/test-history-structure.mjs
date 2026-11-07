@@ -421,10 +421,10 @@ assert.ok(html.includes('id="account-assigned-sections-layout"')&&html.includes(
 
 const pinnedSectionsStart=html.indexOf('function accountPinnedSections(rows){');
 const pinnedSectionsEnd=html.indexOf('\nfunction orderedPinnedItems(',pinnedSectionsStart);
-assert.ok(pinnedSectionsStart>=0&&pinnedSectionsEnd>pinnedSectionsStart,'Pinned Items must have its own unfiltered section grouper.');
+assert.ok(pinnedSectionsStart>=0&&pinnedSectionsEnd>pinnedSectionsStart,'Pinned Items must have its own active-only section grouper.');
 const pinnedSectionsSource=html.slice(pinnedSectionsStart,pinnedSectionsEnd);
 function pinnedGroupsFor(rows){
- return vm.runInNewContext(pinnedSectionsSource+'; accountPinnedSections(rows);',{rows});
+ return vm.runInNewContext(pinnedSectionsSource+'; accountPinnedSections(rows);',{rows,isActiveItem:item=>!item?.deletedAt&&!item?.archivedAt&&!item?.archiveId});
 }
 const pinnedGroups=pinnedGroupsFor([
  {id:'f1',type:'followup'},{id:'p1',type:'project'},
@@ -432,6 +432,8 @@ const pinnedGroups=pinnedGroupsFor([
 ]);
 assert.deepEqual(pinnedGroups.taskFollowups.map(x=>x.id),['f1','t1'],'Pinned Tasks & Follow-ups must include both child types without applying Assigned Items filters.');
 assert.deepEqual(pinnedGroups.projectsJobs.map(x=>x.id),['p1','j1'],'Pinned Projects & Jobs must include both parent types without applying Assigned Items filters.');
+const activePinnedGroups=pinnedGroupsFor([{id:'active',type:'task'},{id:'archived',type:'followup',archivedAt:'2026-11-07T00:00:00.000Z'}]);
+assert.deepEqual(activePinnedGroups.taskFollowups.map(x=>x.id),['active'],'Archived pins must not be rendered in Pinned Items.');
 
 const pinOrderStart=html.indexOf('function orderedPinnedItems(ids,found){');
 const pinOrderEnd=html.indexOf('\nfunction accountAssignedResultsMarkup(',pinOrderStart);

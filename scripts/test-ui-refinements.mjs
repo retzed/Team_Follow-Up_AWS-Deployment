@@ -344,9 +344,13 @@ assert.ok(html.includes("const itemHasChildren=!!(item&&childrenOf(item.id).leng
   'An item with children must not open its editor with Not started selected.');
 assert.ok(itemSubmitSource.includes("if(type!=='followup'&&childrenOf(item.id).length&&status==='not-started')status='in-progress'"),
   'Saving an item with children must normalize Not started to In progress.');
-assert.ok(itemSubmitSource.includes("const previousParent=p.status==='not-started'?copyWorkspace(p):null") &&
-  itemSubmitSource.includes("p.status='in-progress'"),
-  'Creating any child under a Not started parent must promote the parent to In progress.');
+assert.ok(
+  itemSubmitSource.includes("const previousParent=p.status==='not-started'?copyWorkspace(p):null") ||
+  itemSubmitSource.includes("const previousParent=!serverManagedParentActivation&&p.status==='not-started'?copyWorkspace(p):null"),
+  'The demo client must promote a Not started parent locally, while the AWS client delegates activation to the transactional API.');
+assert.ok(itemSubmitSource.includes("p.status='in-progress'") &&
+  (itemSubmitSource.includes("serverManagedParentActivation=api?.mode==='api'") || itemSubmitSource.includes('persistItemMutation(p,false,parentStatusEvents,previousParent)')),
+  'Child creation must switch a Not started parent to In progress locally or through the server-managed path.');
 
 // Deleting an item must refresh the visible Assigned/Pinned account tab after
 // the archive/pin writes finish, even when no list request was active at delete time.

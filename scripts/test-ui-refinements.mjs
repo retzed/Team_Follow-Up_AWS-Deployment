@@ -121,9 +121,9 @@ assert.ok(html.includes("item.type==='followup'?'':'<span class=\"account-assign
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"'"), 'Only Assigned Items Tasks should explicitly request item-only history.');
 assert.ok(/left:50%\s*!important/.test(html) && /transform:translateX\(-50%\)\s*!important/.test(html), 'The scroll-to-top button must be horizontally centered.');
 
-assert.ok(html.includes("function dateModeOptionsMarkup(current,includeDue=true)") && html.includes("filter(([value])=>includeDue||value!=='due')"), 'Due-date filter options must be removable when the selected item type does not support due dates.');
+assert.ok(html.includes("function dateModeOptionsMarkup(current,includeDue=true)") && html.includes("value==='due'&&!includeDue?'disabled class=\\\"is-filter-inapplicable-option\\\"':''"), 'Due-date filter options must remain visible but dimmed and disabled when the selected item type does not support due dates.');
 assert.ok(html.includes("ui.childType==='followup'?'disabled':''") && html.includes("ui.accountAssignedType==='followup'?'disabled':''"), 'Status filters must be disabled when Follow-up is the selected type.');
-assert.ok(html.includes("ui.childType!=='followup')") && html.includes("ui.accountAssignedType!=='followup')"), 'Workspace and Assigned Items must omit the Due date option for Follow-ups.');
+assert.ok(html.includes("dateModeOptionsMarkup(ui.childDateMode,!isFollowup)") && html.includes("dateModeOptionsMarkup(ui.accountAssignedDateMode,ui.accountAssignedType!=='followup')"), 'Workspace and Assigned Items must retain a dimmed Due date option for Follow-ups.');
 assert.ok(html.includes("ui.accountAssignedStatus='all'") && html.includes("ui.childStatus='all'"), 'Selecting Follow-up must clear stale status filters.');
 assert.ok(html.includes("ui.accountAssignedDateMode==='due'") && html.includes("ui.childDateMode==='due'"), 'Selecting Follow-up must reset an inapplicable Due date sort to Last updated.');
 assert.ok(html.includes("unfinished.disabled=ui.childType==='followup'") && html.includes("if(ui.childType!=='followup')ui.childStatus="), 'The Not Completed metric must be disabled for Follow-ups, which have no status.');
@@ -152,8 +152,8 @@ assert.ok(finalPositionCss.includes('#mainContent .child-card .child-last-update
   finalPositionCss.includes('text-align:right!important'),
   'Child Last updated must remain visible and aligned to the physical bottom-right of each item card.');
 assert.ok(html.includes('id="childStatusFilterField" class="child-filter-field"'), 'The workspace status filter must have a type-aware field wrapper.');
-assert.ok(html.includes("ui.childType==='followup'?'hidden':''"), 'The workspace status filter must be hidden for Follow-ups.');
-assert.ok(html.includes("class=\"account-search-field account-search-status-field\" ${ui.accountAssignedType==='followup'?'hidden':''}"), 'The Assigned Items status filter must be hidden for Follow-ups.');
+assert.ok(html.includes("id=\\\"childStatusFilterField\\\" class=\\\"child-filter-field ${ui.childType==='followup'?'is-filter-inapplicable':''}\\\""), 'The workspace status filter must remain visible and dimmed for Follow-ups.');
+assert.ok(html.includes("class=\\\"account-search-field account-search-status-field ${ui.accountAssignedType==='followup'?'is-filter-inapplicable':''}\\\""), 'The Assigned Items status filter must remain visible and dimmed for Follow-ups.');
 assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only, independent of the outer page state.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"':''"), 'Only Assigned Items Tasks should explicitly request item-only history.');
 assert.ok(html.includes('top:calc(68px + 8px + env(safe-area-inset-top,0px))'), 'The mobile back-to-top button must sit below the fixed 68px header.');
@@ -169,9 +169,9 @@ assert.ok(html.includes("if(type==='followup'){delete item.status;delete item.du
 assert.ok(html.includes("if(oldType==='followup'){item.status=status||'not-started';changed.push('status');item.dueDate=dueDate;if(dueDate)changed.push('due date');}"),
   'Follow-up-to-Task conversion must restore the selected status and due date and include them in the audit change set.');
 assert.ok(html.includes("dateModeOptionsMarkup(ui.childDateMode,ui.childType!=='followup')"),
-  'Workspace child filters must omit Due date while Follow-up is selected.');
+  'Workspace child filters must keep Due date visible but disabled while Follow-up is selected.');
 assert.ok(html.includes("dateModeOptionsMarkup(ui.accountAssignedDateMode,ui.accountAssignedType!=='followup')"),
-  'Assigned Items filters must omit Due date while Follow-up is selected.');
+  'Assigned Items filters must keep Due date visible but disabled while Follow-up is selected.');
 assert.ok(html.includes("class=\"account-search-controls account-assigned-controls ${ui.accountAssignedType==='followup'?'followup-filter-mode':''}\""),
   'Assigned Items must switch to a compact filter layout when Follow-up is selected.');
 assert.ok(finalPositionCss.includes('#modalRoot #formStatusField[hidden]') &&
@@ -314,3 +314,12 @@ assert.deepEqual(unavailableCheck.messages,['nameCheckFailed']);
 assert.ok(html.includes("if(!(await validateUniqueItemName(name,currentId,form)))return;") &&
   html.includes('rollbackFailedItemMutation(mutation,isNew,previousItem);'),
   'The form must await global name validation and roll back optimistic writes rejected by the authoritative API.');
+
+assert.ok(html.includes('"query query type status"') && html.includes('"type status"'), 'Follow-up mode must keep the Status filter in the desktop and mobile filter grids.');
+const activePredicateStart=html.indexOf('function isActiveItem(item){');
+const activePredicateEnd=html.indexOf('\n}',activePredicateStart);
+assert.ok(activePredicateStart>=0&&activePredicateEnd>activePredicateStart,'The shared active-item predicate must exist.');
+const activePredicate=html.slice(activePredicateStart,activePredicateEnd);
+assert.ok(activePredicate.includes('recentlyArchivedItemIds')&&activePredicate.includes('archiveId')&&activePredicate.includes('archivedAt')&&activePredicate.includes('deletedAt'),'Archived and deleted records must be excluded from every account view.');
+assert.ok(html.includes('ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;'),'Deleting an item must invalidate cached Assigned and Pinned results so they are reloaded from active records.');
+assert.ok(html.includes("function accountSearchResultsMarkup(){")&&html.includes("(data.parents||[]).filter(item=>isActiveItem(item))"),'Profile Search must render only active parent items.');

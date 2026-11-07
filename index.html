@@ -4251,7 +4251,7 @@ function deleteItem(id){
  }
 }
 async function validateUniqueItemName(name,exceptId,form){
- const normalize=value=>String(value??'').normalize('NFKC').trim().replace(/\\s+/g,' ').toLowerCase();
+ const normalize=value=>String(value??'').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
  const expected=normalize(name);
  if(!expected)return false;
  if(form?.dataset?.nameCheckPending==='true')return false;

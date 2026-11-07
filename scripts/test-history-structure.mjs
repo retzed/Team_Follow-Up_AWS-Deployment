@@ -333,7 +333,7 @@ assert.ok(html.slice(assignedFilterStart, assignedFilterEnd).includes("itemAssig
 const accountUserMatchStart = html.indexOf('function accountSearchUserMatches(');
 const accountUserMatchEnd = html.indexOf('function accountSearchResultsMarkup(', accountUserMatchStart);
 assert.ok(accountUserMatchStart >= 0 && accountUserMatchEnd > accountUserMatchStart, 'Account search assignee matching helper must exist.');
-assert.ok(html.slice(accountUserMatchStart, accountUserMatchEnd).includes('item.assigneeIds'), 'Search user filters must recognize every assigned team member.');
+assert.ok(html.slice(accountUserMatchStart, accountUserMatchEnd).includes('itemAssigneeIds(item)')&&html.slice(accountUserMatchStart, accountUserMatchEnd).includes("wanted==='none'"), 'Search user filters must recognize every assigned team member.');
 
 const accountSearchRendererStart=html.indexOf('function accountSearchResultsMarkup(){');
 const accountSearchRendererEnd=html.indexOf('function refreshAccountSearchResults(',accountSearchRendererStart);

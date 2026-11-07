@@ -137,15 +137,20 @@ const childCardStart=html.indexOf('function childCard(');
 const childCardEnd=html.indexOf('\nfunction renderOverview',childCardStart);
 assert.ok(childCardStart>=0&&childCardEnd>childCardStart,'The workspace child-card renderer must exist.');
 const childCardSource=html.slice(childCardStart,childCardEnd);
-assert.match(childCardSource,/class="child-meta"[\s\S]*?<\/div><div class="child-last-updated-row">\$\{auditLabel\(item,'mini-updated'\)\}<\/div>/,
-  'Child Last updated must be rendered in its own row outside the metadata flex group.');
+const auditRowIndex=childCardSource.indexOf('<div class="child-last-updated-row">');
+const nestedSectionIndex=childCardSource.indexOf("${item.type==='task'?");
+assert.ok(auditRowIndex>nestedSectionIndex&&nestedSectionIndex>=0,
+  'Child Last updated must be rendered after the nested section, at the bottom of the item card.');
 const finalPositionStart=html.lastIndexOf('<style id="scroll-to-top-final-position">');
 const finalPositionEnd=html.indexOf('</style>',finalPositionStart);
 assert.ok(finalPositionStart>=0&&finalPositionEnd>finalPositionStart,'The final floating-control stylesheet must exist.');
 const finalPositionCss=html.slice(finalPositionStart,finalPositionEnd);
 assert.ok(finalPositionCss.includes('#mainContent .child-card .child-last-updated-row .mini-updated{') &&
-  finalPositionCss.includes('display:inline-flex!important'),
-  'Child Last updated must remain visible in its dedicated row.');
+  finalPositionCss.includes('display:inline-flex!important') &&
+  finalPositionCss.includes('direction:ltr!important') &&
+  finalPositionCss.includes('justify-content:flex-end!important') &&
+  finalPositionCss.includes('text-align:right!important'),
+  'Child Last updated must remain visible and aligned to the physical bottom-right of each item card.');
 assert.ok(html.includes('id="childStatusFilterField" class="child-filter-field"'), 'The workspace status filter must have a type-aware field wrapper.');
 assert.ok(html.includes("ui.childType==='followup'?'hidden':''"), 'The workspace status filter must be hidden for Follow-ups.');
 assert.ok(html.includes("class=\"account-search-field account-search-status-field\" ${ui.accountAssignedType==='followup'?'hidden':''}"), 'The Assigned Items status filter must be hidden for Follow-ups.');

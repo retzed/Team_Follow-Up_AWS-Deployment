@@ -43,7 +43,7 @@ for (const [name, fromPos, toPos] of [
   assert.ok(wrapperStart >= 0 && wrapperEnd > toPos, `${name} From/To inputs must be enclosed by one shared date-range wrapper.`);
   assert.ok(html.slice(wrapperStart, wrapperEnd).includes('account-search-date-from-field') && html.slice(wrapperStart, wrapperEnd).includes('account-search-date-to-field'), `${name} must preserve distinct From and To labels inside the paired wrapper.`);
 }
-assert.equal((html.match(/<div class="account-search-date-range(?:\\s|\")/g) || []).length, 2, 'Only Search and Assigned Items should each render one paired date-range wrapper.');
+assert.equal((html.match(/<div class="account-search-date-range(?:\s|")/g) || []).length, 2, 'Only Search and Assigned Items should each render one paired date-range wrapper.');
 assert.ok(dateRangeCss.includes('grid-template-columns:repeat(2,minmax(0,1fr))'), 'The paired date-range wrapper must use two shrinkable columns.');
 assert.ok(dateRangeCss.includes('width:100% !important;') && dateRangeCss.includes('min-width:0 !important;') && dateRangeCss.includes('min-inline-size:0 !important;'), 'Both the date-range wrapper and its native inputs must be shrinkable and constrained to their assigned width.');
 assert.ok(dateRangeCss.includes('-webkit-appearance:none !important;') && dateRangeCss.includes('appearance:none !important;'), 'The native date fields must opt out of iOS WebKit intrinsic sizing.');

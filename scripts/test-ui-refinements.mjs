@@ -377,13 +377,13 @@ assert.ok(html.includes('function jobOverviewChildOrder(parentId){') &&
   html.includes('newJobPosition!==oldJobPosition') &&
   html.includes('alignWorkspaceItemInViewport(movedCard)'),
   'Job overview editing must compare pre/post filtered order and jump only when the card moves.');
-assert.ok(html.includes('function alignWorkspaceItemInViewport(target){') &&
+assert.ok(html.includes('function alignWorkspaceItemInViewport(target,itemId=''){') &&
   html.includes('viewportCenter=usableTop+(usableBottom-usableTop)/2') &&
   html.includes('window.scrollY+targetCenter-viewportCenter'),
   'Item jumps must center the target in the usable desktop viewport.');
 assert.ok(html.includes('window.scrollY+rect.top-headerBottom-12'),
   'Mobile item jumps must preserve top alignment below the fixed header.');
-assert.ok(html.includes('alignWorkspaceItemInViewport(selectedTarget)') &&
+assert.ok(html.includes('alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId)') &&
   html.includes("alignWorkspaceItemInViewport(document.querySelector('#mainContent .detail-banner'))"),
   'Parent, assigned, and pinned destinations must use the same item-aware navigation.');
 assert.ok(html.includes('workspace-jump-highlight') &&

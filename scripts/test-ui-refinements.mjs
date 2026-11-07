@@ -178,8 +178,8 @@ assert.ok(finalPositionCss.includes('#modalRoot #formStatusField[hidden]') &&
   finalPositionCss.includes('display:none!important'),
   'Hidden type-specific form controls must be removed from layout, not merely disabled.');
 assert.ok(finalPositionCss.includes('#accountPage .account-assigned-controls.followup-filter-mode') &&
-  finalPositionCss.includes('"type type"'),
-  'Follow-up Assigned Items filters must reclaim the hidden Status grid slot.');
+  finalPositionCss.includes('"type status"'),
+  'Follow-up Assigned Items filters must keep the dimmed Status control in the mobile grid.');
 assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned';") &&
   html.includes("item.type==='task'?' data-history-scope=\"item\"':''"),
   'Assigned Task activity history must explicitly open with This item only selected.');

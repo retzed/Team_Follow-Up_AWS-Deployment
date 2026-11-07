@@ -21,7 +21,7 @@ assert.ok(handlerStart >= 0 && handlerEnd > handlerStart, 'the item form handler
 const handler = html.slice(handlerStart, handlerEnd);
 assert.equal(handler.split('persistItemMutation(item,true,[event])').length - 1, 2,
   'both parent and child creation must use one-item persistence');
-assert.ok(handler.includes('persistItemMutation(item,false,mutationEvents)'), 'edits must persist only the changed item and its new audit events');
+assert.ok(handler.includes('persistItemMutation(item,false,mutationEvents,previousItem)'), 'edits must persist only the changed item and its new audit events');
 assert.ok(!handler.includes('persist();'), 'ordinary creates and edits must not snapshot and diff the entire workspace');
 assert.ok(handler.includes('renderItemMutationView({refreshSidebar:true})'), 'new items must refresh sidebar counts');
 assert.ok(handler.includes("refreshSidebar:oldType==='project'||oldType==='job'"), 'editing a child must not rebuild the sidebar');

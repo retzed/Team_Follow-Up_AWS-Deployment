@@ -308,13 +308,14 @@ assert.deepEqual(JSON.parse(followupSyncContext.rendered).ids,['u2','u3'],'Chang
 followupSyncContext.currentAssigneeSelection=()=>[];
 followupSyncContext.currentAssigneeMode=()=> 'none';
 vm.runInNewContext(syncAssigneeSource+';syncAssigneeControl("followup",true,false);',followupSyncContext);
-assert.deepEqual(JSON.parse(followupSyncContext.rendered).ids,['u1'],'A new Follow-up with no current assignee may still default to its immediate parent creator.');
+assert.deepEqual(JSON.parse(followupSyncContext.rendered).ids,[],'Selecting None for a new Follow-up must remain unassigned instead of inheriting its parent creator.');
 
-const submitStart = html.indexOf('function handleItemSubmit(form){');
+const submitStart = html.indexOf('async function handleItemSubmit(form){');
 const submitEnd = html.indexOf('\nfunction ', submitStart + 10);
 assert.ok(submitStart >= 0 && submitEnd > submitStart, 'The item form submit handler must exist.');
 const submitSource = html.slice(submitStart, submitEnd);
-assert.ok(submitSource.includes("type==='followup'&&!assigneeIds.length") && submitSource.includes("tr('assigneeRequired')"), 'Follow-ups require at least one assignee; Projects, Jobs, and Tasks may remain unassigned.');
+assert.ok(submitSource.includes('submittedAssigneeMode(type,fd)') && submitSource.includes("assigneeMode:assigneeMode||'none'"), 'Follow-ups must persist an explicit None assignment without requiring a selected user.');
+assert.doesNotMatch(submitSource,/assigneeRequired|at least one team member/i,'A Follow-up with None assignees must be accepted.');
 assert.ok(submitSource.includes('submittedAssigneeMode(type,fd)') && submitSource.includes("assigneeMode:assigneeMode||'none'"), 'New Projects, Jobs, and Tasks must explicitly persist None unless another assignment mode is selected.');
 assert.ok(submitSource.includes('item.assigneeIds=assigneeIds') && submitSource.includes('item.ownerId=ownerId'), 'The canonical assignee list and legacy primary owner must both be persisted.');
 

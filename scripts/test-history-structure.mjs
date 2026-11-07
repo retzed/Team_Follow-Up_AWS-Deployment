@@ -355,7 +355,7 @@ const followupOrderCardStart=html.indexOf('function childCard(item,parent');
 const followupOrderCardEnd=html.indexOf('\nfunction childTreeFiltered(',followupOrderCardStart);
 assert.ok(followupOrderCardStart>=0&&followupOrderCardEnd>followupOrderCardStart,'The child card renderer must exist.');
 const followupOrderCardSource=html.slice(followupOrderCardStart,followupOrderCardEnd);
-assert.ok(followupOrderCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")>=0&&followupOrderCardSource.indexOf("assigneeMarkup(item,'assignee','child-assignee')")<followupOrderCardSource.indexOf('item.dueDate?'), 'Child cards must display the Assignee label before the Due date.');
+assert.ok(followupOrderCardSource.indexOf("assigneeMarkup(item,'child-assignee')")>=0&&followupOrderCardSource.indexOf("assigneeMarkup(item,'child-assignee')")<followupOrderCardSource.indexOf('item.dueDate?'), 'Child cards must display the Assignee label before the Due date.');
 assert.ok(followupOrderCardSource.includes('class="meta-piece child-due-date"')&&html.includes('.child-meta>.child-assignee{order:3}')&&html.includes('.child-meta>.child-due-date{order:4}'),'Child-card visual ordering must keep the complete Assignee label immediately before the Due date regardless of responsive wrapping.');
 
 const assignedRowStart=html.indexOf('function accountAssignedItemRow(item){');

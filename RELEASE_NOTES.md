@@ -6,6 +6,7 @@
 - Task → Follow-up conversion removes both task-only values; Follow-up → Task restores the controls, defaults status to Not Started, and preserves a due date selected during conversion.
 - Status filters and Not Completed counts exclude Follow-ups; due-date filtering/sorting excludes Follow-ups. Legacy Follow-up attributes are stripped during API validation/response mapping, archive creation, and restore.
 - Restored child-item Last updated metadata in the workspace, centered the scroll-to-top control, and made Assigned Items Task history open with This item only selected by default.
+- Placed each workspace child item's Last updated label at the card's bottom-right. Status and Due date filters now remain scoped to the Task and do not remove its nested Follow-ups; query, priority, Created, and Last updated filters still refine nested results. The Task must still satisfy its own Status/Due date filters.
 - Added frontend and backend regression coverage. No DynamoDB table/index migration is required because the removed attributes are optional item attributes.
 
 

@@ -231,7 +231,7 @@ assert.ok(html.includes('id="formAssigneeLabel"') && html.includes("tr(assigneeL
 assert.ok(!html.includes("tr('assignedTo')"),
   'Item ownership labels must no longer render the legacy “Assigned to” wording.');
 assert.ok(html.includes('account-assigned-followup-row') &&
-  html.includes("priorityPill(item.priority||'medium')+'<span class=\\"account-assigned-meta-separator\\">·</span>"),
+  html.includes("priorityPill(item.priority||'medium')") && html.includes("esc(parentName)+'</span></div>'),
   'Assigned and Pinned Follow-ups must render Type, Priority, and Parent in one metadata row.');
 assert.ok(html.includes('.account-assigned-followup-row .account-assigned-parent-name') &&
   html.includes('text-overflow:ellipsis!important'),

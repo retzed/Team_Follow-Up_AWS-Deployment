@@ -793,7 +793,8 @@ def query_events_for_items(item_ids):
 
 def query_work_items(qs):
     direction='asc' if qs.get('direction')=='asc' else 'desc'
-    date_field='updatedAt' if qs.get('dateMode','updated')=='updated' else 'createdAt'
+    date_mode=str(qs.get('dateMode','updated') or 'updated')
+    date_field='dueDate' if date_mode=='due' else ('updatedAt' if date_mode=='updated' else 'createdAt')
     if qs.get('scope')=='top-level':
         rows=all_pages(
             WORK,
@@ -843,6 +844,8 @@ def query_work_items(qs):
     status=qs.get('status')
     if status and status!='all':
         rows=[row for row in rows if row.get('type')!='followup' and (row.get('status')!='completed' if status=='not-completed' else row.get('status')==status)]
+    if date_field=='dueDate':
+        rows=[row for row in rows if row.get('type')!='followup' and bool(row.get('dueDate'))]
     search=str(qs.get('q') or '').lower()
     if search:
         rows=[row for row in rows if search in str(row.get('name','')).lower() or search in str(row.get('description','')).lower()]

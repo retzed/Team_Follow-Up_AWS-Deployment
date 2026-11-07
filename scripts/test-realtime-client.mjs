@@ -112,6 +112,7 @@ function createContext(overrides = {}) {
     clearTimeout: id => timers.delete(id),
     setInterval: (callback, delay) => { calls.intervals.push(delay); const id=nextTimerId++; timers.set(id,callback); return id; },
     clearInterval: id => { calls.clearedIntervals.push(id); timers.delete(id); },
+    queueMicrotask: callback => callback(),
     Math, URL, URLSearchParams, JSON, Promise, Set, Map, String, Number, WebSocket: MockWebSocket
   };
   vm.runInNewContext(

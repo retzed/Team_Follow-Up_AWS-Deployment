@@ -1701,7 +1701,9 @@ window.TEAM_FOLLOW_UP_CONFIG = Object.freeze({
   const result=await request(isNew?'POST':'PATCH',path,payload);
   const savedItem=result?.item?toAppItem(result.item):JSON.parse(JSON.stringify(item));
   const savedEvents=Array.isArray(result?.activityEvents)?result.activityEvents.map(toAppEvent):payload.activityEvents.map(toAppEvent);
-  return {item:savedItem,activityEvents:savedEvents};
+  const parentItem=result?.parentItem?toAppItem(result.parentItem):null;
+  const parentActivityEvents=Array.isArray(result?.parentActivityEvents)?result.parentActivityEvents.map(toAppEvent):[];
+  return {item:savedItem,activityEvents:savedEvents,parentItem,parentActivityEvents};
  }
  async function queryTopLevel(options={}){
   const dateMode=options.dateMode||'updated',params=new URLSearchParams({scope:'top-level',dateMode:dateMode,direction:options.direction||(dateMode==='created'||dateMode==='due'?'asc':'desc')});
@@ -2860,20 +2862,31 @@ function persistItemMutation(item,isNew,activityEvents=[],previousItem=null){
   const committed=await api.commitItemMutation(mutation.item,mutation.activityEvents,isNew);
   const saved=committed?.item||mutation.item;
   const committedEvents=Array.isArray(committed?.activityEvents)?committed.activityEvents:mutation.activityEvents;
+  const parentSaved=committed?.parentItem||null;
+  const parentEvents=Array.isArray(committed?.parentActivityEvents)?committed.parentActivityEvents:[];
   const live=allItem(itemId);
   if(live&&String(live.updatedAt||'')===String(mutation.item.updatedAt||''))Object.assign(live,saved);
   const bucket=saved.type==='project'||saved.type==='job'?'parents':'children';
   const rows=lastApiSnapshot[bucket]||(lastApiSnapshot[bucket]=[]);
   const existing=rows.find(row=>String(row.id)===itemId);
   if(existing)Object.assign(existing,copyWorkspace(saved));else rows.push(copyWorkspace(saved));
+  if(parentSaved){
+   const liveParent=allItem(parentSaved.id);
+   if(liveParent)Object.assign(liveParent,parentSaved);
+   const parentBucket=parentSaved.type==='project'||parentSaved.type==='job'?'parents':'children';
+   const parentRows=lastApiSnapshot[parentBucket]||(lastApiSnapshot[parentBucket]=[]);
+   const parentExisting=parentRows.find(row=>String(row.id)===String(parentSaved.id));
+   if(parentExisting)Object.assign(parentExisting,copyWorkspace(parentSaved));else parentRows.push(copyWorkspace(parentSaved));
+  }
+  const allCommittedEvents=[...committedEvents,...parentEvents];
   const auditRows=lastApiSnapshot.activity||(lastApiSnapshot.activity=[]);
-  for(const event of committedEvents){
+  for(const event of allCommittedEvents){
    const eventId=String(event.id||event.eventId||'');
    const prior=auditRows.find(row=>String(row.id||row.eventId||'')===eventId);
    if(prior)Object.assign(prior,copyWorkspace(event));else auditRows.push(copyWorkspace(event));
   }
-  mergeActivityEventsIntoWorkspace(committedEvents);
-  updateApplicationHistoryFromCommittedEvents(committedEvents);
+  mergeActivityEventsIntoWorkspace(allCommittedEvents);
+  updateApplicationHistoryFromCommittedEvents(allCommittedEvents);
  }).catch(error=>{
   rollbackFailedItemMutation(mutation,isNew,previousItem);
   console.error('The item data API write failed.',error);

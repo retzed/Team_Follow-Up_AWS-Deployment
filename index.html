@@ -3885,7 +3885,7 @@ function updateAssigneePicker(host,requestedMode){
   summary.textContent=mode==='all'?tr('allUsersOption'):(names.length?names.join(', '):tr('none'));
  }
  const label=$('#formAssigneeLabel');
- if(label)label.textContent=tr(assigneeLabelKey(mode==='all'?assignableUsers().length:selected.length));
+ if(label&&typeof tr==='function'&&typeof assigneeLabelKey==='function')label.textContent=tr(assigneeLabelKey(mode==='all'?assignableUsers().length:selected.length));
  return mode;
 }
 function currentAssigneeMode(){
@@ -4431,7 +4431,7 @@ function syncTypeSpecificFields(type){const followup=type==='followup';const sf=
   selected=[];mode='none';
  }
  host.innerHTML=assigneeControlMarkup(type,selected,mode);
- const label=$('#formAssigneeLabel');if(label)label.textContent=tr(assigneeLabelKey(mode==='all'?assignableUsers().length:selected.length));
+ const label=$('#formAssigneeLabel');if(label&&typeof tr==='function'&&typeof assigneeLabelKey==='function')label.textContent=tr(assigneeLabelKey(mode==='all'?assignableUsers().length:selected.length));
  $('#formOwnerField')?.classList.remove('required-assignee');
 }
 function positionAssigneeMenu(){

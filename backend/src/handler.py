@@ -33,7 +33,7 @@ def av_map(item):
     return {str(k): SERIALIZER.serialize(v) for k, v in item.items() if v is not None}
 
 
-def commit_item_with_events(item, events, condition=None, expected_version=None, change_event=None, name_writes=None):
+def commit_item_with_events(item, events, condition=None, expected_version=None, change_event=None, name_writes=None, extra_writes=None):
     writes=[{'Put': {'TableName': WORK.name, 'Item': av_map(item)}}]
     if condition == 'create':
         writes[0]['Put']['ConditionExpression']='attribute_not_exists(#itemId)'
@@ -43,6 +43,7 @@ def commit_item_with_events(item, events, condition=None, expected_version=None,
         writes[0]['Put']['ExpressionAttributeNames']={'#version':'version'}
         writes[0]['Put']['ExpressionAttributeValues']={':expected':SERIALIZER.serialize(expected_version)}
     writes.extend(name_writes or [])
+    writes.extend(extra_writes or [])
     for event in events:
         writes.append({'Put': {'TableName': ACTIVITY.name, 'Item': av_map(event), 'ConditionExpression': 'attribute_not_exists(#activityKey)', 'ExpressionAttributeNames': {'#activityKey': 'activityKey'}}})
     if change_event:
@@ -448,6 +449,15 @@ def public_event(x):
 # Server-side business validation# ---------------------------------------------------------------------------
 # Server-side business validation and audit construction
 # ---------------------------------------------------------------------------
+def has_active_children(parent_id):
+    """Read active child records consistently before allowing a parent to be Not started."""
+    wanted=str(parent_id or '')
+    if not wanted:
+        return False
+    return any(not row.get('deletedAt') and str(row.get('parentId') or '')==wanted
+               for row in scan_pages(WORK, ConsistentRead=True))
+
+
 def validate_item(event, item, previous=None):
     """Validate client input and derive trusted identity and index metadata."""
     profile=current_profile(event)
@@ -564,7 +574,7 @@ def validate_item(event, item, previous=None):
             raise ValueError('Child items require a parentId.')
         if str(parent_id)==item_id:
             raise ValueError('An item cannot be its own parent.')
-        parent=WORK.get_item(Key={'itemId':str(parent_id)}).get('Item')
+        parent=WORK.get_item(Key={'itemId':str(parent_id)},ConsistentRead=True).get('Item')
         if not parent or parent.get('deletedAt'):
             raise ValueError('Parent item does not exist.')
         # Walk the parent chain to reject cycles when editing/moving existing items.
@@ -578,7 +588,7 @@ def validate_item(event, item, previous=None):
                 break
             seen.add(cid)
             next_id=cursor.get('parentId')
-            cursor=WORK.get_item(Key={'itemId':str(next_id)}).get('Item') if next_id else None
+            cursor=WORK.get_item(Key={'itemId':str(next_id)},ConsistentRead=True).get('Item') if next_id else None
         parent_type=parent.get('type')
         if parent_type=='job' and kind!='followup':
             raise ValueError('Jobs can contain follow-ups only.')
@@ -596,7 +606,7 @@ def validate_item(event, item, previous=None):
     else:
         raise ValueError('Item type must be project, job, task, or followup.')
     if kind=='followup':
-        if previous is None and not requested_assignee_ids and parent:
+        if previous is None and not requested_assignee_ids and assignment_mode!='none' and parent:
             parent_creator=str(parent.get('createdByUserId') or parent.get('createdBy') or '').strip()
             if parent_creator and parent_creator.casefold()!='root':
                 creator_record=USERS.get_item(Key={'userId':parent_creator}).get('Item')
@@ -609,8 +619,8 @@ def validate_item(event, item, previous=None):
             current_owner=str(item.get('ownerId') or '').strip()
             if current_owner!=str(previous.get('ownerId') or '') and item_assignee_ids({'type':'followup','assigneeIds':item.get('assigneeIds',previous_ids)})==previous_ids:
                 requested_assignee_ids=[current_owner] if current_owner else []
-    if kind=='followup' and not requested_assignee_ids:
-        raise ValueError('A follow-up must be assigned to an enabled team member.')
+    if previous is not None and kind!='followup' and item.get('status')=='not-started' and has_active_children(item_id):
+        raise ValueError('An item with child items cannot have Not started status.')
     normalized_assignee_ids=[]
     for user_id in requested_assignee_ids:
         owner=USERS.get_item(Key={'userId':str(user_id)}).get('Item')
@@ -1249,6 +1259,48 @@ def make_realtime_change(item, previous=None, affected_items=None, change_kind='
     }
 
 
+def prepare_parent_activation_for_child(parent_id, actor, at):
+    """Prepare a parent status transition inside the same transaction as child creation."""
+    parent_id=str(parent_id or '')
+    if not parent_id:
+        return None
+    previous=WORK.get_item(Key={'itemId':parent_id},ConsistentRead=True).get('Item')
+    if not previous or previous.get('deletedAt') or previous.get('status')!='not-started':
+        return None
+    updated=dict(previous)
+    updated['status']='in-progress'
+    updated['updatedByUserId']=str(actor.get('userId') or '')
+    updated['updatedAt']=at
+    expected_version=int(previous.get('version',0))
+    updated['version']=expected_version+1
+    updated=index_work_item(updated)
+    events=build_audit_events(updated,actor,'update',previous=previous,at=at)
+    change=make_realtime_change(updated,previous=previous,change_kind='updated')
+    condition=('attribute_not_exists(#version) AND #status = :notStarted'
+               if 'version' not in previous else '#version = :expected AND #status = :notStarted')
+    values={':notStarted':SERIALIZER.serialize('not-started')}
+    if 'version' in previous:
+        values[':expected']=SERIALIZER.serialize(expected_version)
+    writes=[{
+        'Put':{
+            'TableName':WORK.name,'Item':av_map(updated),
+            'ConditionExpression':condition,
+            'ExpressionAttributeNames':{'#version':'version','#status':'status'},
+            'ExpressionAttributeValues':values,
+        }
+    }]
+    for event in events:
+        writes.append({
+            'Put':{
+                'TableName':ACTIVITY.name,'Item':av_map(event),
+                'ConditionExpression':'attribute_not_exists(#activityKey)',
+                'ExpressionAttributeNames':{'#activityKey':'activityKey'},
+            }
+        })
+    writes.append(realtime_change_put(change))
+    return {'item':updated,'events':events,'change':change,'extra_writes':writes,'public_item':public_item(updated)}
+
+
 def realtime_change_put(change):
     return {
         'Put': {
@@ -1809,16 +1861,26 @@ def lambda_handler(event, context):
             clean,actor=validate_item(event,item)
             normalized_events=build_audit_events(clean,profile,'create',events,at=clean.get('createdAt'))
             change_event=make_realtime_change(clean,change_kind='created')
+            parent_activation=prepare_parent_activation_for_child(clean.get('parentId'),profile,clean.get('createdAt') or now()) if clean.get('parentId') else None
             name_writes=item_name_write_operations(clean) + assignment_index_operations(clean)
             try:
-                commit_item_with_events(clean,normalized_events,condition='create',change_event=change_event,name_writes=name_writes)
+                commit_item_with_events(
+                    clean,normalized_events,condition='create',change_event=change_event,
+                    name_writes=name_writes,extra_writes=(parent_activation or {}).get('extra_writes'),
+                )
             except ClientError as exc:
                 code=str(exc.response.get('Error',{}).get('Code') or '')
                 if code in ('ConditionalCheckFailedException','TransactionCanceledException'):
-                    return response(409,{'message':'An item with this name already exists, or the item ID was created concurrently. Refresh and try a different name.'})
+                    return response(409,{'message':'The item name is already in use, or its parent changed concurrently. Refresh and try again.'})
                 raise
             publish_realtime_change(change_event)
-            return response(201,{'item':public_item(clean),'activityEvents':[public_event(e) for e in normalized_events]})
+            if parent_activation:
+                publish_realtime_change(parent_activation['change'])
+            payload={'item':public_item(clean),'activityEvents':[public_event(e) for e in normalized_events]}
+            if parent_activation:
+                payload['parentItem']=parent_activation['public_item']
+                payload['parentActivityEvents']=[public_event(e) for e in parent_activation['events']]
+            return response(201,payload)
         m=re.fullmatch(r'/items/([^/]+)',path)
         if m and method=='PATCH':
             item_id=m.group(1)

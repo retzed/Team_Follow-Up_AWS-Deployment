@@ -168,7 +168,7 @@ assert.ok(html.includes("if(type==='followup'){delete item.status;delete item.du
   'Editing or converting an item to Follow-up must remove both Task workflow attributes.');
 assert.ok(html.includes("if(oldType==='followup'){item.status=status||'not-started';changed.push('status');item.dueDate=dueDate;if(dueDate)changed.push('due date');}"),
   'Follow-up-to-Task conversion must restore the selected status and due date and include them in the audit change set.');
-assert.ok(html.includes("dateModeOptionsMarkup(ui.childDateMode,ui.childType!=='followup')"),
+assert.ok(html.includes("dateModeOptionsMarkup(ui.childDateMode,!isJob&&ui.childType!=='followup')"),
   'Workspace child filters must keep Due date visible but disabled while Follow-up is selected.');
 assert.ok(html.includes("dateModeOptionsMarkup(ui.accountAssignedDateMode,ui.accountAssignedType!=='followup')"),
   'Assigned Items filters must keep Due date visible but disabled while Follow-up is selected.');

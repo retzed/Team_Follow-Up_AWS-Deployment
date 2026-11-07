@@ -238,7 +238,7 @@ assert.ok(html.includes('.account-assigned-followup-row .account-assigned-parent
   html.includes('text-overflow:ellipsis!important'),
   'The single Follow-up metadata row must remain readable on narrow account cards.');
 
-// Exercise the actual global-name preflight against active and archived records.
+// Exercise the actual global-name preflight against every active root and Archive.
 const nameValidationStart=html.indexOf('async function validateUniqueItemName(name,exceptId,form){');
 const nameValidationEnd=html.indexOf('\nasync function handleItemSubmit(form){',nameValidationStart);
 assert.ok(nameValidationStart>=0&&nameValidationEnd>nameValidationStart,
@@ -249,11 +249,9 @@ async function runNameValidation(routes,name,exceptId=''){
   const context={
     window:{TeamFollowUpDataApi:{request:async(method,path)=>{
       calls.push({method,path});
-      const pathname=String(path).split('?')[0];
-      const query=String(path).split('?')[1]||'';
-      const offset=Number(new URLSearchParams(query).get('offset')||0);
-      const route=routes[pathname];
-      if(typeof route==='function')return route(offset,method,path);
+      const parsed=new URL(path,'https://test.invalid');
+      const route=routes[parsed.pathname];
+      if(typeof route==='function')return route(Number(parsed.searchParams.get('offset')||0),method,path,parsed.searchParams);
       if(route!==undefined)return route;
       return {items:[],nextOffset:null};
     }}},
@@ -269,13 +267,17 @@ async function runNameValidation(routes,name,exceptId=''){
   return {valid,calls,messages,form};
 }
 const activeDuplicate=await runNameValidation({
-  '/items':{items:[{id:'active-1',name:'  OPS   PLAN '}],nextOffset:null}
+  '/items':(offset,method,path,params)=>{
+    if(params.get('scope')==='top-level')return {items:[{id:'root-1',name:'Root'}],nextOffset:null};
+    if(params.get('rootParentId')==='root-1')return {items:[{id:'active-1',name:'  OPS   PLAN '}],nextOffset:null};
+    return {items:[],nextOffset:null};
+  }
 },'ops plan');
 assert.equal(activeDuplicate.valid,false,
-  'Case and whitespace variants must be rejected against active items.');
+  'Case and whitespace variants must be rejected against active child items.');
 assert.deepEqual(activeDuplicate.messages,['nameTaken']);
 const archivedDuplicate=await runNameValidation({
-  '/items':{items:[],nextOffset:null},
+  '/items':(offset,method,path,params)=>params.get('scope')==='top-level'?{items:[],nextOffset:null}:{items:[],nextOffset:null},
   '/archive':{items:[{archiveId:'archived-1',name:'Ｒｅｐｏｒｔ'}],nextOffset:null}
 },'Report');
 assert.equal(archivedDuplicate.valid,false,
@@ -283,23 +285,31 @@ assert.equal(archivedDuplicate.valid,false,
 assert.ok(archivedDuplicate.calls.some(call=>call.path.startsWith('/archive?')),
   'Name validation must include archived records, not only currently active items.');
 const selfEdit=await runNameValidation({
-  '/items':{items:[{id:'current-item',name:'Existing Name'}],nextOffset:null},
+  '/items':(offset,method,path,params)=>{
+    if(params.get('scope')==='top-level')return {items:[{id:'root-1',name:'Root'}],nextOffset:null};
+    if(params.get('rootParentId')==='root-1')return {items:[{id:'current-item',name:'Existing Name'}],nextOffset:null};
+    return {items:[],nextOffset:null};
+  },
   '/archive':{items:[],nextOffset:null}
 },' existing   name ','current-item');
 assert.equal(selfEdit.valid,true,
   'Editing an item without changing its normalized name must exclude that item itself.');
 const paginatedDuplicate=await runNameValidation({
-  '/items':offset=>offset===0?{items:[],nextOffset:250}:{items:[{id:'late-item',name:'Later Match'}],nextOffset:null},
-  '/archive':{items:[],nextOffset:null}
+  '/items':(offset,method,path,params)=>{
+    if(params.get('scope')==='top-level')return {items:[{id:'root-1',name:'Root'}],nextOffset:null};
+    if(params.get('rootParentId')==='root-1'&&offset===0)return {items:[],nextOffset:250};
+    if(params.get('rootParentId')==='root-1')return {items:[{id:'late-item',name:'Later Match'}],nextOffset:null};
+    return {items:[],nextOffset:null};
+  }
 },'later match');
 assert.equal(paginatedDuplicate.valid,false,
-  'Name validation must continue through subsequent active-item pages.');
-assert.equal(paginatedDuplicate.calls.length,2);
+  'Name validation must continue through subsequent active-root pages.');
+assert.equal(paginatedDuplicate.calls.length,3);
 const unavailableCheck=await runNameValidation({
   '/items':()=>{throw new Error('offline');}
 },'New Item');
 assert.equal(unavailableCheck.valid,false,
-  'Name validation must fail closed when the active item collection cannot be verified.');
+  'Name validation must fail closed when the active root list cannot be verified.');
 assert.deepEqual(unavailableCheck.messages,['nameCheckFailed']);
 assert.ok(html.includes("if(!(await validateUniqueItemName(name,currentId,form)))return;") &&
   html.includes('rollbackFailedItemMutation(mutation,isNew,previousItem);'),

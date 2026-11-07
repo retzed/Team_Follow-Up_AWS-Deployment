@@ -164,8 +164,8 @@ assert.deepEqual(Array.from(updatedRows[0].nested,item=>item.id),['f-pass','f-lo
  'Last updated date ranges remain applicable to nested Follow-ups; only the unsupported Due date filter is ignored.');
 
 filterFixture.ui.childDateMode='created';
-filterFixture.ui.childDateFrom='2026-11-04';
-filterFixture.ui.childDateTo='2026-11-30';
+filterFixture.ui.childDateFrom='2026-11-01';
+filterFixture.ui.childDateTo='2026-11-02';
 const createdRows=filterContext.childTreeFiltered({id:'p1'});
 assert.deepEqual(Array.from(createdRows[0].nested,item=>item.id),[],
  'Created date filters continue to apply to nested Follow-ups.');

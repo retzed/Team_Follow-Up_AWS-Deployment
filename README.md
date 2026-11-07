@@ -237,7 +237,7 @@ The AWS-backed application uses a JSON HTTP API. The frontend sends authenticate
 | `DELETE` | `/items/{itemId}` | Archives the requested item and its descendant subtree where applicable, and records the delete activity event. |
 | `POST` | `/archive/restore` | Restores selected archived records. JSON body: {"itemIds":["archive-item-id"]}. Required parent records must be active or included in a valid restore selection. |
 
-Item query filters use the stored values, such as type=project, status=in-progress, priority=high, dateMode=created or updated, direction=asc or desc, ISO date strings (from=YYYY-MM-DD / to=YYYY-MM-DD), and a bounded page limit with offset. List responses include items, count, and nextOffset. Activity responses include events and count. Public responses omit DynamoDB-only index attributes.
+Item query filters use the stored values, such as type=project, status=in-progress, priority=high, dateMode=created, updated, or due, direction=asc or desc, ISO date strings (from=YYYY-MM-DD / to=YYYY-MM-DD), and a bounded page limit with offset. Due-date mode returns only items that support a due date (Projects, Jobs, and Tasks); Follow-ups are excluded. List responses include items, count, and nextOffset. Activity responses include events and count. Public responses omit DynamoDB-only index attributes.
 
 Activity is append-oriented: POST /activity is rejected because events are written atomically with item mutations; PATCH and DELETE on /activity/{eventId} return 405 Method Not Allowed. Do not send requests with AWS credentials from the browser; Cognito access tokens, not AWS IAM keys, authorize application calls.
 

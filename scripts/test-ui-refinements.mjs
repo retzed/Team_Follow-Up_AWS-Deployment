@@ -152,7 +152,7 @@ assert.ok(finalPositionCss.includes('#mainContent .child-card .child-last-update
   finalPositionCss.includes('text-align:right!important'),
   'Child Last updated must remain visible and aligned to the physical bottom-right of each item card.');
 assert.ok(html.includes('id="childStatusFilterField"') && html.includes('child-filter-field'), 'The workspace status filter must have a type-aware field wrapper.');
-assert.ok(html.includes('id="childStatusFilterField"') && html.includes("class=\"child-filter-field ${ui.childType==='followup'?'is-filter-inapplicable':''}\""), 'The workspace status filter must remain visible and dimmed for Follow-ups.');
+assert.ok(html.includes('id="childStatusFilterField"') && html.includes("class=\"child-filter-field ${isJob||ui.childType==='followup'?'is-filter-inapplicable':''}\""), 'The workspace status filter must remain visible and dimmed when Follow-ups are selected or the current parent is a Job.');
 assert.ok(html.includes("class=\"account-search-field account-search-status-field ${ui.accountAssignedType==='followup'?'is-filter-inapplicable':''}\""), 'The Assigned Items status filter must remain visible and dimmed for Follow-ups.');
 assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only, independent of the outer page state.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"':''"), 'Only Assigned Items Tasks should explicitly request item-only history.');

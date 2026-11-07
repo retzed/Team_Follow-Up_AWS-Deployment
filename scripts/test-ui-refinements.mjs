@@ -151,7 +151,7 @@ assert.ok(finalPositionCss.includes('#mainContent .child-card .child-last-update
   finalPositionCss.includes('justify-content:flex-end!important') &&
   finalPositionCss.includes('text-align:right!important'),
   'Child Last updated must remain visible and aligned to the physical bottom-right of each item card.');
-assert.ok(html.includes('id="childStatusFilterField" class="child-filter-field"'), 'The workspace status filter must have a type-aware field wrapper.');
+assert.ok(html.includes('id="childStatusFilterField"') && html.includes('child-filter-field'), 'The workspace status filter must have a type-aware field wrapper.');
 assert.ok(html.includes('id="childStatusFilterField"') && html.includes("class=\"child-filter-field ${ui.childType==='followup'?'is-filter-inapplicable':''}\""), 'The workspace status filter must remain visible and dimmed for Follow-ups.');
 assert.ok(html.includes("class=\"account-search-field account-search-status-field ${ui.accountAssignedType==='followup'?'is-filter-inapplicable':''}\""), 'The Assigned Items status filter must remain visible and dimmed for Follow-ups.');
 assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only, independent of the outer page state.');
@@ -323,5 +323,9 @@ const activePredicate=html.slice(activePredicateStart,activePredicateEnd);
 assert.ok(activePredicate.includes('recentlyArchivedItemIds')&&activePredicate.includes('archiveId')&&activePredicate.includes('archivedAt')&&activePredicate.includes('deletedAt'),'Archived and deleted records must be excluded from every account view.');
 assert.ok(html.includes('ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;'),'Deleting an item must invalidate cached Assigned and Pinned results so they are reloaded from active records.');
 assert.ok(html.includes("function accountSearchResultsMarkup(){")&&html.includes("(data.parents||[]).filter(item=>isActiveItem(item))"),'Profile Search must render only active parent items.');
+const assignedFilterStart=html.indexOf('function filteredAccountAssignedItems(){');
+const assignedFilterEnd=html.indexOf('\nfunction accountAssignedSectionVisibility(',assignedFilterStart);
+assert.ok(assignedFilterStart>=0&&assignedFilterEnd>assignedFilterStart&&html.slice(assignedFilterStart,assignedFilterEnd).includes('.filter(item=>isActiveItem(item))'),'Assigned Items filtering must reject archived records.');
+assert.ok(html.includes('const activePinnedRows=(ui.accountPinnedRows||[]).filter(isActiveItem)'),'Pinned Items rendering must reject archived records even before a reload completes.');
 
 assert.ok(html.includes('ui.accountAssignedRows=(ui.accountAssignedRows||[]).filter(isActiveItem)') && html.includes('ui.accountPinnedRows=(ui.accountPinnedRows||[]).filter(isActiveItem)'), 'Demo real-time deletions must remove archived records from Assigned and Pinned caches regardless of assignee changes.');

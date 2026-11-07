@@ -131,9 +131,9 @@ filterFixture.children.set('t-pass',followups.filter(x=>x.parentId==='t-pass'));
 filterFixture.children.set('t-status-fail',followups.filter(x=>x.parentId==='t-status-fail'));
 filterFixture.children.set('t-due-fail',followups.filter(x=>x.parentId==='t-due-fail'));
 vm.runInNewContext(
- html.slice(childMatchStart,childMatchEnd)+'\\n'+
+ html.slice(childMatchStart,childMatchEnd)+'\n'+
  html.slice(childTreeStart,childTreeEnd)+
- '\\nthis.childTreeFiltered=childTreeFiltered;',
+ '\nthis.childTreeFiltered=childTreeFiltered;',
  filterContext
 );
 const filteredTaskRows=filterContext.childTreeFiltered({id:'p1'});

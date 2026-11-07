@@ -3108,7 +3108,7 @@ function itemCountText(n){return `${n} ${n===1?tr('item'):tr('items')}`;}
 function getItemSummary(parent,descendants=null){const all=Array.isArray(descendants)?descendants:allDescendants(parent.id);return {tasks:all.filter(x=>x.type==='task').length,followups:all.filter(x=>x.type==='followup').length,completed:all.filter(x=>x.type==='task'&&x.status==='completed').length,all};}
 function setSelectOptions(el,items,current){el.innerHTML=items.map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');}
 function dateModeOptions(){return [['updated',tr('lastUpdated')],['last-created',tr('lastCreated')],['created',tr('createdOldest')],['due',tr('dueDate')]];}
-function dateModeOptionsMarkup(current,includeDue=true){return dateModeOptions().map(([value,label])=>`<option value="${value}" ${value==='due'&&!includeDue?'disabled':''} ${current===value?'selected':''}>${esc(label)}</option>`).join('');}
+function dateModeOptionsMarkup(current,includeDue=true){return dateModeOptions().map(([value,label])=>`<option value="${value}" ${value==='due'&&!includeDue?'disabled class="is-filter-inapplicable-option"':''} ${current===value?'selected':''}>${esc(label)}</option>`).join('');}
 function applyTheme(){
  const theme=ui.theme==='light'?'light':'dark';if(ui.theme!==theme)ui.theme=theme;
  const root=document.documentElement;
@@ -3471,8 +3471,8 @@ function renderAccountPage(){
   const assignedCount=filteredAccountAssignedItems().length;
   panel=`<div class="account-panel-heading account-tab-heading"><div><h2>${esc(tr('accountAssigned'))}</h2></div><span class="account-pill" id="accountAssignedCount">${assignedCount} ${esc(tr('items'))}</span></div><div class="account-search-controls account-assigned-controls"><label class="account-search-field account-search-query-field"><span>${esc(tr('sidebarSearch'))}</span><input id="accountAssignedQuery" type="search" value="${esc(ui.accountAssignedQuery||'')}" autocomplete="off" placeholder="${esc(tr('searchAssignedPlaceholder'))}"></label><label class="account-search-field account-search-type-field"><span>${esc(tr('type'))}</span><select id="accountAssignedType" aria-label="${esc(tr('type'))}"><option value="all" ${(ui.accountAssignedType||'all')==='all'?'selected':''}>${esc(tr('allTypes'))}</option><option value="project" ${ui.accountAssignedType==='project'?'selected':''}>${esc(tr('project'))}</option><option value="job" ${ui.accountAssignedType==='job'?'selected':''}>${esc(tr('job'))}</option><option value="task" ${ui.accountAssignedType==='task'?'selected':''}>${esc(tr('task'))}</option><option value="followup" ${ui.accountAssignedType==='followup'?'selected':''}>${esc(tr('followup'))}</option></select></label><label class="account-search-field account-search-status-field ${ui.accountAssignedType==='followup'?'is-filter-inapplicable':''}"><span>${esc(tr('status'))}</span><select id="accountAssignedStatus" aria-label="${esc(tr('status'))}" ${ui.accountAssignedType==='followup'?'disabled':''}><option value="all" ${(ui.accountAssignedStatus||'all')==='all'?'selected':''}>${esc(tr('allStatuses'))}</option><option value="not-started" ${ui.accountAssignedStatus==='not-started'?'selected':''}>${esc(tr('notStarted'))}</option><option value="in-progress" ${ui.accountAssignedStatus==='in-progress'?'selected':''}>${esc(tr('inProgress'))}</option><option value="on-hold" ${ui.accountAssignedStatus==='on-hold'?'selected':''}>${esc(tr('onHold'))}</option><option value="completed" ${ui.accountAssignedStatus==='completed'?'selected':''}>${esc(tr('completed'))}</option><option value="not-completed" ${ui.accountAssignedStatus==='not-completed'?'selected':''}>${esc(tr('notCompleted'))}</option></select></label><label class="account-search-field account-search-priority-field"><span>${esc(tr('priority'))}</span><select id="accountAssignedPriority" aria-label="${esc(tr('priority'))}"><option value="all" ${(ui.accountAssignedPriority||'all')==='all'?'selected':''}>${esc(tr('allAssignedItems'))}</option><option value="urgent" ${ui.accountAssignedPriority==='urgent'?'selected':''}>${esc(tr('urgent'))}</option><option value="high" ${ui.accountAssignedPriority==='high'?'selected':''}>${esc(tr('high'))}</option><option value="medium" ${ui.accountAssignedPriority==='medium'?'selected':''}>${esc(tr('medium'))}</option><option value="low" ${ui.accountAssignedPriority==='low'?'selected':''}>${esc(tr('low'))}</option></select></label><label class="account-search-field account-search-date-mode-field ${ui.accountAssignedType==='followup'&&ui.accountAssignedDateMode==='due'?'is-filter-inapplicable':''}"><span>${esc(tr('dateList'))}</span><select id="accountAssignedDateMode" aria-label="${esc(tr('dateList'))}">${dateModeOptionsMarkup(ui.accountAssignedDateMode,ui.accountAssignedType!=='followup')}</select></label><div class="account-search-date-range ${ui.accountAssignedType==='followup'&&ui.accountAssignedDateMode==='due'?'is-filter-inapplicable':''}"><label class="account-search-field account-search-date-from-field"><span>${esc(tr('from'))}</span><input id="accountAssignedDateFrom" type="date" value="${esc(ui.accountAssignedDateFrom||'')}" aria-label="${esc(tr('from'))}" ${ui.accountAssignedType==='followup'&&ui.accountAssignedDateMode==='due'?'disabled':''}></label><label class="account-search-field account-search-date-to-field"><span>${esc(tr('to'))}</span><input id="accountAssignedDateTo" type="date" value="${esc(ui.accountAssignedDateTo||'')}" aria-label="${esc(tr('to'))}" ${ui.accountAssignedType==='followup'&&ui.accountAssignedDateMode==='due'?'disabled':''}></label></div><button class="subtle-btn clear-text-action account-search-clear-button" type="button" data-action="clear-account-assigned-filters">${icon('filter',13)} ${esc(tr('clear'))}</button></div><div id="accountAssignedResults">${accountAssignedResultsMarkup()}</div>`;
  } else {
-  const pinnedSections=accountPinnedSections(ui.accountPinnedRows);
-  panel=`<div class="account-panel-heading account-tab-heading"><div><h2>${esc(tr('accountPinned'))}</h2></div><span class="account-pill">${ui.accountPinnedRows.length} ${esc(tr('items'))}</span></div>${ui.accountPinnedLoading?`<div class="account-empty">${spinnerMarkup(tr('loadingPinned'),true)}</div>`:ui.accountPinnedError?`<div class="account-notice">${esc(ui.accountPinnedError)}</div>`:ui.accountPinnedRows.length?`<div class="account-assigned-sections">${accountAssignedSectionMarkup('taskFollowups',pinnedSections.taskFollowups)}${accountAssignedSectionMarkup('projectsJobs',pinnedSections.projectsJobs)}</div>`:`<div class="account-empty">${icon('pin',24)}<div>${esc(tr('noPinnedItems'))}</div></div>`}`;
+  const activePinnedRows=(ui.accountPinnedRows||[]).filter(isActiveItem);const pinnedSections=accountPinnedSections(activePinnedRows);
+  panel=`<div class="account-panel-heading account-tab-heading"><div><h2>${esc(tr('accountPinned'))}</h2></div><span class="account-pill">${activePinnedRows.length} ${esc(tr('items'))}</span></div>${ui.accountPinnedLoading?`<div class="account-empty">${spinnerMarkup(tr('loadingPinned'),true)}</div>`:ui.accountPinnedError?`<div class="account-notice">${esc(ui.accountPinnedError)}</div>`:activePinnedRows.length?`<div class="account-assigned-sections">${accountAssignedSectionMarkup('taskFollowups',pinnedSections.taskFollowups)}${accountAssignedSectionMarkup('projectsJobs',pinnedSections.projectsJobs)}</div>`:`<div class="account-empty">${icon('pin',24)}<div>${esc(tr('noPinnedItems'))}</div></div>`}`;
  }
  if(ui.accountTab==='search'){const accountSearchMarkup=accountSearchResultsMarkup();panel=`<div class="account-panel-heading account-tab-heading"><div><h2>${esc(tr('accountSearch'))}</h2></div><span class="account-pill" id="accountSearchCount">${ui.accountSearchResultCount||0} ${esc(tr('items'))}</span></div><div class="account-search-controls"><label class="account-search-field account-search-query-field"><span>${esc(tr('accountSearch'))}</span><input id="accountSearchQuery" type="search" value="${esc(ui.accountSearchQuery||'')}" autocomplete="off" placeholder="${esc(tr('searchPlaceholder'))}"></label><label class="account-search-field account-search-type-field"><span>${esc(tr('type'))}</span><select id="accountSearchType" aria-label="${esc(tr('type'))}"><option value="all" ${ui.accountSearchType==='all'?'selected':''}>${esc(tr('allTypes'))}</option><option value="project" ${ui.accountSearchType==='project'?'selected':''}>${esc(tr('project'))}</option><option value="job" ${ui.accountSearchType==='job'?'selected':''}>${esc(tr('job'))}</option></select></label><label class="account-search-field account-search-status-field"><span>${esc(tr('status'))}</span><select id="accountSearchStatus" aria-label="${esc(tr('status'))}"><option value="all" ${ui.accountSearchStatus==='all'?'selected':''}>${esc(tr('allStatuses'))}</option><option value="not-completed" ${ui.accountSearchStatus==='not-completed'?'selected':''}>${esc(tr('notCompleted'))}</option><option value="not-started" ${ui.accountSearchStatus==='not-started'?'selected':''}>${esc(tr('notStarted'))}</option><option value="in-progress" ${ui.accountSearchStatus==='in-progress'?'selected':''}>${esc(tr('inProgress'))}</option><option value="on-hold" ${ui.accountSearchStatus==='on-hold'?'selected':''}>${esc(tr('onHold'))}</option><option value="completed" ${ui.accountSearchStatus==='completed'?'selected':''}>${esc(tr('completed'))}</option></select></label><label class="account-search-field account-search-date-mode-field"><span>${esc(tr('dateList'))}</span><select id="accountSearchDateMode" aria-label="${esc(tr('dateList'))}">${dateModeOptionsMarkup(ui.accountSearchDateMode)}</select></label><label class="account-search-field account-search-user-field"><span>${esc(tr('accountSearchUserLabel'))}</span><select id="accountSearchUser" aria-label="${esc(tr('accountSearchUserLabel'))}"><option value="all" ${(ui.accountSearchUser||'all')==='all'?'selected':''}>${esc(tr('accountSearchAllUsers'))}</option>${(data.users||[]).slice().sort((a,b)=>String(person(a.id).name).localeCompare(String(person(b.id).name))).map(member=>`<option value="${esc(member.id)}" ${String(ui.accountSearchUser||'all')===String(member.id)?'selected':''}>${esc(person(member.id).name)}</option>`).join('')}</select></label><div class="account-search-date-range"><label class="account-search-field account-search-date-from-field"><span>${esc(tr('from'))}</span><input id="accountSearchDateFrom" type="date" value="${esc(ui.accountSearchDateFrom||'')}" aria-label="${esc(tr('from'))}"></label><label class="account-search-field account-search-date-to-field"><span>${esc(tr('to'))}</span><input id="accountSearchDateTo" type="date" value="${esc(ui.accountSearchDateTo||'')}" aria-label="${esc(tr('to'))}"></label></div><button class="subtle-btn clear-text-action account-search-clear-button" type="button" data-action="clear-account-search">${icon('filter',13)} ${esc(tr('clear'))}</button></div><div id="accountSearchResults" class="account-search-results">${accountSearchMarkup}</div>`;}
  const heroUser=user||currentUser();
@@ -3490,7 +3490,7 @@ async function refreshAccountProfileForForm(){
  finally{if(requestId===ui.accountProfileRefreshToken&&ui.page==='account'&&ui.accountTab==='profile'&&userId===String(ui.actingUserId||''))renderAccountPage();}
 }
 async function openAccountTab(tab){const next=['profile','assigned','pinned','search'].includes(tab)?tab:'profile';ui.page='account';ui.accountTab=next;render();if(next==='profile')void refreshAccountProfileForForm();if(next==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();if(next==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();}
-const recentlyArchivedItemIds=new Set();
+const recentlyArchivedItemIds=new Set();let accountItemsRequestGeneration=0;
 function isActiveItem(item){
  const id=String(item?.id||item?.itemId||'');
  return !!id&&!recentlyArchivedItemIds.has(id)&&!item?.deletedAt&&!item?.archivedAt&&!item?.isArchived;
@@ -3510,16 +3510,81 @@ async function resolveActiveAccountItems(rows,api,hydration){
 }
 
 async function loadAccountAssignedItems(){
- if(ui.accountAssignedLoading)return;ui.accountAssignedLoading=true;ui.accountAssignedError='';const hydration=workspaceHydrationGeneration;renderAccountPage();
- try{const api=window.TeamFollowUpDataApi;if(!api?.queryAssigned)throw new Error(tr('assignedLoadFailed'));const rows=[];let offset=0,pages=0;while(true){const result=await api.queryAssigned(ui.actingUserId,{dateMode:'updated',direction:'desc',limit:250,offset});rows.push(...(Array.isArray(result?.items)?result.items:[]));const next=result?.nextOffset;if(next===undefined||next===null)break;const parsed=Number(next);if(!Number.isFinite(parsed)||parsed<=offset||++pages>1000)throw new Error('Assignment pagination did not advance.');offset=parsed;}if(hydration!==workspaceHydrationGeneration)return;const activeRows=await resolveActiveAccountItems(rows,api,hydration);if(hydration!==workspaceHydrationGeneration)return;const hydratedRows=await hydrateAccountAssignedParentNames(activeRows,api,hydration);if(hydration!==workspaceHydrationGeneration)return;const unique=new Map();for(const rawItem of mergeRealtimeItemOverlays(hydratedRows,item=>String(item.ownerId||'')===String(ui.actingUserId))){const item={...rawItem,id:String(rawItem.id||rawItem.itemId||'')};if(item.id){unique.set(item.id,item);assignedItemCache.set(item.id,item);}}ui.accountAssignedRows=[...unique.values()];ui.accountAssignedLoaded=true;}
- catch(error){if(hydration===workspaceHydrationGeneration)ui.accountAssignedError=String(error?.message||tr('assignedLoadFailed'));}
- finally{if(hydration===workspaceHydrationGeneration){ui.accountAssignedLoading=false;if(ui.page==='account'&&ui.accountTab==='assigned')renderAccountPage();if(realtimeAssignedRefreshPending&&ui.page==='account'&&ui.accountTab==='assigned'){realtimeAssignedRefreshPending=false;queueMicrotask(()=>void loadAccountAssignedItems());}}}
+ if(ui.accountAssignedLoading)return;
+ ui.accountAssignedLoading=true;ui.accountAssignedError='';
+ const hydration=workspaceHydrationGeneration,requestGeneration=accountItemsRequestGeneration;renderAccountPage();
+ try{
+  const api=window.TeamFollowUpDataApi;if(!api?.queryAssigned)throw new Error(tr('assignedLoadFailed'));
+  const rows=[];let offset=0,pages=0;
+  while(true){
+   const result=await api.queryAssigned(ui.actingUserId,{dateMode:'updated',direction:'desc',limit:250,offset});
+   rows.push(...(Array.isArray(result?.items)?result.items:[]));
+   const next=result?.nextOffset;if(next===undefined||next===null)break;
+   const parsed=Number(next);if(!Number.isFinite(parsed)||parsed<=offset||++pages>1000)throw new Error('Assignment pagination did not advance.');
+   offset=parsed;
+  }
+  if(hydration!==workspaceHydrationGeneration||requestGeneration!==accountItemsRequestGeneration)return;
+  const activeRows=await resolveActiveAccountItems(rows,api,hydration);
+  if(hydration!==workspaceHydrationGeneration||requestGeneration!==accountItemsRequestGeneration)return;
+  const hydratedRows=await hydrateAccountAssignedParentNames(activeRows,api,hydration);
+  if(hydration!==workspaceHydrationGeneration||requestGeneration!==accountItemsRequestGeneration)return;
+  const overlayRows=typeof mergeRealtimeItemOverlays==='function'
+   ?mergeRealtimeItemOverlays(hydratedRows,item=>String(item.ownerId||'')===String(ui.actingUserId))
+   :hydratedRows;
+  const unique=new Map();
+  for(const rawItem of overlayRows.filter(isActiveItem)){
+   const item={...rawItem,id:String(rawItem.id||rawItem.itemId||'')};
+   if(item.id){unique.set(item.id,item);assignedItemCache.set(item.id,item);}
+  }
+  ui.accountAssignedRows=[...unique.values()];ui.accountAssignedLoaded=true;
+ }catch(error){
+  if(hydration===workspaceHydrationGeneration&&requestGeneration===accountItemsRequestGeneration)
+   ui.accountAssignedError=String(error?.message||tr('assignedLoadFailed'));
+ }finally{
+  if(hydration===workspaceHydrationGeneration&&requestGeneration===accountItemsRequestGeneration){
+   ui.accountAssignedLoading=false;
+   if(ui.page==='account'&&ui.accountTab==='assigned')renderAccountPage();
+   if(realtimeAssignedRefreshPending&&ui.page==='account'&&ui.accountTab==='assigned'){
+    realtimeAssignedRefreshPending=false;queueMicrotask(()=>void loadAccountAssignedItems());
+   }
+  }
+ }
 }
 async function loadAccountPinnedItems(){
- if(ui.accountPinnedLoading)return;ui.accountPinnedLoading=true;ui.accountPinnedError='';const hydration=workspaceHydrationGeneration;renderAccountPage();
- try{const api=window.TeamFollowUpDataApi,ids=[...(rawCurrentUser()?.pinnedItemIds||[])].map(String);if(!api?.resolveItems)throw new Error(tr('pinLoadFailed'));const rows=[];for(let start=0;start<ids.length;start+=100){const result=await api.resolveItems(ids.slice(start,start+100));rows.push(...(Array.isArray(result?.items)?result.items:[]));}if(hydration!==workspaceHydrationGeneration)return;const hydratedRows=await hydrateAccountAssignedParentNames(rows,api,hydration);if(hydration!==workspaceHydrationGeneration)return;const found=new Map();for(const rawItem of hydratedRows){const item={...rawItem,id:String(rawItem.id||rawItem.itemId||'')};if(item.id){found.set(item.id,item);assignedItemCache.set(item.id,item);}}const orderedPins=orderedPinnedItems(ids,found);ui.accountPinnedRows=orderedPins.rows;if(orderedPins.validIds.length!==ids.length){const result=await api.updateMyPins(orderedPins.validIds);if(result?.user)mergeProfileIntoData(result.user);}ui.accountPinnedLoaded=true;}
- catch(error){if(hydration===workspaceHydrationGeneration)ui.accountPinnedError=String(error?.message||tr('pinLoadFailed'));}
- finally{if(hydration===workspaceHydrationGeneration){ui.accountPinnedLoading=false;if(ui.page==='account'&&ui.accountTab==='pinned')renderAccountPage();}}
+ if(ui.accountPinnedLoading)return;
+ ui.accountPinnedLoading=true;ui.accountPinnedError='';
+ const hydration=workspaceHydrationGeneration,requestGeneration=accountItemsRequestGeneration;renderAccountPage();
+ try{
+  const api=window.TeamFollowUpDataApi,ids=[...(rawCurrentUser()?.pinnedItemIds||[])].map(String);
+  if(!api?.resolveItems)throw new Error(tr('pinLoadFailed'));
+  const rows=[];for(let start=0;start<ids.length;start+=100){
+   const result=await api.resolveItems(ids.slice(start,start+100));
+   rows.push(...(Array.isArray(result?.items)?result.items:[]));
+  }
+  if(hydration!==workspaceHydrationGeneration||requestGeneration!==accountItemsRequestGeneration)return;
+  const hydratedRows=await hydrateAccountAssignedParentNames(rows.filter(isActiveItem),api,hydration);
+  if(hydration!==workspaceHydrationGeneration||requestGeneration!==accountItemsRequestGeneration)return;
+  const found=new Map();
+  for(const rawItem of hydratedRows.filter(isActiveItem)){
+   const item={...rawItem,id:String(rawItem.id||rawItem.itemId||'')};
+   if(item.id){found.set(item.id,item);assignedItemCache.set(item.id,item);}
+  }
+  const orderedPins=orderedPinnedItems(ids,found);
+  ui.accountPinnedRows=orderedPins.rows.filter(isActiveItem);
+  if(orderedPins.validIds.length!==ids.length){
+   const result=await api.updateMyPins(orderedPins.validIds);
+   if(result?.user)mergeProfileIntoData(result.user);
+  }
+  ui.accountPinnedLoaded=true;
+ }catch(error){
+  if(hydration===workspaceHydrationGeneration&&requestGeneration===accountItemsRequestGeneration)
+   ui.accountPinnedError=String(error?.message||tr('pinLoadFailed'));
+ }finally{
+  if(hydration===workspaceHydrationGeneration&&requestGeneration===accountItemsRequestGeneration){
+   ui.accountPinnedLoading=false;
+   if(ui.page==='account'&&ui.accountTab==='pinned')renderAccountPage();
+  }
+ }
 }
 async function togglePinnedItem(itemId){
  const id=String(itemId||''),user=rawCurrentUser();if(!id||!user||user.id==='root')return;const old=[...(user.pinnedItemIds||[])].map(String),next=old.includes(id)?old.filter(value=>value!==id):[...old,id];
@@ -4249,19 +4314,20 @@ function validateParentType(parentId,type){return allowedChildTypes(parentId).in
 function descendantsIds(id){return allDescendants(id).map(x=>x.id);}
 function deleteItem(id){
  const item=allItem(id);if(!item)return;
+ const wasAssignedLoading=ui.accountAssignedLoading,wasPinnedLoading=ui.accountPinnedLoading;accountItemsRequestGeneration++;ui.accountAssignedLoading=false;ui.accountPinnedLoading=false;if(wasAssignedLoading)ui.accountAssignedLoaded=false;if(wasPinnedLoading)ui.accountPinnedLoaded=false;
  const isRoot=item.type==='project'||item.type==='job';
  // Follow-ups are leaves by model, so avoid building/traversing the hierarchy for a single follow-up delete.
- const doomedItems=item.type==='followup'?[item]:[item,...allDescendants(id)];const doomed=new Set(doomedItems.map(x=>String(x.id)));for(const doomedId of doomed)recentlyArchivedItemIds.add(doomedId);const deletedAt=nowISO();
- ui.accountAssignedRows=(ui.accountAssignedRows||[]).filter(row=>!doomed.has(String(row.id||row.itemId||'')));
- ui.accountPinnedRows=(ui.accountPinnedRows||[]).filter(row=>!doomed.has(String(row.id||row.itemId||'')));
+ const doomedItems=item.type==='followup'?[item]:[item,...allDescendants(id)];const doomed=new Set(doomedItems.map(x=>String(x.id)));if(isRoot||item.type==='task'){const knownRows=[...(data.parents||[]),...(data.children||[]),...[...(assignedItemCache?.values?.()||[])],...(ui.accountAssignedRows||[]),...(ui.accountPinnedRows||[])];let changed=true;while(changed){changed=false;for(const row of knownRows){const rowId=String(row?.id||row?.itemId||''),parentKey=String(row?.parentId||''),rowRoot=String(row?.rootParentId||'');if(!rowId||doomed.has(rowId))continue;if(doomed.has(parentKey)||(isRoot&&rowRoot===String(id))){doomed.add(rowId);doomedItems.push(row);changed=true;}}}}for(const doomedId of doomed)recentlyArchivedItemIds.add(doomedId);const deletedAt=nowISO();
+ ui.accountAssignedRows=(ui.accountAssignedRows||[]).filter(row=>!doomed.has(String(row.id||row.itemId||''))&&isActiveItem(row));
+ ui.accountPinnedRows=(ui.accountPinnedRows||[]).filter(row=>!doomed.has(String(row.id||row.itemId||''))&&isActiveItem(row));
  for(const doomedId of doomed)assignedItemCache.delete(doomedId);
- const pinnedUser=rawCurrentUser();
+ const pinnedUser=rawCurrentUser();let pinsWrite=Promise.resolve();
  const existingPins=(pinnedUser?.pinnedItemIds||[]).map(String);
  const remainingPins=existingPins.filter(pinId=>!doomed.has(pinId));
  if(pinnedUser&&remainingPins.length!==existingPins.length){
   pinnedUser.pinnedItemIds=remainingPins;
   const pinsApi=window.TeamFollowUpDataApi;
-  if(pinsApi?.updateMyPins)void pinsApi.updateMyPins(remainingPins).then(result=>{if(result?.user)mergeProfileIntoData(result.user);}).catch(error=>console.warn('Could not remove archived items from the pinned list.',error));
+  if(pinsApi?.updateMyPins)pinsWrite=pinsApi.updateMyPins(remainingPins).then(result=>{if(result?.user)mergeProfileIntoData(result.user);}).catch(error=>console.warn('Could not remove archived items from the pinned list.',error));
  }
  // Record a single immutable summary for the user-initiated delete, even when it archives a subtree.
  const affectedDescendantCount=Math.max(0,doomedItems.length-1);
@@ -4272,7 +4338,7 @@ function deleteItem(id){
  // just to bump its timestamp; the DELETE endpoint can archive a lone follow-up in one request.
  data.children=data.children.filter(c=>!doomed.has(c.id));data.parents=data.parents.filter(p=>!doomed.has(p.id));invalidateHierarchyIndex();
  if(isRoot){ui.selectedParentId=defaultWorkspaceParentId(data.parents);ui.tab='overview';}
- ui.expanded.forEach(x=>{if(doomed.has(x))ui.expanded.delete(x);});persist();ui.modal=null;
+ ui.expanded.forEach(x=>{if(doomed.has(x))ui.expanded.delete(x);});const deleteWrite=persist();ui.modal=null;void Promise.all([Promise.resolve(deleteWrite),pinsWrite]).then(()=>{if(wasAssignedLoading){ui.accountAssignedLoaded=false;if(ui.page==='account'&&ui.accountTab==='assigned'&&!ui.accountAssignedLoading)void loadAccountAssignedItems();}if(wasPinnedLoading){ui.accountPinnedLoaded=false;if(ui.page==='account'&&ui.accountTab==='pinned'&&!ui.accountPinnedLoading)void loadAccountPinnedItems();}});
  if(!data.parents.length){render();toast(tr('deleted'));return;}
  render();toast(tr('deleted'));
  // After deleting the selected Project/Job, hydrate the automatically selected replacement.
@@ -4476,7 +4542,7 @@ function syncTypeSpecificFields(type){const followup=type==='followup';const sf=
  if(!selected.length&&item)selected=itemAssigneeIds(item);
  // The parent creator is only the initial fallback for a new Follow-up. Never
  // replace assignees already selected by the user when its parent changes.
- if(modal?.kind==='new-child'&&type==='followup'&&!selected.length){
+ if(modal?.kind==='new-child'&&type==='followup'&&!selected.length&&mode!=='none'){
   const parent=allItem($('#formParent')?.value||modal?.parentId||item?.parentId||'');
   const creator=parentCreatorAssigneeId(parent);
   selected=creator?[creator]:[];
@@ -4762,19 +4828,39 @@ async function applyRealtimeChangeBatch(changes){
  const missing=resolveIds.filter(id=>!resolvedById.has(id));
  if(missing.length)throw new Error('A real-time item is not visible in the consistent item read yet: '+missing.join(', '));
  for(const item of resolvedById.values()){
+  recentlyArchivedItemIds.delete(String(item.id||''));
   rememberRealtimeItem(item);
   upsertRealtimeWorkspaceItem(item);
  }
  for(const id of deletedIds){
+  recentlyArchivedItemIds.add(String(id));assignedItemCache.delete(String(id));
   forgetRealtimeItem(id);
   removeRealtimeWorkspaceItem(id);
  }
  for(const rootId of deletedRootIds){
-  for(const row of [...(data.children||[])])if(String(row.rootParentId||'')===rootId){forgetRealtimeItem(row.id);removeRealtimeWorkspaceItem(row.id);}
-  for(const [id,row] of [...realtimeItemOverlay])if(String(row.rootParentId||'')===rootId)forgetRealtimeItem(id);
+  for(const row of [...(data.children||[])])if(String(row.rootParentId||'')===rootId){recentlyArchivedItemIds.add(String(row.id));assignedItemCache.delete(String(row.id));forgetRealtimeItem(row.id);removeRealtimeWorkspaceItem(row.id);}
+  for(const [id,row] of [...realtimeItemOverlay])if(String(row.rootParentId||'')===rootId){recentlyArchivedItemIds.add(String(id));assignedItemCache.delete(String(id));forgetRealtimeItem(id);}
   forgetRealtimeItem(rootId);removeRealtimeWorkspaceItem(rootId);
  }
  invalidateHierarchyIndex();
+ if(deletedIds.size||deletedRootIds.size){
+  accountItemsRequestGeneration++;
+  const assignedWasLoading=ui.accountAssignedLoading,pinnedWasLoading=ui.accountPinnedLoading;
+  ui.accountAssignedLoading=false;ui.accountPinnedLoading=false;
+  if(assignedWasLoading)ui.accountAssignedLoaded=false;
+  if(pinnedWasLoading)ui.accountPinnedLoaded=false;
+  const isDeletedRow=row=>deletedIds.has(String(row?.id||row?.itemId||''))||deletedRootIds.has(String(row?.rootParentId||rootParent(row)?.id||''));
+  ui.accountAssignedRows=(ui.accountAssignedRows||[]).filter(row=>isActiveItem(row)&&!isDeletedRow(row));
+  ui.accountPinnedRows=(ui.accountPinnedRows||[]).filter(row=>isActiveItem(row)&&!isDeletedRow(row));
+  const pinUser=rawCurrentUser(),oldPins=(pinUser?.pinnedItemIds||[]).map(String),activePins=oldPins.filter(id=>!deletedIds.has(id));
+  if(pinUser&&activePins.length!==oldPins.length&&api.updateMyPins){
+   void api.updateMyPins(activePins).then(result=>{if(result?.user)mergeProfileIntoData(result.user);}).catch(error=>console.warn('Could not remove remotely archived items from Pins.',error));
+  }
+  queueMicrotask(()=>{
+   if(assignedWasLoading&&ui.page==='account'&&ui.accountTab==='assigned'&&!ui.accountAssignedLoading)void loadAccountAssignedItems();
+   if(pinnedWasLoading&&ui.page==='account'&&ui.accountTab==='pinned'&&!ui.accountPinnedLoading)void loadAccountPinnedItems();
+  });
+ }
  const activityItemIds=[...new Set([...updatedIds,...deletedIds])];
  const activityRows=[];
  if(activityItemIds.length&&typeof api.queryActivityForItems==='function'){
@@ -4802,7 +4888,7 @@ async function applyRealtimeChangeBatch(changes){
    const assigned=new Map((ui.accountAssignedRows||[]).map(row=>[String(row.id),row]));
    for(const id of new Set([...updatedIds,...deletedIds]))assigned.delete(id);
    for(const item of resolvedById.values())if(item.assigneeMode==='all'||(item.assigneeMode!=='none'&&(Array.isArray(item.assigneeIds)?item.assigneeIds:[item.ownerId]).some(id=>String(id||'')===currentUserId)))assigned.set(String(item.id),item);
-   ui.accountAssignedRows=[...assigned.values()];
+   ui.accountAssignedRows=[...assigned.values()].filter(isActiveItem);
    if(ui.page==='account'&&ui.accountTab==='assigned')renderAccountPage();
   }else if(ui.page==='account'&&ui.accountTab==='assigned')void loadAccountAssignedItems();
  }
@@ -4810,7 +4896,7 @@ async function applyRealtimeChangeBatch(changes){
   const pinned=new Map((ui.accountPinnedRows||[]).map(row=>[String(row.id),row]));
   for(const id of new Set([...updatedIds,...deletedIds]))pinned.delete(id);
   for(const item of resolvedById.values())if(pinned.has(String(item.id)))pinned.set(String(item.id),item);
-  ui.accountPinnedRows=[...pinned.values()];
+  ui.accountPinnedRows=[...pinned.values()].filter(isActiveItem);
   if(ui.page==='account'&&ui.accountTab==='pinned')renderAccountPage();
  }
  const parentListChanged=[...resolvedById.values()].some(item=>item.type==='project'||item.type==='job')||deletedRootIds.size>0;
@@ -7789,6 +7875,7 @@ body.signin-open .scroll-to-top {
 </style>
 <style id="followup-filter-dim-state">
 .is-filter-inapplicable{opacity:.48!important;filter:saturate(.55)!important}
+.is-filter-inapplicable-option{color:var(--muted)!important}
 .is-filter-inapplicable select:disabled,
 .is-filter-inapplicable input:disabled{cursor:not-allowed!important}
 </style>

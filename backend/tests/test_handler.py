@@ -1224,6 +1224,79 @@ class MultiAssigneeTests(unittest.TestCase):
         self.assertEqual(item["assigneeIds"], [])
         self.assertIsNone(item["ownerId"])
 
+    def test_validate_item_allows_none_assignees_for_followups(self):
+        parent = {
+            "itemId": "project-followup-none",
+            "type": "project",
+            "createdByUserId": "u1",
+            "rootParentId": "project-followup-none",
+        }
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "followup-none",
+                "type": "followup",
+                "parentId": "project-followup-none",
+                "name": "Unassigned follow-up",
+                "assigneeMode": "none",
+                "assigneeIds": [],
+            })
+        self.assertEqual(item["assigneeMode"], "none")
+        self.assertEqual(item["assigneeIds"], [])
+        self.assertIsNone(item["ownerId"])
+
+    def test_parent_with_active_children_cannot_be_set_to_not_started(self):
+        previous = {
+            "itemId": "project-has-child",
+            "type": "project",
+            "name": "Parent with child",
+            "status": "in-progress",
+            "createdByUserId": "u1",
+            "createdAt": "2026-11-07T10:00:00.000Z",
+            "version": 2,
+        }
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler, "has_active_children", return_value=True),
+        ):
+            with self.assertRaisesRegex(ValueError, "cannot have Not started status"):
+                handler.validate_item({}, {
+                    "itemId": "project-has-child",
+                    "type": "project",
+                    "name": "Parent with child",
+                    "status": "not-started",
+                }, previous=previous)
+
+    def test_child_creation_prepares_atomic_parent_activation(self):
+        parent = {
+            "itemId": "task-parent",
+            "type": "task",
+            "status": "not-started",
+            "version": 4,
+            "rootParentId": "project-root",
+        }
+        audit = [{"eventId": "parent-status-event"}]
+        change = {"changeId": "parent-status-change"}
+        realtime_write = {"Put": {"TableName": "UnitTest-Realtime"}}
+        with (
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+            patch.object(handler, "index_work_item", side_effect=lambda row: row),
+            patch.object(handler, "build_audit_events", return_value=audit),
+            patch.object(handler, "make_realtime_change", return_value=change),
+            patch.object(handler, "realtime_change_put", return_value=realtime_write),
+        ):
+            result = handler.prepare_parent_activation_for_child(
+                "task-parent", {"userId": "u1"}, "2026-11-07T12:00:00.000Z"
+            )
+        self.assertEqual(result["item"]["status"], "in-progress")
+        self.assertEqual(result["item"]["version"], 5)
+        self.assertEqual(result["events"], audit)
+        self.assertEqual(result["change"], change)
+        self.assertEqual(len(result["extra_writes"]), 3)
+        self.assertIs(result["extra_writes"][-1], realtime_write)
+
     def test_validate_item_resolves_all_users_from_enabled_team_roster(self):
         roster = [
             {"userId": "u2", "enabled": True},

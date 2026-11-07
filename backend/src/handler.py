@@ -553,8 +553,6 @@ def validate_item(event, item, previous=None):
         else:
             assignment_mode='selected' if requested_assignee_ids else ''
         item['assigneeMode']=assignment_mode
-    if kind=='followup':
-        assignment_mode=assignment_mode or 'none'
         item['assigneeMode']=assignment_mode
     if len(requested_assignee_ids)>20 and assignment_mode!='all':
         raise ValueError('At most 20 team members can be assigned to one item.')
@@ -624,6 +622,8 @@ def validate_item(event, item, previous=None):
             current_owner=str(item.get('ownerId') or '').strip()
             if current_owner!=str(previous.get('ownerId') or '') and item_assignee_ids({'type':'followup','assigneeIds':item.get('assigneeIds',previous_ids)})==previous_ids:
                 requested_assignee_ids=[current_owner] if current_owner else []
+        assignment_mode=assignment_mode or 'none'
+        item['assigneeMode']=assignment_mode
     if previous is not None and kind!='followup' and item.get('status')=='not-started' and has_active_children(item_id):
         raise ValueError('An item with child items cannot have Not started status.')
     normalized_assignee_ids=[]

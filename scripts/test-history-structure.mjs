@@ -452,10 +452,10 @@ const pinnedLoaderStart=html.indexOf('async function loadAccountPinnedItems(){')
 const pinnedLoaderEnd=html.indexOf('\nasync function ',pinnedLoaderStart+20);
 assert.ok(pinnedLoaderStart>=0&&pinnedLoaderEnd>pinnedLoaderStart,'Pinned Items loading must remain isolated.');
 const pinnedLoaderSource=html.slice(pinnedLoaderStart,pinnedLoaderEnd);
-assert.ok(pinnedLoaderSource.includes('hydrateAccountAssignedParentNames(rows,api,hydration)')&&pinnedLoaderSource.includes('orderedPinnedItems(ids,found)'), 'Pinned child rows must resolve immediate parent names and use pin-order display sequencing.');
+assert.ok(pinnedLoaderSource.includes('hydrateAccountAssignedParentNames(rows.filter(isActiveItem),api,hydration)')&&pinnedLoaderSource.includes('orderedPinnedItems(ids,found)'), 'Pinned child rows must resolve immediate parent names and use pin-order display sequencing.');
 assert.ok(pinnedLoaderSource.includes('updateMyPins(orderedPins.validIds)'), 'Stale-pin cleanup must persist the original sequence, not the reversed display order.');
 
-const pinnedPanelStart=html.indexOf('const pinnedSections=accountPinnedSections(ui.accountPinnedRows);');
+const pinnedPanelStart=html.indexOf('const activePinnedRows=(ui.accountPinnedRows||[]).filter(isActiveItem);const pinnedSections=accountPinnedSections(activePinnedRows);');
 const pinnedPanelEnd=html.indexOf("\n }\n if(ui.accountTab==='search')",pinnedPanelStart);
 assert.ok(pinnedPanelStart>=0&&pinnedPanelEnd>pinnedPanelStart,'The Pinned Items panel must render its two sections independently of search filters.');
 const pinnedPanelSource=html.slice(pinnedPanelStart,pinnedPanelEnd);

@@ -3,7 +3,7 @@
 ## 7 November 2026 — Follow-ups no longer have status or due date
 
 - Follow-ups no longer expose, persist, filter, or display status and due-date fields. Projects, Jobs, and Tasks retain their existing status and optional due-date behavior.
-- Task → Follow-up conversion removes both task-only values; Follow-up → Task restores the controls with status set to Not Started and no due date.
+- Task → Follow-up conversion removes both task-only values; Follow-up → Task restores the controls, defaults status to Not Started, and preserves a due date selected during conversion.
 - Status filters and Not Completed counts exclude Follow-ups; due-date filtering/sorting excludes Follow-ups. Legacy Follow-up attributes are stripped during API validation/response mapping, archive creation, and restore.
 - Restored child-item Last updated metadata in the workspace, centered the scroll-to-top control, and made Assigned Items Task history open with This item only selected by default.
 - Added frontend and backend regression coverage. No DynamoDB table/index migration is required because the removed attributes are optional item attributes.

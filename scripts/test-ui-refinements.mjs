@@ -364,7 +364,7 @@ assert.ok(html.includes("(data.parents||[]).filter(item=>isActiveItem(item))") &
   'Profile Search and Assigned Items must render from active item collections only.');
 
 // The status and due-date filters remain present but dimmed when Follow-up is selected.
-assert.ok(html.includes("class=\"child-filter-field ${ui.childType==='followup'?'is-filter-inapplicable':''}\"") &&
+assert.ok(html.includes("class=\"child-filter-field ${isJob||ui.childType==='followup'?'is-filter-inapplicable':''}\"") &&
   html.includes("class=\"account-search-field account-search-status-field ${ui.accountAssignedType==='followup'?'is-filter-inapplicable':''}\""),
   'Workspace and Assigned Items keep the inapplicable Status controls visible and dimmed.');
 assert.ok(!html.includes("id=\"childStatusFilterField\" hidden") && !html.includes("id=\"accountAssignedStatus\" hidden"),

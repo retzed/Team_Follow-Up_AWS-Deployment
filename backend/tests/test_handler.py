@@ -1117,6 +1117,70 @@ class MultiAssigneeTests(unittest.TestCase):
         self.assertEqual({item["id"] for item in completed["items"]}, {"task-completed"})
         self.assertEqual({item["id"] for item in not_completed["items"]}, {"task-open"})
 
+    def test_validate_item_strips_legacy_status_and_due_date_from_followups(self):
+        parent = {
+            "itemId": "project-fields",
+            "type": "project",
+            "createdByUserId": "u1",
+            "rootParentId": "project-fields",
+        }
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+            patch.object(handler.USERS, "get_item", return_value={"Item": {"userId": "u2", "enabled": True}}),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "followup-fields",
+                "type": "followup",
+                "parentId": "project-fields",
+                "name": "Follow-up without workflow fields",
+                "assigneeMode": "selected",
+                "assigneeIds": ["u2"],
+                "status": "completed",
+                "dueDate": "2026-11-12",
+            })
+        self.assertNotIn("status", item)
+        self.assertNotIn("dueDate", item)
+
+    def test_followup_to_task_conversion_restores_task_workflow_fields(self):
+        parent = {
+            "itemId": "project-conversion",
+            "type": "project",
+            "createdByUserId": "u1",
+            "rootParentId": "project-conversion",
+        }
+        previous = {
+            "itemId": "followup-conversion",
+            "type": "followup",
+            "parentId": "project-conversion",
+            "rootParentId": "project-conversion",
+            "name": "Converted work",
+            "assigneeMode": "selected",
+            "assigneeIds": ["u2"],
+            "ownerId": "u2",
+            "createdByUserId": "u1",
+            "createdAt": "2026-11-06T08:00:00.000Z",
+            "version": 1,
+        }
+        with (
+            patch.object(handler, "current_profile", return_value={"userId": "u1"}),
+            patch.object(handler.WORK, "get_item", return_value={"Item": parent}),
+            patch.object(handler.USERS, "get_item", return_value={"Item": {"userId": "u2", "enabled": True}}),
+        ):
+            item, _ = handler.validate_item({}, {
+                "itemId": "followup-conversion",
+                "type": "task",
+                "parentId": "project-conversion",
+                "name": "Converted work",
+                "assigneeMode": "selected",
+                "assigneeIds": ["u2"],
+                "status": "in-progress",
+                "dueDate": "2026-11-13",
+            }, previous=previous)
+        self.assertEqual(item["type"], "task")
+        self.assertEqual(item["status"], "in-progress")
+        self.assertEqual(item["dueDate"], "2026-11-13")
+
     def test_validate_item_allows_multiple_assignees_for_parent_items(self):
         def user_lookup(**kwargs):
             user_id = kwargs["Key"]["userId"]
@@ -1131,6 +1195,24 @@ class MultiAssigneeTests(unittest.TestCase):
             })
         self.assertEqual(item["assigneeIds"], ["u2", "u3"])
         self.assertEqual(item["ownerId"], "u2")
+
+    def test_due_date_queries_sort_earliest_first_and_exclude_followups(self):
+        rows = [
+            {"itemId": "task-later", "type": "task", "name": "Later", "dueDate": "2026-11-12"},
+            {"itemId": "followup-legacy", "type": "followup", "name": "Legacy", "dueDate": "2026-11-09"},
+            {"itemId": "task-near", "type": "task", "name": "Near", "dueDate": "2026-11-10"},
+            {"itemId": "task-no-due", "type": "task", "name": "No due date"},
+        ]
+        with patch.object(handler, "query_children_rows", return_value=rows):
+            result = handler.query_work_items({
+                "parentId": "project-1",
+                "dateMode": "due",
+                "direction": "asc",
+                "from": "2026-11-10",
+                "to": "2026-11-12",
+            })
+        self.assertEqual([item["id"] for item in result["items"]], ["task-near", "task-later"])
+        self.assertEqual(result["count"], 2)
 
     def test_validate_item_allows_none_for_projects_jobs_and_tasks(self):
         with patch.object(handler, "current_profile", return_value={"userId": "u1"}):

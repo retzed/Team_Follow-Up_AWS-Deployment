@@ -119,7 +119,7 @@ assert.ok(html.includes("matchesItemStatusFilter(item,filter)"), 'Status filteri
 assert.ok(html.includes("child.type!=='task'||child.status==='completed'"), 'Not Completed metrics must count Tasks only and must not infer a Follow-up status.');
 assert.ok(html.includes("item.type==='followup'?'':'<span class=\"account-assigned-due\""), 'Assigned Items must not render a due date for Follow-ups.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"'"), 'Only Assigned Items Tasks should explicitly request item-only history.');
-assert.ok(/left:50%\s*!important/.test(html) && /transform:translate(?:3d|X)\(/.test(html), 'The scroll-to-top button must use viewport-based horizontal centering.');
+assert.ok(/left:50vw\s*!important/.test(html) && /transform:translate(?:3d|X)\(/.test(html), 'The scroll-to-top button must use viewport-based horizontal centering.');
 
 assert.ok(html.includes("function dateModeOptionsMarkup(current,includeDue=true)") && html.includes("value==='due'&&!includeDue?'disabled class=") && html.includes('is-filter-inapplicable-option'), 'Due-date filter options must remain visible but dimmed and disabled when the selected item type does not support due dates.');
 assert.ok(html.includes("ui.childType==='followup'?'disabled':''") && html.includes("ui.accountAssignedType==='followup'?'disabled':''"), 'Status filters must be disabled when Follow-up is the selected type.');
@@ -156,7 +156,7 @@ assert.ok(html.includes('id="childStatusFilterField"') && html.includes("class=\
 assert.ok(html.includes("class=\"account-search-field account-search-status-field ${ui.accountAssignedType==='followup'?'is-filter-inapplicable':''}\""), 'The Assigned Items status filter must remain visible and dimmed for Follow-ups.');
 assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only, independent of the outer page state.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"':''"), 'Only Assigned Items Tasks should explicitly request item-only history.');
-assert.ok(html.includes('top:calc(68px + 32px + env(safe-area-inset-top,0px))!important'), 'The mobile back-to-top button must sit with a clear gap below the fixed 68px header.');
+assert.ok(html.includes('top:calc(68px + 4px + env(safe-area-inset-top,0px))!important'), 'The mobile back-to-top button must sit with a clear gap below the fixed 68px header.');
 assert.ok(html.includes("const workflowSearch=item.type==='followup'?'':[statusName(item.status,'en'),statusName(item.status,'ar')].join(' ');"), 'Workspace Assigned-list search must not match Follow-ups using legacy status values.');
 
 
@@ -212,10 +212,10 @@ assert.equal(typeSyncNodes.get('#formDueDateField').hidden,false);
 assert.equal(typeSyncNodes.get('#formDueDate').disabled,false,
   'Switching back to Task must restore the due-date control.');
 
-assert.ok(finalPositionCss.includes('left:50%!important') && finalPositionCss.includes('transform:translateX(-50%)!important'),
+assert.ok(finalPositionCss.includes('left:50vw!important') && finalPositionCss.includes('transform:translateX(-50%)!important'),
   'The scroll-to-top control must be horizontally centered on desktop and mobile.');
-assert.ok(finalPositionCss.includes('top:calc(76px + 10px + env(safe-area-inset-top,0px))!important') &&
-  finalPositionCss.includes('top:calc(68px + 32px + env(safe-area-inset-top,0px))!important'),
+assert.ok(finalPositionCss.includes('top:calc(76px + 2px + env(safe-area-inset-top,0px))!important') &&
+  finalPositionCss.includes('top:calc(68px + 4px + env(safe-area-inset-top,0px))!important'),
   'The scroll-to-top control must sit below the fixed header at both desktop and mobile breakpoints.');
 
 
@@ -390,8 +390,8 @@ assert.ok(html.includes('workspace-jump-highlight') &&
   html.includes('consistent-card-hover-and-jump-highlight') &&
   html.includes(':hover{') ,
   'Cards must share a consistent hover highlight and temporary jump highlight.');
-assert.ok(finalPositionCss.includes('left:50%!important') &&
-  finalPositionCss.includes('top:calc(68px + 32px + env(safe-area-inset-top,0px))!important'),
+assert.ok(finalPositionCss.includes('left:50vw!important') &&
+  finalPositionCss.includes('top:calc(68px + 4px + env(safe-area-inset-top,0px))!important'),
   'The back-to-top control must be centered on desktop and lower below the mobile header.');
 
 const parentJumpStart=html.indexOf("case 'select-parent':");

@@ -223,7 +223,7 @@ assert.ok(assigneeControlStart >= 0 && assigneeControlEnd > assigneeControlStart
 const assigneeControlSource = html.slice(assigneeControlStart, assigneeControlEnd);
 assert.ok(!assigneeControlSource.includes("if(type==='followup')") && !assigneeControlSource.includes('<select id="formOwner"') && assigneeControlSource.includes('name="assigneeIds"') && assigneeControlSource.includes('type="checkbox"'), 'Follow-ups must use the same multi-assignee checklist as other items.');
 assert.ok(assigneeControlSource.includes('name="assigneeIds"') && assigneeControlSource.includes('type="checkbox"'), 'Projects, jobs, and Tasks must use a multi-assignee checklist.');
-assert.ok(assigneeControlSource.includes('data-assignee-mode="all"') && assigneeControlSource.includes('data-assignee-mode="none"') && assigneeControlSource.includes('name="assigneeMode"'), 'The checklist must persist distinct All Users and None modes.');
+assert.ok(assigneeControlSource.includes('data-assignee-mode="all"') && assigneeControlSource.includes('data-assignee-mode="none"') && assigneeControlSource.includes('name="assigneeMode"'), 'The checklist must persist distinct All Members and None modes.');
 
 const assigneeIdsStart=html.indexOf('function itemAssigneeIds(item){');
 const assigneeIdsEnd=html.indexOf('\nfunction parentCreatorAssigneeId(',assigneeIdsStart);
@@ -234,7 +234,7 @@ const submittedIdsStart=html.indexOf('function submittedAssigneeIds(type,formDat
 const submittedIdsEnd=html.indexOf('\nfunction sameAssigneeIds(',submittedIdsStart);
 assert.ok(submittedIdsStart>=0&&submittedIdsEnd>submittedIdsStart,'The submitted multi-assignee helper must exist.');
 const submittedIdsSource=html.slice(submittedIdsStart,submittedIdsEnd);
-assert.ok(submittedIdsSource.includes("formData.getAll('assigneeIds')")&&submittedIdsSource.includes("mode==='all'")&&!submittedIdsSource.includes('slice(0,1)'),'Follow-up form submissions must preserve every selected assignee and All Users selection.');
+assert.ok(submittedIdsSource.includes("formData.getAll('assigneeIds')")&&submittedIdsSource.includes("mode==='all'")&&!submittedIdsSource.includes('slice(0,1)'),'Follow-up form submissions must preserve every selected assignee and All Members selection.');
 const assigneeSyncStart=html.indexOf('function syncAssigneeControl(type,parentChanged=false,typeChanged=false){');
 const assigneeSyncEnd=html.indexOf('\nfunction positionAssigneeMenu(',assigneeSyncStart);
 assert.ok(assigneeSyncStart>=0&&assigneeSyncEnd>assigneeSyncStart,'The shared assignee-control refresh function must exist.');
@@ -266,13 +266,13 @@ const assigneePickerUpdateStart = html.indexOf('function updateAssigneePicker(')
 const assigneePickerUpdateEnd = html.indexOf('\nfunction currentAssigneeMode(', assigneePickerUpdateStart);
 assert.ok(assigneePickerUpdateStart >= 0 && assigneePickerUpdateEnd > assigneePickerUpdateStart, 'Assignee mode selection synchronization must exist.');
 const assigneePickerUpdateSource = html.slice(assigneePickerUpdateStart, assigneePickerUpdateEnd);
-assert.ok(assigneePickerUpdateSource.includes('const allChecked=checks.length>0&&selected.length===checks.length;') && assigneePickerUpdateSource.includes("requestedMode==='all'||allChecked"), 'Manually checking every listed user must automatically activate the All Users mode.');
+assert.ok(assigneePickerUpdateSource.includes('const allChecked=checks.length>0&&selected.length===checks.length;') && assigneePickerUpdateSource.includes("requestedMode==='all'||allChecked"), 'Manually checking every listed user must automatically activate the All Members mode.');
 
-assert.ok(assigneePickerUpdateSource.includes("requestedMode==='all'") && assigneePickerUpdateSource.includes("checks.forEach(input=>{input.checked=true;})"), 'Choosing All Users must check every listed user.');
+assert.ok(assigneePickerUpdateSource.includes("requestedMode==='all'") && assigneePickerUpdateSource.includes("checks.forEach(input=>{input.checked=true;})"), 'Choosing All Members must check every listed user.');
 assert.ok(assigneePickerUpdateSource.includes("requestedMode==='none'") && assigneePickerUpdateSource.includes("checks.forEach(input=>{input.checked=false;})"), 'Choosing None must clear every user checkbox.');
-assert.ok(assigneePickerUpdateSource.includes("mode==='all'?tr('allUsersOption')") && assigneePickerUpdateSource.includes(":'none'"), 'The selected mode must display the exact All Users or None label in the control.');
-assert.ok(html.includes("?'<span class=\"assigned-person\">'+esc(tr('allUsersOption'))+'</span>'"), 'Items assigned to All Users must display All Users in the Assignee label.');
-assert.ok(html.includes("allUsersOption:'All Users'") && html.includes("none:'None'"), 'All Users and None must have explicit English labels.');
+assert.ok(assigneePickerUpdateSource.includes("mode==='all'?tr('allUsersOption')") && assigneePickerUpdateSource.includes(":'none'"), 'The selected mode must display the exact All Members or None label in the control.');
+assert.ok(html.includes("?'<span class=\"assigned-person\">'+esc(tr('allUsersOption'))+'</span>'"), 'Items assigned to All Members must display All Members in the Assignee label.');
+assert.ok(html.includes("allUsersOption:'All Members'") && html.includes("none:'None'"), 'All Members and None must have explicit English labels.');
 const assigneePickerCssStart = html.indexOf('<style id="assignee-picker-popover">');
 const assigneePickerCssEnd = html.indexOf('</style>', assigneePickerCssStart);
 assert.ok(assigneePickerCssStart >= 0 && assigneePickerCssEnd > assigneePickerCssStart, 'The assignee popover stylesheet must exist.');
@@ -319,7 +319,7 @@ assert.doesNotMatch(submitSource,/assigneeRequired|at least one team member/i,'A
 assert.ok(submitSource.includes('submittedAssigneeMode(type,fd)') && submitSource.includes("assigneeMode:assigneeMode||'none'"), 'New Projects, Jobs, and Tasks must explicitly persist None unless another assignment mode is selected.');
 assert.ok(submitSource.includes('item.assigneeIds=assigneeIds') && submitSource.includes('item.ownerId=ownerId'), 'The canonical assignee list and legacy primary owner must both be persisted.');
 
-assert.ok(html.includes("mode==='all'?tr('allUsersOption')") && html.includes("allUsersOption:'All Users'"), 'All Users must have a dedicated picker label without changing Activity history filtering.');
+assert.ok(html.includes("mode==='all'?tr('allUsersOption')") && html.includes("allUsersOption:'All Members'"), 'All Members must have a dedicated picker label without changing Activity history filtering.');
 const selectedDefault = syncAssigneeSource.includes("modal?.kind==='new-child'&&type==='followup'") && syncAssigneeSource.includes('parentCreatorAssigneeId(parent)') && syncAssigneeSource.includes("mode=selected.length?'selected':'none'");
 assert.ok(selectedDefault, 'New Follow-ups must default to their immediate parent creator while retaining the shared picker.');
 const pickerCssStart = html.indexOf('<style id="assignee-picker-popover">');
@@ -474,3 +474,5 @@ for(const priority of ['priority-urgent','priority-high','priority-medium','prio
 }
 assert.ok(assignedStyleSource.includes('color-mix(in srgb,var(--amber) 68%,var(--muted))')&&assignedStyleSource.includes('color-mix(in srgb,var(--amber-bg) 70%,var(--panel-2))'), 'On Hold must use a dimmed amber treatment distinct from Medium priority.');
 
+
+assert.ok(html.includes("const historyUsers=(data.users||[]).filter(raw=>String(raw?.id||raw?.userId||'').trim().toLowerCase()!=='root');")&&html.includes("requestedHistoryUser==='root'?'all':requestedHistoryUser"),'Application-wide activity history excludes root and resets a stale root selection to All users.');

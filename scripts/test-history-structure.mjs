@@ -411,7 +411,7 @@ const assignedHistoryStart=html.indexOf('function openHistory(');
 const assignedHistoryEnd=html.indexOf('\nfunction openApplicationHistory(',assignedHistoryStart);
 assert.ok(assignedHistoryStart>=0&&assignedHistoryEnd>assignedHistoryStart,'The item history opener must exist.');
 const assignedHistorySource=html.slice(assignedHistoryStart,assignedHistoryEnd);
-assert.ok(assignedHistorySource.includes("requestedScope==='item'")&&assignedHistorySource.includes("const assignedTask=item.type==='task'&&ui.page==='account'&&ui.accountTab==='assigned'")&&assignedHistorySource.includes("historyScope=item.type==='followup'||requestedScope==='item'||assignedTask?'item':'all'"), 'Assigned Items Task history must default to This item only, while other item scopes retain their requested/default history behavior.');
+assert.ok(assignedHistorySource.includes("requestedScope==='item'")&&assignedHistorySource.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned'")&&assignedHistorySource.includes("historyScope=item.type==='followup'||requestedScope==='item'||assignedTask?'item':'all'"), 'Assigned Items Task history must default to This item only, while other item scopes retain their requested/default history behavior.');
 assert.ok(html.includes("actionEl.dataset.historyScope||''"), 'The Activity action handler must forward the requested history scope.');
 
 assert.ok(html.includes("assignedTasksFollowups:'Tasks & Follow-ups'")&&html.includes("assignedProjectsJobs:'Projects & Jobs'"), 'The two Assigned Items section headings must be translated in English.');

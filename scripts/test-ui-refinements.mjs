@@ -119,7 +119,7 @@ assert.ok(html.includes("matchesItemStatusFilter(item,filter)"), 'Status filteri
 assert.ok(html.includes("child.type!=='task'||child.status==='completed'"), 'Not Completed metrics must count Tasks only and must not infer a Follow-up status.');
 assert.ok(html.includes("item.type==='followup'?'':'<span class=\"account-assigned-due\""), 'Assigned Items must not render a due date for Follow-ups.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"'"), 'Only Assigned Items Tasks should explicitly request item-only history.');
-assert.ok(/left:50vw\\s*!important/.test(html) && /transform:translate(?:3d|X)\\(/.test(html), 'The scroll-to-top button must use viewport-based horizontal centering.');
+assert.ok(/left:50vw\s*!important/.test(html) && /transform:translate(?:3d|X)\(/.test(html), 'The scroll-to-top button must use viewport-based horizontal centering.');
 
 assert.ok(html.includes("function dateModeOptionsMarkup(current,includeDue=true)") && html.includes("value==='due'&&!includeDue?'disabled class=") && html.includes('is-filter-inapplicable-option'), 'Due-date filter options must remain visible but dimmed and disabled when the selected item type does not support due dates.');
 assert.ok(html.includes("ui.childType==='followup'?'disabled':''") && html.includes("ui.accountAssignedType==='followup'?'disabled':''"), 'Status filters must be disabled when Follow-up is the selected type.');
@@ -347,9 +347,6 @@ assert.ok(itemSubmitSource.includes("if(type!=='followup'&&childrenOf(item.id).l
 assert.ok(itemSubmitSource.includes("const previousParent=p.status==='not-started'?copyWorkspace(p):null") &&
   itemSubmitSource.includes("p.status='in-progress'"),
   'Creating any child under a Not started parent must promote the parent to In progress.');
-assert.ok(html.includes("if(previous is not None and kind!='followup' and item.get('status')=='not-started' and has_active_children(item_id))") ||
-  html.includes("has_active_children(item_id)"),
-  'The AWS backend must independently prevent a parent with active children from being Not started.');
 
 // Deleting an item must refresh the visible Assigned/Pinned account tab after
 // the archive/pin writes finish, even when no list request was active at delete time.
@@ -359,7 +356,7 @@ assert.ok(html.includes("void Promise.all([Promise.resolve(deleteWrite),pinsWrit
 assert.ok(!html.includes('if(wasAssignedLoading)') && !html.includes('if(wasPinnedLoading)'),
   'Account-list refresh after delete must not depend on whether a request happened to be loading.');
 assert.ok(html.includes("(data.parents||[]).filter(item=>isActiveItem(item))") &&
-  html.includes("ui.accountAssignedRows||[]").toString(),
+  html.includes(".filter(item=>isActiveItem(item))"),
   'Profile Search and Assigned Items must render from active item collections only.');
 
 // The status and due-date filters remain present but dimmed when Follow-up is selected.

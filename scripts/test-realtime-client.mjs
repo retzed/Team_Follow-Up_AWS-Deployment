@@ -106,6 +106,7 @@ function createContext(overrides = {}) {
     loadAccountPinnedItems: async () => { calls.pinned += 1; },
     toAppItem: row => row,
     assignedItemCache: new Map(),
+    accountItemsRequestGeneration: 0,
     console: { warn() {}, error() {}, log() {} },
     setTimeout: callback => { const id=nextTimerId++; timers.set(id,callback); return id; },
     clearTimeout: id => timers.delete(id),

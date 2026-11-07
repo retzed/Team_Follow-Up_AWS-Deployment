@@ -119,7 +119,7 @@ assert.ok(html.includes("matchesItemStatusFilter(item,filter)"), 'Status filteri
 assert.ok(html.includes("child.type!=='task'||child.status==='completed'"), 'Not Completed metrics must count Tasks only and must not infer a Follow-up status.');
 assert.ok(html.includes("item.type==='followup'?'':'<span class=\"account-assigned-due\""), 'Assigned Items must not render a due date for Follow-ups.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"'"), 'Only Assigned Items Tasks should explicitly request item-only history.');
-assert.ok(/left:50vw\s*!important/.test(html) && /transform:translate(?:3d|X)\(/.test(html), 'The scroll-to-top button must use viewport-based horizontal centering.');
+assert.ok(/left:50%\s*!important/.test(html) && /transform:translate(?:3d|X)\(/.test(html), 'The scroll-to-top button must use viewport-based horizontal centering.');
 
 assert.ok(html.includes("function dateModeOptionsMarkup(current,includeDue=true)") && html.includes("value==='due'&&!includeDue?'disabled class=") && html.includes('is-filter-inapplicable-option'), 'Due-date filter options must remain visible but dimmed and disabled when the selected item type does not support due dates.');
 assert.ok(html.includes("ui.childType==='followup'?'disabled':''") && html.includes("ui.accountAssignedType==='followup'?'disabled':''"), 'Status filters must be disabled when Follow-up is the selected type.');
@@ -156,7 +156,7 @@ assert.ok(html.includes('id="childStatusFilterField"') && html.includes("class=\
 assert.ok(html.includes("class=\"account-search-field account-search-status-field ${ui.accountAssignedType==='followup'?'is-filter-inapplicable':''}\""), 'The Assigned Items status filter must remain visible and dimmed for Follow-ups.');
 assert.ok(html.includes("const assignedTask=item.type==='task'&&ui.accountTab==='assigned'"), 'Task history opened from Assigned Items must default to this task only, independent of the outer page state.');
 assert.ok(html.includes("item.type==='task'?' data-history-scope=\"item\"':''"), 'Only Assigned Items Tasks should explicitly request item-only history.');
-assert.ok(html.includes('top:calc(68px + 20px + env(safe-area-inset-top,0px))!important'), 'The mobile back-to-top button must sit with a clear gap below the fixed 68px header.');
+assert.ok(html.includes('top:calc(68px + 32px + env(safe-area-inset-top,0px))!important'), 'The mobile back-to-top button must sit with a clear gap below the fixed 68px header.');
 assert.ok(html.includes("const workflowSearch=item.type==='followup'?'':[statusName(item.status,'en'),statusName(item.status,'ar')].join(' ');"), 'Workspace Assigned-list search must not match Follow-ups using legacy status values.');
 
 
@@ -212,10 +212,10 @@ assert.equal(typeSyncNodes.get('#formDueDateField').hidden,false);
 assert.equal(typeSyncNodes.get('#formDueDate').disabled,false,
   'Switching back to Task must restore the due-date control.');
 
-assert.ok(finalPositionCss.includes('left:50vw!important') && finalPositionCss.includes('transform:translateX(-50%)!important'),
+assert.ok(finalPositionCss.includes('left:50%!important') && finalPositionCss.includes('transform:translateX(-50%)!important'),
   'The scroll-to-top control must be horizontally centered on desktop and mobile.');
 assert.ok(finalPositionCss.includes('top:calc(76px + 10px + env(safe-area-inset-top,0px))!important') &&
-  finalPositionCss.includes('top:calc(68px + 20px + env(safe-area-inset-top,0px))!important'),
+  finalPositionCss.includes('top:calc(68px + 32px + env(safe-area-inset-top,0px))!important'),
   'The scroll-to-top control must sit below the fixed header at both desktop and mobile breakpoints.');
 
 
@@ -390,10 +390,32 @@ assert.ok(html.includes('workspace-jump-highlight') &&
   html.includes('consistent-card-hover-and-jump-highlight') &&
   html.includes(':hover{') ,
   'Cards must share a consistent hover highlight and temporary jump highlight.');
-assert.ok(finalPositionCss.includes('left:50vw!important') &&
-  finalPositionCss.includes('top:calc(68px + 20px + env(safe-area-inset-top,0px))!important'),
+assert.ok(finalPositionCss.includes('left:50%!important') &&
+  finalPositionCss.includes('top:calc(68px + 32px + env(safe-area-inset-top,0px))!important'),
   'The back-to-top control must be centered on desktop and lower below the mobile header.');
 
 const parentJumpStart=html.indexOf("case 'select-parent':");
 const parentJumpEnd=html.indexOf("case 'select-assigned':",parentJumpStart);
 assert.ok(parentJumpStart>=0&&parentJumpEnd>parentJumpStart&&html.slice(parentJumpStart,parentJumpEnd).includes('alignWorkspaceItemInViewport(document.querySelector(\'#mainContent .detail-banner\'))'),'Selecting a parent must use centered item navigation after its children load.');
+
+
+const accountSearchMatcherStart=html.indexOf('function accountSearchUserMatches(item,userId){');
+const accountSearchMatcherEnd=html.indexOf('function accountSearchResultsMarkup(){',accountSearchMatcherStart);
+assert.ok(accountSearchMatcherStart>=0&&accountSearchMatcherEnd>accountSearchMatcherStart&&html.slice(accountSearchMatcherStart,accountSearchMatcherEnd).includes("const ids=itemAssigneeIds(item);if(wanted==='none')return ids.length===0;return ids.includes(wanted);"),'Profile Search filters by assigned users and supports None.');
+assert.ok(html.includes("accountSearchUserLabel:'Assignee'")&&html.includes("accountSearchNoneAssignee:'None'")&&html.includes("assignableUsers().slice().sort("),'Profile Search labels the filter Assignee, offers None, and excludes root/system users.');
+assert.ok(html.includes("ui.accountAssignedType==='project'||ui.accountAssignedType==='job'?'disabled':''")&&html.includes("if(ui.accountAssignedType==='project'||ui.accountAssignedType==='job')ui.accountAssignedPriority='all';"),'Assigned Items disables and resets Priority for Project and Job type selections.');
+assert.ok(html.includes("workspaceTitle:'WORKSPACE'")&&html.includes("accountHubTitle:'USERSPACE'")&&html.includes("$('#workspaceTitle').hidden=ui.page!=='account';"),'Workspace and account headers use WORKSPACE and USERSPACE.');
+assert.ok(html.includes("pendingTasks:'Pending Tasks'")&&html.includes("tr('pendingTasks')"),'Project overview labels its incomplete task metric Pending Tasks.');
+const overviewRegressionStart=html.indexOf('function renderOverview(parent,summary=null){');
+const overviewRegressionEnd=html.indexOf('\nfunction childTreeFiltered(parent){',overviewRegressionStart);
+const overviewRegression=html.slice(overviewRegressionStart,overviewRegressionEnd);
+assert.ok(overviewRegression.includes("const summaryCards=isJob?`\u0024{followupsCard}\u0024{urgentCard}\u0024{highCard}`"),'Job overview orders Follow-ups, Urgent, then High.');
+assert.ok(overviewRegression.includes("const childTypeOptions=isJob?[['followup',tr('followup')]]")&&overviewRegression.includes("id=\"childTypeFilter\" aria-label=\"${esc(tr('type'))}\" ${isJob?'disabled':''}")&&overviewRegression.includes("dateModeOptionsMarkup(ui.childDateMode,!isJob&&ui.childType!=='followup')"),'Job overview locks Type to Follow-ups, disables Type and Status, and disables Due date.');
+assert.ok(html.includes("else if(filter==='high')")&&html.includes("high?.setAttribute('aria-pressed',String(ui.childPriority==='high'))"),'The High overview card applies and reflects the High filter.');
+assert.ok(html.includes(":root[data-theme=\"light\"] .priority-urgent {\n  color: #d33d51")&&html.includes(":root[data-theme=\"dark\"] .priority-urgent {\n  color: #ffadb9")&&html.includes("priority-pill.priority-urgent{\n color:#d33d51!important"),'Urgent labels use the brighter High-level colors in both themes and Assigned Items.');
+const editJumpStart=html.indexOf('async function handleItemSubmit(form){');
+const editJumpEnd=html.indexOf('\nfunction clearParentFilters()',editJumpStart);
+const editJumpSource=html.slice(editJumpStart,editJumpEnd);
+assert.ok(editJumpStart>=0&&editJumpEnd>editJumpStart&&editJumpSource.includes('if(overviewJobId){')&&!editJumpSource.includes('if(overviewJobId&&oldJobPosition>=0)')&&editJumpSource.includes('if(newJobPosition>=0&&newJobPosition!==oldJobPosition)'), 'Job edits jump when a child newly enters or changes position in the active filter, but not when its position is unchanged or it leaves the result set.');
+assert.ok(html.includes("const overflowY=window.getComputedStyle(node).overflowY;")&&html.includes("scrollContainer.scrollTo({top,behavior:reduceMotion?'instant':'smooth'});"),'Item navigation scrolls the nearest scrollable ancestor when one exists.');
+assert.ok(html.includes('function positionButton()')&&html.includes("set('left', `${viewportWidth / 2}px`);")&&html.includes("${mobile ? 32 : 10}px"),'The floating top control is centered from the live viewport width and is placed farther below the mobile header.');

@@ -6192,14 +6192,18 @@ html[dir="rtl"] .application-history-controls .application-history-user-filter {
   text-align: start !important;
 }
 .top-title strong.account-page-heading {
-  font-size: 10px !important;
-  font-weight: 750 !important;
-  letter-spacing: 1.4px !important;
-  text-transform: uppercase !important;
-  color: var(--muted) !important;
-  line-height: 1.2 !important;
-  text-align: start !important;
-  direction: inherit;
+  display:block !important;
+  width:100% !important;
+  font-family:inherit !important;
+  font-size:10px !important;
+  font-weight:750 !important;
+  letter-spacing:1.4px !important;
+  text-transform:uppercase !important;
+  color:var(--muted) !important;
+  line-height:1.2 !important;
+  text-align:start !important;
+  direction:inherit;
+  unicode-bidi:plaintext;
 }
 .history-search-hint { display: none !important; }
 </style>
@@ -7371,6 +7375,9 @@ body.signin-open .scroll-to-top {
   const button = document.getElementById('scrollToTopButton');
   const app = document.getElementById('app');
   if (!button || !app) return;
+  // Keep the fixed control outside application layout/transform contexts so
+  // viewport coordinates remain consistent on desktop and mobile.
+  if (button.parentElement !== document.body) document.body.appendChild(button);
 
   const SHOW_AFTER_PX = 360;
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -7390,10 +7397,17 @@ body.signin-open .scroll-to-top {
     const measuredHeaderHeight = topbar?.getBoundingClientRect?.().height || topbar?.offsetHeight || (mobile ? 68 : 76);
     const headerHeight = Math.max(0, Math.ceil(measuredHeaderHeight));
     const set = (property, value) => button.style.setProperty(property, value, 'important');
-    // Horizontal centering is owned by the physical left:50vw CSS rule. Do not
-    // combine it with a direction-aware logical inset in RTL layouts.
+    const viewportWidth = document.documentElement?.clientWidth || window.innerWidth || 0;
+    // The control is a direct body child; set physical coordinates explicitly
+    // to avoid RTL logical-inset and transformed-ancestor containing-block bugs.
     set('position', 'fixed');
-    set('top', `calc(${headerHeight}px + ${mobile ? 4 : 2}px + env(safe-area-inset-top,0px))`);
+    set('left', `${viewportWidth / 2}px`);
+    set('right', 'auto');
+    set('inset-inline-start', 'auto');
+    set('inset-inline-end', 'auto');
+    set('margin-left', '0');
+    set('transform', 'translateX(-50%)');
+    set('top', `calc(${headerHeight}px + ${mobile ? 2 : 2}px + env(safe-area-inset-top,0px))`);
     set('bottom', 'auto');
   }
 

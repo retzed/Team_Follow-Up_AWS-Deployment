@@ -3324,7 +3324,7 @@ function renderOverview(parent,summary=null){
  const projectTasksCard=`<button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="tasks" type="button" aria-pressed="${tasksActive}"><div class="summary-tile-head"><span>${esc(tr('openTasks'))}</span>${icon('clipboard',15)}</div><div class="summary-value">${countValueMarkup(totalTasks,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr('inThisProject'))}</div></button>`;
  const followupsCard=`<button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="direct-followups" type="button" aria-pressed="${followupsActive}"><div class="summary-tile-head"><span>${esc(tr('openFollowups'))}</span>${icon('message',15)}</div><div class="summary-value">${countValueMarkup(directFollowups,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr(isJob?'inThisJob':'inThisProject'))}</div></button>`;
  const pendingTasksCard=`<button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="not-completed" ${ui.childType==='followup'?'disabled':''} type="button" aria-pressed="${notCompletedActive}"><div class="summary-tile-head"><span>${esc(tr('pendingTasks'))}</span>${icon('clock',15)}</div><div class="summary-value" id="notCompletedMetricCount">${countValueMarkup(notCompleted,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr('inThisProject'))}</div></button>`;
- const urgentCard=`<button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="urgent" type="button" aria-pressed="${ui.childPriority==='urgent'}"><div class="summary-tile-head"><span>${esc(tr('urgent'))}</span>${icon('alert-triangle',15)}</div><div class="summary-value">${countValueMarkup(all.filter(c=>c.priority==='urgent').length,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr('inThisJob'))}</div></button>`;
+ const urgentCard=`<button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="urgent" type="button" aria-pressed="${ui.childPriority==='urgent'}"><div class="summary-tile-head"><span>${esc(tr('urgent'))}</span><span class="priority-urgent-icon" aria-hidden="true">!</span></div><div class="summary-value">${countValueMarkup(all.filter(c=>c.priority==='urgent').length,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr('inThisJob'))}</div></button>`;
  const highCard=`<button class="summary-tile summary-tile-button" data-action="overview-filter" data-filter="high" type="button" aria-pressed="${ui.childPriority==='high'}"><div class="summary-tile-head"><span>${esc(tr('high'))}</span>${icon('zap',15)}</div><div class="summary-value">${countValueMarkup(highCount,countsReady,parent.id,'children')}</div><div class="summary-note">${esc(tr('inThisJob'))}</div></button>`;
  const summaryCards=isJob?`${followupsCard}${urgentCard}${highCard}`:`${projectTasksCard}${followupsCard}${pendingTasksCard}`;
  const childTypeOptions=isJob?[['followup',tr('followup')]]:[['all',tr('allTypes')],['task',tr('task')],['followup',tr('followup')]];
@@ -3459,7 +3459,7 @@ function mergeProfileIntoData(raw,options={}){
 function mergeProfileEvents(events){if(Array.isArray(events)&&events.length&&typeof updateApplicationHistoryFromCommittedEvents==='function')updateApplicationHistoryFromCommittedEvents(events);}
 function accountItemRow(item){
  const id=String(item.id||item.itemId||''),rootId=String(item.rootParentId||(item.type==='project'||item.type==='job'?id:'')||''),root=data.parents.find(row=>String(row.id)===rootId),context=root&&root.id!==id?root.name:typeName(item.type);
- return `<div class="account-item-row"><div class="account-item-icon">${typeIcon(item.type)}</div><div class="account-item-copy"><strong dir="auto">${esc(item.name||id)}</strong><span>${esc(context)}${item.type!=='followup'&&item.status?` · ${esc(item.status)}`:''}</span>${item.type!=='followup'&&item.dueDate?`<span>${esc(fmtDate(item.dueDate,{month:'short',day:'numeric',year:'numeric'}))}</span>`:''}</div><div class="account-item-actions"><button class="btn btn-small" type="button" data-action="select-assigned" data-id="${esc(id)}">${icon('arrow',12)} ${esc(tr('workLabel'))}</button><button class="btn btn-small" type="button" data-action="history" data-item-id="${esc(id)}" aria-label="${esc(tr('activityHistory'))}" title="${esc(tr('activityHistory'))}">${icon('clock',12)} ${esc(tr('activityHistory'))}</button>${pinActionMarkup(id)}</div></div>`;
+ return `<div class="account-item-row"><div class="account-item-icon">${typeIcon(item.type)}</div><div class="account-item-copy"><strong dir="${ui.lang==='ar'?'rtl':'ltr'}" title="${esc(item.name||id)}">${esc(item.name||id)}</strong><span>${esc(context)}${item.type!=='followup'&&item.status?` · ${esc(item.status)}`:''}</span>${item.type!=='followup'&&item.dueDate?`<span>${esc(fmtDate(item.dueDate,{month:'short',day:'numeric',year:'numeric'}))}</span>`:''}</div><div class="account-item-actions"><button class="btn btn-small" type="button" data-action="select-assigned" data-id="${esc(id)}">${icon('arrow',12)} ${esc(tr('workLabel'))}</button><button class="btn btn-small" type="button" data-action="history" data-item-id="${esc(id)}" aria-label="${esc(tr('activityHistory'))}" title="${esc(tr('activityHistory'))}">${icon('clock',12)} ${esc(tr('activityHistory'))}</button>${pinActionMarkup(id)}</div></div>`;
 }
 async function hydrateAccountAssignedParentNames(rows,api,hydration){
  const known=new Map();
@@ -3494,8 +3494,8 @@ function accountAssignedItemRow(item){
  const parentParentName=String(parentParent?.name||(parentParentId===rootId?root?.name:'')||'');
  const parentParentType=String(parentParent?.type||(parentParentId===rootId?root?.type:'')||'');
  const parentNameMarkup=parentName&&parentName!=='—'
-  ?'<button type="button" class="account-assigned-parent-name" dir="auto" title="'+esc(parentName)+'" aria-label="'+esc(tr('parentContextTitle')+': '+parentName)+'" aria-haspopup="dialog" aria-expanded="false" data-parent-context data-parent-context-name="'+esc(parentName)+'" data-parent-context-type="'+esc(parentType)+'" data-parent-context-parent-name="'+esc(parentParentName)+'" data-parent-context-parent-type="'+esc(parentParentType)+'"><bdi dir="auto">'+esc(parentName)+'</bdi></button>'
-  :'<span class="account-assigned-parent-name" dir="auto"><bdi dir="auto">'+esc(parentName)+'</bdi></span>';
+  ?'<button type="button" class="account-assigned-parent-name" dir="'+(ui.lang==='ar'?'rtl':'ltr')+'" title="'+esc(parentName)+'" aria-label="'+esc(tr('parentContextTitle')+': '+parentName)+'" aria-haspopup="dialog" aria-expanded="false" data-parent-context data-parent-context-name="'+esc(parentName)+'" data-parent-context-type="'+esc(parentType)+'" data-parent-context-parent-name="'+esc(parentParentName)+'" data-parent-context-parent-type="'+esc(parentParentType)+'"><bdi dir="auto">'+esc(parentName)+'</bdi></button>'
+  :'<span class="account-assigned-parent-name" dir="'+(ui.lang==='ar'?'rtl':'ltr')+'"><bdi dir="auto">'+esc(parentName)+'</bdi></span>';
  const typeLabel='<span class="account-assigned-type-label">'+esc(typeName(item.type))+'</span>';
  const dueLabel=esc(item.dueDate?fmtDate(item.dueDate,{month:'short',day:'numeric',year:'numeric'}):'—');
  const dueMarkup=item.type==='followup'?'':'<span class="account-assigned-due">'+icon('calendar',12)+' '+dueLabel+'</span>';
@@ -3505,7 +3505,7 @@ function accountAssignedItemRow(item){
    ?'<div class="account-assigned-meta-row">'+typeLabel+(item.type==='followup'?'':statusPill(item.status))+dueMarkup+'</div>'
    :'<div class="account-assigned-meta-row account-assigned-context-row">'+typeLabel+'<span class="account-assigned-meta-separator">·</span>'+parentNameMarkup+'</div><div class="account-assigned-meta-row account-assigned-state-row">'+priorityPill(item.priority||'medium')+statusPill(item.status)+dueMarkup+'</div>';
  const workArrowMarkup='<span class="account-assigned-work-arrow'+(ui.lang==='ar'?' is-rtl':'')+'" aria-hidden="true">'+icon('arrow',12)+'</span>';
- return '<div class="account-item-row account-assigned-item-row"><div class="account-item-icon">'+typeIcon(item.type)+'</div><div class="account-item-copy"><strong dir="auto">'+esc(item.name||id)+'</strong>'+details+'</div><div class="account-item-actions"><button class="btn btn-small" type="button" data-action="select-assigned" data-id="'+esc(id)+'">'+workArrowMarkup+' '+esc(tr('workLabel'))+'</button><button class="btn btn-small" type="button" data-action="history" data-item-id="'+esc(id)+'"'+(item.type==='task'?' data-history-scope="item"':'')+' aria-label="'+esc(tr('activityHistory'))+'" title="'+esc(tr('activityHistory'))+'">'+icon('clock',12)+' '+esc(tr('activityHistory'))+'</button>'+pinActionMarkup(id)+'</div></div>';
+ return '<div class="account-item-row account-assigned-item-row"><div class="account-item-icon">'+typeIcon(item.type)+'</div><div class="account-item-copy"><strong dir="'+(ui.lang==='ar'?'rtl':'ltr')+'" title="'+esc(item.name||id)+'">'+esc(item.name||id)+'</strong>'+details+'</div><div class="account-item-actions"><button class="btn btn-small" type="button" data-action="select-assigned" data-id="'+esc(id)+'">'+workArrowMarkup+' '+esc(tr('workLabel'))+'</button><button class="btn btn-small" type="button" data-action="history" data-item-id="'+esc(id)+'"'+(item.type==='task'?' data-history-scope="item"':'')+' aria-label="'+esc(tr('activityHistory'))+'" title="'+esc(tr('activityHistory'))+'">'+icon('clock',12)+' '+esc(tr('activityHistory'))+'</button>'+pinActionMarkup(id)+'</div></div>';
 }
 function filteredAccountAssignedItems(){
  const query=String(ui.accountAssignedQuery||'').trim().toLocaleLowerCase();
@@ -8260,10 +8260,101 @@ body.signin-open .scroll-to-top {
  .tree-created-meta .creator-line>.avatar svg{display:block!important;width:10px!important;height:10px!important}
  .tree-created-meta .creator-line>span:not(.avatar){min-width:0!important;line-height:16px!important;overflow-wrap:anywhere!important}
 }
-/* Urgent retains its existing colors but gains a warning marker and heavier outline. */
-.priority-pill.priority-urgent{border:2px solid currentColor!important;box-shadow:inset 0 0 0 1px currentColor!important;font-weight:900!important}
-.priority-pill.priority-urgent::before{content:"!";display:inline-grid;place-items:center;flex:0 0 11px;width:11px;height:11px;border:1px solid currentColor;border-radius:50%;font-size:8px;font-weight:900;line-height:1}
-#accountPage .account-assigned-item-row .account-item-copy .priority-pill.priority-urgent{border-width:2px!important;box-shadow:inset 0 0 0 1px currentColor!important;font-weight:900!important}
+/* The same compact warning marker appears in the Urgent label and Job overview tile.
+   The priority label keeps the standard one-pixel frame and weight. */
+.priority-pill.priority-urgent::before{content:"!"}
+.priority-pill.priority-urgent::before,
+.priority-urgent-icon{
+ display:inline-grid;
+ place-items:center;
+ flex:0 0 11px;
+ width:11px;
+ height:11px;
+ border:1px solid currentColor;
+ border-radius:50%;
+ font-size:8px;
+ font-weight:900;
+ line-height:1;
+}
+.priority-urgent-icon{color:var(--red)}
+</style>
+<style id="rtl-account-title-and-timeline-control-fixes">
+/* Account item titles follow the selected UI direction and use a real ellipsis
+   rather than wrapping outside the available card width. */
+#accountPage .account-item-row .account-item-copy{min-width:0!important}
+#accountPage .account-item-row .account-item-copy>strong{
+ display:block!important;
+ width:100%!important;
+ min-width:0!important;
+ max-width:100%!important;
+ direction:inherit!important;
+ text-align:start!important;
+ white-space:nowrap!important;
+ overflow:hidden!important;
+ text-overflow:ellipsis!important;
+ overflow-wrap:normal!important;
+ word-break:normal!important;
+}
+/* The parent context name aligns to the interface direction while its BDI
+   child remains content-aware for mixed Arabic/English item names. */
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-parent-name{
+ direction:inherit!important;
+ unicode-bidi:isolate!important;
+ text-align:start!important;
+}
+/* Preserve the Last updated text formatting, changing only its physical
+   corner in Arabic so it sits at the left edge of the child card. */
+html[dir="rtl"] #mainContent .child-card .child-last-updated-row{
+ direction:ltr!important;
+ justify-content:flex-start!important;
+}
+html[dir="rtl"] #mainContent .child-card .child-last-updated-row .mini-updated{
+ align-self:flex-start!important;
+}
+/* Mobile hierarchy: keep Edit on the title row. Grid direction puts it at the
+   top-right in English and top-left in Arabic; status stays below the title. */
+@media(max-width:700px){
+ .tree-task-row{
+  display:grid!important;
+  grid-template-columns:20px minmax(0,1fr) auto!important;
+  grid-template-rows:auto auto!important;
+  align-items:start!important;
+  column-gap:8px!important;
+  row-gap:7px!important;
+  min-width:0!important;
+  direction:inherit!important;
+ }
+ .tree-task-row>svg:first-child{
+  grid-column:1!important;
+  grid-row:1!important;
+  align-self:start!important;
+ }
+ .tree-task-row>.tree-name-type{
+  grid-column:2!important;
+  grid-row:1!important;
+  min-width:0!important;
+  max-width:100%!important;
+ }
+ .tree-task-row>.tree-task-controls{display:contents!important}
+ .tree-task-row>.tree-task-controls>.tree-task-edit{
+  grid-column:3!important;
+  grid-row:1!important;
+  justify-self:end!important;
+  align-self:start!important;
+  flex:0 0 auto!important;
+  margin:0!important;
+  min-height:30px!important;
+  max-width:100%!important;
+  white-space:nowrap!important;
+ }
+ .tree-task-row>.tree-task-controls>.status-pill{
+  grid-column:2!important;
+  grid-row:2!important;
+  justify-self:start!important;
+  align-self:center!important;
+  margin:0!important;
+ }
+}
 </style>
 </body>
 </html>

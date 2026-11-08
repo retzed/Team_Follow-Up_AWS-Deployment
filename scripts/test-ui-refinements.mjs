@@ -212,8 +212,13 @@ assert.equal(typeSyncNodes.get('#formDueDateField').hidden,false);
 assert.equal(typeSyncNodes.get('#formDueDate').disabled,false,
   'Switching back to Task must restore the due-date control.');
 
-assert.ok(finalPositionCss.includes('left:50vw!important') && finalPositionCss.includes('transform:translateX(-50%)!important'),
-  'The scroll-to-top control must be horizontally centered on desktop and mobile.');
+assert.ok(finalPositionCss.includes('#scrollToTopPositioner{') &&
+  finalPositionCss.includes('display:flex!important') &&
+  finalPositionCss.includes('justify-content:center!important') &&
+  finalPositionCss.includes('#scrollToTopPositioner>.scroll-to-top') &&
+  finalPositionCss.includes('position:relative!important') &&
+  finalPositionCss.includes('transform:none!important'),
+  'The top control must be centered by a full-width fixed flex host, not by a button offset or transform.');
 assert.ok(finalPositionCss.includes('top:calc(76px + 2px + env(safe-area-inset-top,0px))!important') &&
   finalPositionCss.includes('top:calc(68px + 4px + env(safe-area-inset-top,0px))!important'),
   'The scroll-to-top control must sit below the fixed header at both desktop and mobile breakpoints.');
@@ -230,9 +235,10 @@ assert.ok(html.includes('id="formAssigneeLabel"') && html.includes("tr(assigneeL
 assert.ok(!html.includes("tr('assignedTo')"),
   'Item ownership labels must no longer render the legacy “Assigned to” wording.');
 assert.ok(html.includes('account-assigned-followup-row') &&
-  html.includes(`priorityPill(item.priority||'medium')`) &&
-  html.includes(`esc(parentName)+'</span></div>`),
-  'Assigned and Pinned Follow-ups must render Type, Priority, and Parent in one metadata row.');
+  html.includes("priorityPill(item.priority||'medium')") &&
+  html.includes('data-parent-context-name=') &&
+  html.includes("esc(parentName)+'</button>'"),
+  'Assigned and Pinned Follow-ups must render Type, Priority, and a clickable parent name in one metadata row.');
 assert.ok(html.includes('.account-assigned-followup-row .account-assigned-parent-name') &&
   html.includes('text-overflow:ellipsis!important'),
   'The single Follow-up metadata row must remain readable on narrow account cards.');
@@ -390,9 +396,10 @@ assert.ok(html.includes('workspace-jump-highlight') &&
   html.includes('consistent-card-hover-and-jump-highlight') &&
   html.includes(':hover{') ,
   'Cards must share a consistent hover highlight and temporary jump highlight.');
-assert.ok(finalPositionCss.includes('left:50vw!important') &&
-  finalPositionCss.includes('top:calc(68px + 4px + env(safe-area-inset-top,0px))!important'),
-  'The back-to-top control must be centered on desktop and lower below the mobile header.');
+assert.ok(finalPositionCss.includes('justify-content:center!important') &&
+  finalPositionCss.includes('top:calc(68px + 4px + env(safe-area-inset-top,0px))!important') &&
+  finalPositionCss.includes('inset-inline-end:0!important'),
+  'The back-to-top flex host must center the button and remain below the mobile header.');
 
 const parentJumpStart=html.indexOf("case 'select-parent':");
 const parentJumpEnd=html.indexOf("case 'select-assigned':",parentJumpStart);
@@ -419,7 +426,12 @@ const editJumpEnd=html.indexOf('\nfunction clearParentFilters()',editJumpStart);
 const editJumpSource=html.slice(editJumpStart,editJumpEnd);
 assert.ok(editJumpStart>=0&&editJumpEnd>editJumpStart&&editJumpSource.includes('if(overviewJobId){')&&!editJumpSource.includes('if(overviewJobId&&oldJobPosition>=0)')&&editJumpSource.includes('if(newJobPosition>=0&&newJobPosition!==oldJobPosition)'), 'Job edits jump when a child newly enters or changes position in the active filter, but not when its position is unchanged or it leaves the result set.');
 assert.ok(html.includes("const overflowY=window.getComputedStyle(node).overflowY;")&&html.includes("scrollContainer.scrollTo({top,behavior:reduceMotion?'instant':'smooth'});"),'Item navigation scrolls the nearest scrollable ancestor when one exists.');
-assert.ok(html.includes("if (button.parentElement !== document.body) document.body.appendChild(button);")&&html.includes("set('left', `${viewportWidth / 2}px`);")&&html.includes("${mobile ? 2 : 2}px")&&html.includes("set('inset-inline-start', 'auto');"),'The floating top control is moved out of transformed application layout and physically centered, directly beneath the measured fixed header.');
+assert.ok(html.includes("let positioner = document.getElementById('scrollToTopPositioner');") &&
+  html.includes("if (button.parentElement !== positioner) positioner.appendChild(button);") &&
+  html.includes("set('justify-content', 'center');") &&
+  html.includes("set('left', '0');") &&
+  html.includes("set('right', '0');"),
+  'The fixed top control must be reparented into a viewport-wide flex host and centered independently of text direction.');
 
 assert.ok(html.includes("function findWorkspaceItemCard(itemId){")&&html.includes("data-item-id=\"${esc(item.id)}\"")&&html.includes("resolveAttempts<12"),'Workspace navigation resolves direct child cards by stable item ID after asynchronous rendering.');
 assert.ok(html.includes("void target.offsetWidth")&&html.includes("workspaceJumpHighlightGeneration"),'Repeated navigation restarts an existing card highlight without stale timers clearing the new highlight.');
@@ -427,3 +439,37 @@ assert.ok(html.includes("allUsersOption:'All Members'")&&html.includes("allUsers
 assert.ok(html.includes("${esc(tr('allPriorities'))}</option><option value=\"urgent\""),'The Assigned Items priority filter starts with All priorities.');
 assert.ok(html.includes(".top-title strong.account-page-heading")&&html.includes("font-weight:750 !important")&&html.includes("text-align:start !important"),'USERSPACE uses the same eyebrow font weight, typography, and alignment as WORKSPACE.');
 assert.ok(html.includes('#accountPage [dir="auto"]')&&html.includes('unicode-bidi: plaintext')&&html.includes('text-align: start !important;'),'Profile tabs inherit the workspace mixed Arabic/English direction and alignment rules.');
+
+const assignedRowStart=html.indexOf('function accountAssignedItemRow(item){');
+const assignedRowEnd=html.indexOf('\\nfunction filteredAccountAssignedItems(){',assignedRowStart);
+const assignedRowSource=html.slice(assignedRowStart,assignedRowEnd);
+assert.ok(assignedRowStart>=0&&assignedRowEnd>assignedRowStart &&
+  assignedRowSource.includes('data-parent-context-name=') &&
+  assignedRowSource.includes('data-parent-context-parent-name=') &&
+  assignedRowSource.includes('title=') ,
+  'The shared Assigned/Pinned card renderer must expose parent and ancestor names and a native hover tooltip.');
+assert.ok(assignedRowSource.includes('parentRecord?.parentId') &&
+  assignedRowSource.includes("parentId!==rootId?rootId:''"),
+  'A Follow-up under a Task must resolve and expose the Project/Job above its immediate parent.');
+assert.ok(html.includes('function toggleAccountParentContextPopup(trigger){') &&
+  html.includes('function positionAccountParentContextPopup(trigger,popup){') &&
+  html.includes('data-parent-context-close') &&
+  html.includes('aria-expanded=\"true\"'),
+  'The parent context popup must be positioned, dismissible, and expose its expanded state accessibly.');
+assert.ok(html.includes('.account-parent-context-popup{') &&
+  html.includes('background:var(--panel)') &&
+  html.includes('color:var(--text)') &&
+  html.includes('border:1px solid var(--border)'),
+  'The parent context popup must use the active theme surface, text, and border tokens.');
+assert.ok(html.includes('text-overflow:ellipsis!important') &&
+  html.includes('white-space:nowrap!important') &&
+  html.includes('unicode-bidi:plaintext!important') &&
+  html.includes('text-align:start!important'),
+  'The parent name must truncate with an ellipsis and follow English/Arabic text direction.');
+assert.ok(html.includes('account-assigned-work-arrow.is-rtl') &&
+  html.includes('transform:scaleX(-1)!important') &&
+  html.includes(\"(ui.lang==='ar'?' is-rtl':'')\"),
+  'Open in workspace must mirror its directional arrow in Arabic.');
+assert.ok(html.includes('rows.map(accountAssignedItemRow)') &&
+  html.includes('function accountAssignedSectionMarkup(key,rows){'),
+  'Assigned and Pinned Items must reuse the same parent-context card renderer.');

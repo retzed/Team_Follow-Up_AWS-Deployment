@@ -467,11 +467,10 @@ assert.ok(html.includes('.account-parent-context-popup{') &&
   html.includes('color:var(--text)') &&
   html.includes('border:1px solid var(--border)'),
   'The parent context popup must use the active theme surface, text, and border tokens.');
-assert.ok(html.includes('text-overflow:ellipsis!important') &&
-  html.includes('white-space:nowrap!important') &&
-  html.includes('unicode-bidi:plaintext!important') &&
-  html.includes('text-align:start!important'),
-  'The parent name must truncate with an ellipsis and follow English/Arabic text direction.');
+assert.ok(html.includes('#accountPage .account-assigned-item-row .account-item-copy .account-assigned-parent-name{') &&
+  html.includes('flex:1 1 0%!important') && html.includes('text-overflow:ellipsis!important') &&
+  html.includes('white-space:nowrap!important') && html.includes('text-align:start!important'),
+  'Only the parent name must take the remaining line width and truncate with an ellipsis aligned to the selected UI direction.');
 assert.ok(html.includes('account-assigned-work-arrow.is-rtl') &&
   html.includes('transform:scaleX(-1)!important') &&
   html.includes("(ui.lang==='ar'?' is-rtl':'')"),
@@ -490,13 +489,16 @@ assert.ok(html.includes('.tree-task-row{display:grid!important;') && html.includ
 assert.ok(html.includes("textDir=ui.lang==='ar'?'rtl':'ltr'") && html.includes('class="mini-updated" dir="${'),
   'Last-updated controls must explicitly follow the selected interface direction.');
 assert.ok(html.includes('.account-parent-context-row>strong>bdi[dir="auto"]') &&
-  html.includes('text-align:var(--mixed-content-align)!important') &&
-  html.includes('.account-assigned-item-row .account-item-copy .account-assigned-parent-name>bdi[dir="auto"]'),
-  'Assigned/Pinned parent names must use the selected English/Arabic alignment in both the card and popup.');
-assert.ok(html.includes('.tree-task-row>.tree-task-controls{') &&
-  html.includes('grid-column:2!important;') &&
-  html.includes('.tree-task-wrap .tree-child-main>button,.tree-direct-main>button{'),
-  'Mobile timeline hierarchy reserves stable grid positions for type icons, status, and Edit buttons.');
+  html.includes('.account-assigned-item-row .account-item-copy .account-assigned-parent-name>bdi{') &&
+  html.includes('<bdi dir="') && html.includes("ui.lang==='ar'?'rtl':'ltr'") &&
+  !html.includes('<bdi dir="auto">'),
+  'Assigned/Pinned parent names must use the selected English/Arabic direction and block alignment in the card and popup.');
+assert.ok(html.includes('grid-template-columns:20px minmax(0,1fr) auto!important') &&
+  html.includes('.tree-task-row.is-ltr{direction:ltr!important}') &&
+  html.includes('.tree-task-row.is-rtl{direction:rtl!important}') &&
+  html.includes('.tree-task-row>.tree-task-edit{') &&
+  html.includes('.tree-task-row>.status-pill{'),
+  'Mobile timeline hierarchy assigns direct grid positions using explicit English and Arabic directions.');
 assert.ok(html.includes('@media(min-width:701px)') &&
   html.includes('.tree-created-meta .creator-line>.avatar') &&
   html.includes('flex:0 0 16px!important') &&
@@ -526,19 +528,18 @@ assert.ok(assignedParentSource.includes("ui.lang==='ar'?'rtl':'ltr'") &&
   assignedParentSource.includes("class=\"account-assigned-parent-name\" dir=\"'+(ui.lang==="),
   'Assigned item and parent-context titles must use the selected UI direction.');
 
-assert.ok(html.includes('#accountPage .account-item-row .account-item-copy>strong') &&
-  html.includes('white-space:nowrap!important') &&
-  html.includes('text-overflow:ellipsis!important') &&
-  html.includes('text-align:start!important'),
-  'Assigned and Pinned item titles must remain on one line and show an ellipsis when constrained.');
+assert.ok(html.includes('#accountPage .account-item-row .account-item-copy>strong{') &&
+  html.includes('white-space:normal!important') && html.includes('overflow:visible!important') &&
+  html.includes('text-overflow:clip!important') && html.includes('overflow-wrap:anywhere!important'),
+  'Assigned and Pinned item names must remain fully visible and wrap over multiple lines.');
 
 assert.ok(html.includes('html[dir="rtl"] #mainContent .child-card .child-last-updated-row') &&
   html.includes('justify-content:flex-start!important'),
   'Arabic child-card Last updated labels must move to the physical left without changing their text formatting.');
 
-assert.ok(html.includes('grid-template-columns:20px minmax(0,1fr) auto!important') &&
-  html.includes('.tree-task-row>.tree-task-controls{display:contents!important}') &&
-  html.includes('.tree-task-row>.tree-task-controls>.tree-task-edit{') &&
-  html.includes('grid-column:3!important;') &&
-  html.includes('grid-row:1!important;'),
-  'Mobile hierarchy Edit buttons must occupy the title row and follow LTR/RTL grid direction.');
+assert.ok(html.includes('.tree-task-row.is-ltr{direction:ltr!important}') &&
+  html.includes('.tree-task-row.is-rtl{direction:rtl!important}') &&
+  html.includes('.tree-task-row>.tree-task-edit{') &&
+  html.includes('grid-template-columns:20px minmax(0,1fr) auto!important') &&
+  html.includes('grid-column:3!important;') && html.includes('grid-row:1!important;'),
+  'Mobile hierarchy Edit buttons must occupy physical top-right in English and top-left in Arabic without nested display:contents.');

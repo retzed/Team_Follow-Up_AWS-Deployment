@@ -522,8 +522,8 @@ const assignedParentEnd = html.indexOf('function filteredAccountAssignedItems()'
 assert.ok(assignedParentStart >= 0 && assignedParentEnd > assignedParentStart, 'Assigned item-card rendering must remain available.');
 const assignedParentSource = html.slice(assignedParentStart, assignedParentEnd);
 assert.ok(assignedParentSource.includes("ui.lang==='ar'?'rtl':'ltr'") &&
-  assignedParentSource.includes('title="'+esc(item.name||id)+'"') &&
-  assignedParentSource.includes('class="account-assigned-parent-name" dir="'+(ui.lang==='),
+  assignedParentSource.includes("title=\"'+esc(parentName)+'\"") &&
+  assignedParentSource.includes("class=\"account-assigned-parent-name\" dir=\"'+(ui.lang==="),
   'Assigned item and parent-context titles must use the selected UI direction.');
 
 assert.ok(html.includes('#accountPage .account-item-row .account-item-copy>strong') &&

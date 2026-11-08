@@ -242,7 +242,7 @@ assert.ok(!html.includes("tr('assignedTo')"),
 assert.ok(html.includes('account-assigned-followup-row') &&
   html.includes("priorityPill(item.priority||'medium')") &&
   html.includes('data-parent-context-name=') &&
-  html.includes("esc(parentName)+'</button>'"),
+  html.includes("esc(parentName)+'</bdi></button>'"),
   'Assigned and Pinned Follow-ups must render Type, Priority, and a clickable parent name in one metadata row.');
 assert.ok(html.includes('.account-assigned-followup-row .account-assigned-parent-name') &&
   html.includes('text-overflow:ellipsis!important'),

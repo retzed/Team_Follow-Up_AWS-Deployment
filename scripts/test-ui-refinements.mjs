@@ -242,7 +242,7 @@ assert.ok(!html.includes("tr('assignedTo')"),
 assert.ok(html.includes('account-assigned-followup-row') &&
   html.includes("priorityPill(item.priority||'medium')") &&
   html.includes('data-parent-context-name=') &&
-  html.includes("esc(parentName)+'</button>'"),
+  html.includes("esc(parentName)+'</bdi></button>'"),
   'Assigned and Pinned Follow-ups must render Type, Priority, and a clickable parent name in one metadata row.');
 assert.ok(html.includes('.account-assigned-followup-row .account-assigned-parent-name') &&
   html.includes('text-overflow:ellipsis!important'),
@@ -479,3 +479,10 @@ assert.ok(html.includes('account-assigned-work-arrow.is-rtl') &&
 assert.ok(html.includes('rows.map(accountAssignedItemRow)') &&
   html.includes('function accountAssignedSectionMarkup(key,rows){'),
   'Assigned and Pinned Items must reuse the same parent-context card renderer.');
+
+
+assert.ok(html.includes('parentContextRootLabel:"Grand Parent Item"') && html.includes("parentContextRootLabel:'العنصر الأعلى'"), 'English popup label is Grand Parent Item and Arabic translation remains unchanged.');
+assert.ok(html.includes('<bdi dir="auto">') && html.includes('data-parent-context-parent-name=') && html.includes('<strong><bdi dir="auto">'), 'Assigned/Pinned parent names and popup values isolate mixed-direction text.');
+assert.ok(html.includes('job-overview-summary-grid') && html.includes('>[data-filter="direct-followups"]') && html.includes('grid-template-columns:repeat(2,minmax(0,1fr))'), 'Mobile Job overview hides Follow-ups and places Urgent and High side by side.');
+assert.ok(html.includes('<bdi dir="auto">') && html.includes('function auditLabel(item,extraClass=') && html.includes('unicode-bidi:isolate'), 'Last-updated labels isolate timestamps and names to prevent mixed-direction reordering.');
+assert.ok(html.includes('.tree-task-row{display:grid!important;') && html.includes('.tree-task-wrap .tree-child-row,.tree-direct{display:block!important;') && html.includes('.tree-task-wrap .tree-child-main,.tree-direct-main{display:grid!important;'), 'Mobile timeline hierarchy uses explicit grid rows and block wrappers to prevent overlap.');

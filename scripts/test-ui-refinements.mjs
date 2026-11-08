@@ -212,7 +212,7 @@ assert.equal(typeSyncNodes.get('#formDueDateField').hidden,false);
 assert.equal(typeSyncNodes.get('#formDueDate').disabled,false,
   'Switching back to Task must restore the due-date control.');
 
-assert.ok(finalPositionCss.includes('#scrollToTopPositioner{') &&
+assert.ok(finalPositionCss.includes('#scrollToTopPositioner {') &&
   finalPositionCss.includes('display:flex!important') &&
   finalPositionCss.includes('justify-content:center!important') &&
   finalPositionCss.includes('#scrollToTopPositioner>.scroll-to-top') &&

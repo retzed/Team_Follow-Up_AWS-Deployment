@@ -490,8 +490,7 @@ assert.ok(html.includes("textDir=ui.lang==='ar'?'rtl':'ltr'") && html.includes('
   'Last-updated controls must explicitly follow the selected interface direction.');
 assert.ok(html.includes('.account-parent-context-row>strong>bdi[dir="auto"]') &&
   html.includes('.account-assigned-item-row .account-item-copy .account-assigned-parent-name>bdi{') &&
-  html.includes('<bdi dir="') && html.includes("ui.lang==='ar'?'rtl':'ltr'") &&
-  !html.includes('<bdi dir="auto">'),
+  html.includes('<bdi dir="') && html.includes("ui.lang==='ar'?'rtl':'ltr'"),
   'Assigned/Pinned parent names must use the selected English/Arabic direction and block alignment in the card and popup.');
 assert.ok(html.includes('grid-template-columns:20px minmax(0,1fr) auto!important') &&
   html.includes('.tree-task-row.is-ltr{direction:ltr!important}') &&

@@ -350,7 +350,7 @@ const workspaceFixCss = html.slice(workspaceFixStart, workspaceFixEnd);
 assert.ok(workspaceFixCss.includes('grid-template-columns:22px minmax(132px,1fr)') && workspaceFixCss.includes('minmax(132px,1fr)') && workspaceFixCss.includes('overflow-wrap:break-word !important;') && workspaceFixCss.includes('writing-mode:horizontal-tb !important;'), 'Hierarchy rows must preserve a usable text column and horizontal text flow on phones.');
 assert.ok(workspaceFixCss.includes('.mobile-search-toggle[aria-expanded="true"]') && workspaceFixCss.includes('.mobile-search-toggle[aria-expanded="false"]') && workspaceFixCss.includes('mobile-search-toggle-state svg'), 'The search toggle must visually distinguish expanded and collapsed states.');
 assert.ok(html.includes('<style id="scroll-to-top-final-position">') &&
-  html.includes('#scrollToTopPositioner{') &&
+  html.includes('#scrollToTopPositioner {') &&
   html.includes('justify-content:center!important') &&
   html.includes('#scrollToTopPositioner>.scroll-to-top') &&
   html.includes('top:calc(76px + 2px + env(safe-area-inset-top,0px))!important;') &&

@@ -3364,7 +3364,7 @@ function renderChildList(parent){
  const cards=roots.map(({item,nested})=>childCard(item,parent,{filteredNested:nested})).join('');
  return cards+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):error?loadErrorMarkup(error):'');
 }
-function treeActivity(parent){const roots=childrenOf(parent.id).sort(newestCreatedFirst);const ready=rootChildrenReady(parent.id);const rootMeta=`<div class="tree-created-meta tree-root-created-meta">${creatorLabel(parent)}</div>`;if(!roots.length&&!ready)return rootMeta+rootPendingMarkup(parent.id,'children',tr('loadingItems'));if(!roots.length)return rootMeta+`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`;const markup=roots.map(item=>{if(item.type==='task'){const nested=childrenOf(item.id).sort(newestCreatedFirst);return `<div class="tree-task-wrap"><div class="tree-task-row">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-title" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div><div class="tree-task-controls">${statusPill(item.status)}<button class="subtle-btn tree-task-edit" data-action="edit-item" data-id="${esc(item.id)}" type="button">${icon('edit',12)} ${esc(tr('edit'))}</button></div></div><div class="tree-created-meta">${creatorLabel(item)}</div><details class="tree-item"><summary class="tree-followups-summary">${icon('chevron',13)}<span class="tree-title tree-followups-label" dir="auto">${esc(tr('openFollowups'))}</span><span class="tree-count" title="${esc(tr('openFollowups'))}">${nested.length}${!ready?` ${icon('spinner',10)}`:''}</span>${icon('chevron',13)}</summary><div class="tree-contents">${nested.length?nested.map(c=>`<div class="tree-child-row"><div class="tree-child-main">${typeIcon(c.type)}<span class="tree-child-name" dir="auto">${esc(c.name)}</span>${c.type!=='followup'?statusPill(c.status):''}<button class="subtle-btn" data-action="edit-item" data-id="${esc(c.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(c)}</div></div>`).join(''):`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`}${!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button></div></details></div>`;}return `<div class="tree-direct"><div class="tree-direct-main">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-child-name" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div>${item.type!=='followup'?statusPill(item.status):''}<button class="subtle-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(item)}</div></div>`;}).join('');return rootMeta+markup+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):'');}
+function treeActivity(parent){const roots=childrenOf(parent.id).sort(newestCreatedFirst);const ready=rootChildrenReady(parent.id);const rootMeta=`<div class="tree-created-meta tree-root-created-meta">${creatorLabel(parent)}</div>`;if(!roots.length&&!ready)return rootMeta+rootPendingMarkup(parent.id,'children',tr('loadingItems'));if(!roots.length)return rootMeta+`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`;const markup=roots.map(item=>{if(item.type==='task'){const nested=childrenOf(item.id).sort(newestCreatedFirst);return `<div class="tree-task-wrap"><div class="tree-task-row ${ui.lang==='ar'?'is-rtl':'is-ltr'}">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-title" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div>${statusPill(item.status)}<button class="subtle-btn tree-task-edit" data-action="edit-item" data-id="${esc(item.id)}" type="button">${icon('edit',12)} ${esc(tr('edit'))}</button></div><div class="tree-created-meta">${creatorLabel(item)}</div><details class="tree-item"><summary class="tree-followups-summary">${icon('chevron',13)}<span class="tree-title tree-followups-label" dir="auto">${esc(tr('openFollowups'))}</span><span class="tree-count" title="${esc(tr('openFollowups'))}">${nested.length}${!ready?` ${icon('spinner',10)}`:''}</span>${icon('chevron',13)}</summary><div class="tree-contents">${nested.length?nested.map(c=>`<div class="tree-child-row"><div class="tree-child-main">${typeIcon(c.type)}<span class="tree-child-name" dir="auto">${esc(c.name)}</span>${c.type!=='followup'?statusPill(c.status):''}<button class="subtle-btn" data-action="edit-item" data-id="${esc(c.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(c)}</div></div>`).join(''):`<div class="timeline-empty">${esc(tr('noChildItems'))}</div>`}${!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):''}<button class="btn btn-small" data-action="new-child" data-parent-id="${esc(item.id)}" data-type="followup" type="button">${icon('plus',12)} ${esc(tr('newFollowup'))}</button></div></details></div>`;}return `<div class="tree-direct"><div class="tree-direct-main">${typeIcon(item.type)}<div class="tree-name-type"><span class="tree-child-name" dir="auto">${esc(item.name)}</span><span class="type-pill tree-direct-type">${esc(typeName(item.type))}</span></div>${item.type!=='followup'?statusPill(item.status):''}<button class="subtle-btn" data-action="edit-item" data-id="${esc(item.id)}" type="button" aria-label="${esc(tr('edit'))}" title="${esc(tr('edit'))}">${icon('edit',12)}</button></div><div class="tree-created-meta">${creatorLabel(item)}</div></div>`;}).join('');return rootMeta+markup+(!ready?rootPendingMarkup(parent.id,'children',tr('loadingItems')):rootLoadingError(parent.id,'children')?loadErrorMarkup(rootLoadingError(parent.id,'children')):'');}
 function timelineEvents(parent,limit=8){
  const ready=rootActivityReady(parent.id),error=rootLoadingError(parent.id,'activity');
  if(!ready&&!error)return `<div class="timeline-empty">${esc(tr('activityNotLoaded'))}</div>`;
@@ -3494,8 +3494,8 @@ function accountAssignedItemRow(item){
  const parentParentName=String(parentParent?.name||(parentParentId===rootId?root?.name:'')||'');
  const parentParentType=String(parentParent?.type||(parentParentId===rootId?root?.type:'')||'');
  const parentNameMarkup=parentName&&parentName!=='—'
-  ?'<button type="button" class="account-assigned-parent-name" dir="'+(ui.lang==='ar'?'rtl':'ltr')+'" title="'+esc(parentName)+'" aria-label="'+esc(tr('parentContextTitle')+': '+parentName)+'" aria-haspopup="dialog" aria-expanded="false" data-parent-context data-parent-context-name="'+esc(parentName)+'" data-parent-context-type="'+esc(parentType)+'" data-parent-context-parent-name="'+esc(parentParentName)+'" data-parent-context-parent-type="'+esc(parentParentType)+'"><bdi dir="auto">'+esc(parentName)+'</bdi></button>'
-  :'<span class="account-assigned-parent-name" dir="'+(ui.lang==='ar'?'rtl':'ltr')+'"><bdi dir="auto">'+esc(parentName)+'</bdi></span>';
+  ?'<button type="button" class="account-assigned-parent-name" dir="'+(ui.lang==='ar'?'rtl':'ltr')+'" title="'+esc(parentName)+'" aria-label="'+esc(tr('parentContextTitle')+': '+parentName)+'" aria-haspopup="dialog" aria-expanded="false" data-parent-context data-parent-context-name="'+esc(parentName)+'" data-parent-context-type="'+esc(parentType)+'" data-parent-context-parent-name="'+esc(parentParentName)+'" data-parent-context-parent-type="'+esc(parentParentType)+'"><bdi dir="'+(ui.lang==='ar'?'rtl':'ltr')+'">'+esc(parentName)+'</bdi></button>'
+  :'<span class="account-assigned-parent-name" dir="'+(ui.lang==='ar'?'rtl':'ltr')+'"><bdi dir="'+(ui.lang==='ar'?'rtl':'ltr')+'">'+esc(parentName)+'</bdi></span>';
  const typeLabel='<span class="account-assigned-type-label">'+esc(typeName(item.type))+'</span>';
  const dueLabel=esc(item.dueDate?fmtDate(item.dueDate,{month:'short',day:'numeric',year:'numeric'}):'—');
  const dueMarkup=item.type==='followup'?'':'<span class="account-assigned-due">'+icon('calendar',12)+' '+dueLabel+'</span>';
@@ -8279,81 +8279,49 @@ body.signin-open .scroll-to-top {
 .priority-urgent-icon{color:var(--red)}
 </style>
 <style id="rtl-account-title-and-timeline-control-fixes">
-/* Account item titles follow the selected UI direction and use a real ellipsis
-   rather than wrapping outside the available card width. */
-#accountPage .account-item-row .account-item-copy{min-width:0!important}
+/* Item names are content, not metadata: keep the full value and let it wrap
+   naturally over as many lines as the card needs. */
 #accountPage .account-item-row .account-item-copy>strong{
- display:block!important;
- width:100%!important;
- min-width:0!important;
- max-width:100%!important;
- direction:inherit!important;
- text-align:start!important;
- white-space:nowrap!important;
- overflow:hidden!important;
- text-overflow:ellipsis!important;
- overflow-wrap:normal!important;
- word-break:normal!important;
+ display:block!important;flex:0 0 auto!important;width:100%!important;min-width:0!important;max-width:100%!important;
+ direction:inherit!important;text-align:var(--mixed-content-align)!important;white-space:normal!important;
+ overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important;word-break:normal!important;unicode-bidi:plaintext!important;
 }
-/* The parent context name aligns to the interface direction while its BDI
-   child remains content-aware for mixed Arabic/English item names. */
+/* The parent name alone truncates. It consumes the remaining metadata-row width
+   and aligns to the selected interface direction. */
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-context-row,
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-followup-row{
+ display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;
+ width:100%!important;min-width:0!important;max-width:100%!important;overflow:hidden!important;
+}
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-meta-row>.account-assigned-type-label,
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-meta-row>.account-assigned-meta-separator,
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-meta-row>.priority-pill{
+ flex:0 0 auto!important;white-space:nowrap!important;
+}
 #accountPage .account-assigned-item-row .account-item-copy .account-assigned-parent-name{
- direction:inherit!important;
- unicode-bidi:isolate!important;
- text-align:start!important;
+ display:block!important;flex:1 1 0%!important;width:0!important;min-width:0!important;max-width:100%!important;
+ margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;
+ color:var(--text)!important;font:inherit!important;font-size:10px!important;font-weight:650!important;line-height:1.4!important;
+ direction:inherit!important;unicode-bidi:isolate!important;text-align:start!important;
+ white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;overflow-wrap:normal!important;word-break:normal!important;
 }
-/* Preserve the Last updated text formatting, changing only its physical
-   corner in Arabic so it sits at the left edge of the child card. */
-html[dir="rtl"] #mainContent .child-card .child-last-updated-row{
- direction:ltr!important;
- justify-content:flex-start!important;
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-parent-name>bdi{
+ display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;
+ direction:inherit!important;unicode-bidi:isolate!important;text-align:inherit!important;
+ white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;overflow-wrap:normal!important;word-break:normal!important;
 }
-html[dir="rtl"] #mainContent .child-card .child-last-updated-row .mini-updated{
- align-self:flex-start!important;
-}
-/* Mobile hierarchy: keep Edit on the title row. Grid direction puts it at the
-   top-right in English and top-left in Arabic; status stays below the title. */
+/* Preserve Last updated formatting and place it at the physical left in Arabic. */
+html[dir="rtl"] #mainContent .child-card .child-last-updated-row{direction:ltr!important;justify-content:flex-start!important}
+html[dir="rtl"] #mainContent .child-card .child-last-updated-row .mini-updated{align-self:flex-start!important}
+/* Direct grid children prevent older nested-controls rules from moving Edit. */
 @media(max-width:700px){
- .tree-task-row{
-  display:grid!important;
-  grid-template-columns:20px minmax(0,1fr) auto!important;
-  grid-template-rows:auto auto!important;
-  align-items:start!important;
-  column-gap:8px!important;
-  row-gap:7px!important;
-  min-width:0!important;
-  direction:inherit!important;
- }
- .tree-task-row>svg:first-child{
-  grid-column:1!important;
-  grid-row:1!important;
-  align-self:start!important;
- }
- .tree-task-row>.tree-name-type{
-  grid-column:2!important;
-  grid-row:1!important;
-  min-width:0!important;
-  max-width:100%!important;
- }
- .tree-task-row>.tree-task-controls{display:contents!important}
- .tree-task-row>.tree-task-controls>.tree-task-edit{
-  grid-column:3!important;
-  grid-row:1!important;
-  justify-self:end!important;
-  align-self:start!important;
-  flex:0 0 auto!important;
-  margin:0!important;
-  min-height:30px!important;
-  max-width:100%!important;
-  white-space:nowrap!important;
- }
- .tree-task-row>.tree-task-controls>.status-pill{
-  grid-column:2!important;
-  grid-row:2!important;
-  justify-self:start!important;
-  align-self:center!important;
-  margin:0!important;
- }
+ .tree-task-row{display:grid!important;grid-template-columns:20px minmax(0,1fr) auto!important;grid-template-rows:auto auto!important;align-items:start!important;column-gap:8px!important;row-gap:7px!important;min-width:0!important}
+ .tree-task-row.is-ltr{direction:ltr!important}
+ .tree-task-row.is-rtl{direction:rtl!important}
+ .tree-task-row>svg:first-child{grid-column:1!important;grid-row:1!important;align-self:start!important;margin-top:2px!important}
+ .tree-task-row>.tree-name-type{grid-column:2!important;grid-row:1!important;min-width:0!important;max-width:100%!important}
+ .tree-task-row>.status-pill{grid-column:2!important;grid-row:2!important;justify-self:start!important;align-self:center!important;margin:0!important}
+ .tree-task-row>.tree-task-edit{grid-column:3!important;grid-row:1!important;justify-self:end!important;align-self:start!important;flex:0 0 auto!important;margin:0!important;min-height:30px!important;max-width:100%!important;white-space:nowrap!important}
 }
 </style>
 </body>

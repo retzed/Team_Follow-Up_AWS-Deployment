@@ -486,3 +486,24 @@ assert.ok(html.includes('<bdi dir="auto">') && html.includes('data-parent-contex
 assert.ok(html.includes('job-overview-summary-grid') && html.includes('>[data-filter="direct-followups"]') && html.includes('grid-template-columns:repeat(2,minmax(0,1fr))'), 'Mobile Job overview hides Follow-ups and places Urgent and High side by side.');
 assert.ok(html.includes('<bdi dir="auto">') && html.includes('function auditLabel(item,extraClass=') && html.includes('unicode-bidi:isolate'), 'Last-updated labels isolate timestamps and names to prevent mixed-direction reordering.');
 assert.ok(html.includes('.tree-task-row{display:grid!important;') && html.includes('.tree-task-wrap .tree-child-row,.tree-direct{display:block!important;') && html.includes('.tree-task-wrap .tree-child-main,.tree-direct-main{display:grid!important;'), 'Mobile timeline hierarchy uses explicit grid rows and block wrappers to prevent overlap.');
+// RTL alignment and final cascade regression coverage.
+assert.ok(html.includes("textDir=ui.lang==='ar'?'rtl':'ltr'") && html.includes('class="mini-updated" dir="${'),
+  'Last-updated controls must explicitly follow the selected interface direction.');
+assert.ok(html.includes('.account-parent-context-row>strong>bdi[dir="auto"]') &&
+  html.includes('text-align:var(--mixed-content-align)!important') &&
+  html.includes('.account-assigned-item-row .account-item-copy .account-assigned-parent-name>bdi[dir="auto"]'),
+  'Assigned/Pinned parent names must use the selected English/Arabic alignment in both the card and popup.');
+assert.ok(html.includes('.tree-task-row>.tree-task-controls{') &&
+  html.includes('grid-column:2!important;') &&
+  html.includes('.tree-task-wrap .tree-child-main>button,.tree-direct-main>button{'),
+  'Mobile timeline hierarchy reserves stable grid positions for type icons, status, and Edit buttons.');
+assert.ok(html.includes('@media(min-width:701px)') &&
+  html.includes('.tree-created-meta .creator-line>.avatar') &&
+  html.includes('flex:0 0 16px!important') &&
+  html.includes('align-items:center!important'),
+  'Desktop timeline creator icons must be compact and aligned with their metadata text.');
+assert.ok(html.includes('.priority-pill.priority-urgent::before') &&
+  html.includes('content:"!"') &&
+  html.includes('border:2px solid currentColor!important') &&
+  html.includes('box-shadow:inset 0 0 0 1px currentColor!important'),
+  'Urgent must be more prominent than High through a marker and heavier outline without changing its color.');

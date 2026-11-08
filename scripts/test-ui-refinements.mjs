@@ -440,13 +440,14 @@ assert.ok(html.includes("${esc(tr('allPriorities'))}</option><option value=\"urg
 assert.ok(html.includes(".top-title strong.account-page-heading")&&html.includes("font-weight:750 !important")&&html.includes("text-align:start !important"),'USERSPACE uses the same eyebrow font weight, typography, and alignment as WORKSPACE.');
 assert.ok(html.includes('#accountPage [dir="auto"]')&&html.includes('unicode-bidi: plaintext')&&html.includes('text-align: start !important;'),'Profile tabs inherit the workspace mixed Arabic/English direction and alignment rules.');
 
+
 const assignedRowStart=html.indexOf('function accountAssignedItemRow(item){');
-const assignedRowEnd=html.indexOf('\\nfunction filteredAccountAssignedItems(){',assignedRowStart);
+const assignedRowEnd=html.indexOf('\nfunction filteredAccountAssignedItems(){',assignedRowStart);
 const assignedRowSource=html.slice(assignedRowStart,assignedRowEnd);
 assert.ok(assignedRowStart>=0&&assignedRowEnd>assignedRowStart &&
   assignedRowSource.includes('data-parent-context-name=') &&
   assignedRowSource.includes('data-parent-context-parent-name=') &&
-  assignedRowSource.includes('title=') ,
+  assignedRowSource.includes("title=\"'+esc(parentName)+'\""),
   'The shared Assigned/Pinned card renderer must expose parent and ancestor names and a native hover tooltip.');
 assert.ok(assignedRowSource.includes('parentRecord?.parentId') &&
   assignedRowSource.includes("parentId!==rootId?rootId:''"),
@@ -454,7 +455,7 @@ assert.ok(assignedRowSource.includes('parentRecord?.parentId') &&
 assert.ok(html.includes('function toggleAccountParentContextPopup(trigger){') &&
   html.includes('function positionAccountParentContextPopup(trigger,popup){') &&
   html.includes('data-parent-context-close') &&
-  html.includes('aria-expanded=\"true\"'),
+  html.includes("trigger.setAttribute('aria-expanded','true');"),
   'The parent context popup must be positioned, dismissible, and expose its expanded state accessibly.');
 assert.ok(html.includes('.account-parent-context-popup{') &&
   html.includes('background:var(--panel)') &&
@@ -468,7 +469,7 @@ assert.ok(html.includes('text-overflow:ellipsis!important') &&
   'The parent name must truncate with an ellipsis and follow English/Arabic text direction.');
 assert.ok(html.includes('account-assigned-work-arrow.is-rtl') &&
   html.includes('transform:scaleX(-1)!important') &&
-  html.includes(\"(ui.lang==='ar'?' is-rtl':'')\"),
+  html.includes("(ui.lang==='ar'?' is-rtl':'')"),
   'Open in workspace must mirror its directional arrow in Arabic.');
 assert.ok(html.includes('rows.map(accountAssignedItemRow)') &&
   html.includes('function accountAssignedSectionMarkup(key,rows){'),

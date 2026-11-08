@@ -503,7 +503,42 @@ assert.ok(html.includes('@media(min-width:701px)') &&
   html.includes('align-items:center!important'),
   'Desktop timeline creator icons must be compact and aligned with their metadata text.');
 assert.ok(html.includes('.priority-pill.priority-urgent::before') &&
-  html.includes('content:"!"') &&
-  html.includes('border:2px solid currentColor!important') &&
-  html.includes('box-shadow:inset 0 0 0 1px currentColor!important'),
-  'Urgent must be more prominent than High through a marker and heavier outline without changing its color.');
+  html.includes('.priority-urgent-icon') &&
+  html.includes('class="priority-urgent-icon"') &&
+  html.includes('border:1px solid currentColor') &&
+  !html.includes('border:2px solid currentColor!important'),
+  'Urgent must use the standard priority frame while the Job overview reuses its circular exclamation marker.');
+
+const pinnedCardStart = html.indexOf('function accountItemRow(item){');
+const pinnedCardEnd = html.indexOf('async function hydrateAccountAssignedParentNames', pinnedCardStart);
+assert.ok(pinnedCardStart >= 0 && pinnedCardEnd > pinnedCardStart, 'Pinned account-card rendering must remain available.');
+const pinnedCardSource = html.slice(pinnedCardStart, pinnedCardEnd);
+assert.ok(pinnedCardSource.includes("ui.lang==='ar'?'rtl':'ltr'") &&
+  pinnedCardSource.includes('title="${esc(item.name||id)}"'),
+  'Pinned item titles must align to the selected UI direction and expose the full name on hover.');
+
+const assignedParentStart = html.indexOf('const parentNameMarkup=');
+const assignedParentEnd = html.indexOf('function filteredAccountAssignedItems()', assignedParentStart);
+assert.ok(assignedParentStart >= 0 && assignedParentEnd > assignedParentStart, 'Assigned item-card rendering must remain available.');
+const assignedParentSource = html.slice(assignedParentStart, assignedParentEnd);
+assert.ok(assignedParentSource.includes("ui.lang==='ar'?'rtl':'ltr'") &&
+  assignedParentSource.includes('title="'+esc(item.name||id)+'"') &&
+  assignedParentSource.includes('class="account-assigned-parent-name" dir="'+(ui.lang==='),
+  'Assigned item and parent-context titles must use the selected UI direction.');
+
+assert.ok(html.includes('#accountPage .account-item-row .account-item-copy>strong') &&
+  html.includes('white-space:nowrap!important') &&
+  html.includes('text-overflow:ellipsis!important') &&
+  html.includes('text-align:start!important'),
+  'Assigned and Pinned item titles must remain on one line and show an ellipsis when constrained.');
+
+assert.ok(html.includes('html[dir="rtl"] #mainContent .child-card .child-last-updated-row') &&
+  html.includes('justify-content:flex-start!important'),
+  'Arabic child-card Last updated labels must move to the physical left without changing their text formatting.');
+
+assert.ok(html.includes('grid-template-columns:20px minmax(0,1fr) auto!important') &&
+  html.includes('.tree-task-row>.tree-task-controls{display:contents!important}') &&
+  html.includes('.tree-task-row>.tree-task-controls>.tree-task-edit{') &&
+  html.includes('grid-column:3!important;') &&
+  html.includes('grid-row:1!important;'),
+  'Mobile hierarchy Edit buttons must occupy the title row and follow LTR/RTL grid direction.');

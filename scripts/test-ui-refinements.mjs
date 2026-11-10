@@ -388,13 +388,17 @@ assert.ok(html.includes('function jobOverviewChildOrder(parentId){') &&
   html.includes('newJobPosition!==oldJobPosition') &&
   html.includes('alignWorkspaceItemInViewport(movedCard)'),
   'Job overview editing must compare pre/post filtered order and jump only when the card moves.');
-assert.ok(html.includes("function alignWorkspaceItemInViewport(target,itemId=''){") &&
+assert.ok(html.includes("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false}={}){") &&
   html.includes('viewportCenter=usableTop+(usableBottom-usableTop)/2') &&
   html.includes('window.scrollY+targetCenter-viewportCenter'),
   'Item jumps must center the target in the usable desktop viewport.');
+assert.ok(html.includes('const delta=alignToTop||!desktop?rect.top-(usableTop+12):targetCenter-viewportCenter;') &&
+  html.includes('if(desktop&&!alignToTop){') &&
+  html.includes("alignToTop:isRootItem&&item.type==='job'"),
+  'Job root redirects align the actual detail-card start below the header; ordinary item jumps retain desktop centering.');
 assert.ok(html.includes('window.scrollY+rect.top-headerBottom-12'),
   'Mobile item jumps must preserve top alignment below the fixed header.');
-assert.ok(html.includes("alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId)") &&
+assert.ok(html.includes("alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId,{alignToTop:isRootItem&&item.type==='job'})") &&
   html.includes("alignWorkspaceItemInViewport(document.querySelector('#mainContent .detail-banner'))"),
   'Parent, assigned, and pinned destinations must use the same item-aware navigation.');
 assert.ok(html.includes('workspace-jump-highlight') &&
@@ -408,7 +412,7 @@ assert.ok(finalPositionCss.includes('justify-content:center!important') &&
 
 const parentJumpStart=html.indexOf("case 'select-parent':");
 const parentJumpEnd=html.indexOf("case 'select-assigned':",parentJumpStart);
-assert.ok(parentJumpStart>=0&&parentJumpEnd>parentJumpStart&&html.slice(parentJumpStart,parentJumpEnd).includes('alignWorkspaceItemInViewport(document.querySelector(\'#mainContent .detail-banner\'))'),'Selecting a parent must use centered item navigation after its children load.');
+assert.ok(parentJumpStart>=0&&parentJumpEnd>parentJumpStart&&html.slice(parentJumpStart,parentJumpEnd).includes("alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'})"),'Selecting a parent aligns Job items to the beginning and preserves the existing Project behavior.');
 
 
 const accountSearchMatcherStart=html.indexOf('function accountSearchUserMatches(item,userId){');
@@ -585,7 +589,7 @@ assert.ok(html.includes('#mainContent .tree-task-row .tree-title') &&
   'Related hierarchy item names match Recent activity title weight, and Recent activity metadata matches the compact metadata scale.');
 assert.ok(html.includes('function metaSeparatorMarkup(){') &&
   html.includes('function fmtDateTimeMarkup(date){') &&
-  html.includes('class="meta-separator" aria-hidden="true">&thinsp;·&thinsp;</span>') &&
+  html.includes('class="meta-separator" aria-hidden="true">&nbsp;·&nbsp;</span>') &&
   html.includes('font-weight:1000!important') &&
   html.includes('-webkit-text-stroke:.18px currentColor') &&
   html.includes('gap:0!important'),
@@ -610,7 +614,7 @@ assert.ok(finalLayoutFixStart>=0 && finalLayoutFixEnd>finalLayoutFixStart &&
   finalLayoutFix.includes('text-decoration:inherit!important') &&
   finalLayoutFix.includes('.meta-separator{display:inline!important;margin-inline:0!important') &&
   finalLayoutFix.includes('gap:0!important') &&
-  html.includes('&thinsp;·&thinsp;'),
+  html.includes('&nbsp;·&nbsp;'),
   'Last-updated date/time remains inline and underlined, with separator whitespace inside the decorated text rather than outside margins.');
 assert.ok(finalLayoutFix.includes('--activity-meta-font:var(--font-ui)') &&
   finalLayoutFix.includes('--activity-meta-size:10px') &&
@@ -642,6 +646,22 @@ assert.ok(historyUserRendererStart>=0 &&
   historyUserRenderer.includes('class="history-user-copy"'),
   'History popup user name stays inside the flex-aligned avatar/name group.');
 
+assert.ok(html.includes("function metaSeparatorMarkup(){return '<span class=\"meta-separator\" aria-hidden=\"true\">&nbsp;·&nbsp;</span>';") &&
+  html.includes("function creatorLabel(item){") && html.includes("function auditLabel(item,extraClass=''){") &&
+  html.includes("fmtDateTimeMarkup(p.updatedAt)}\u0024{metaSeparatorMarkup()}") &&
+  html.includes("\u0024{metaSeparatorMarkup()}\u0024{fmtDateTimeMarkup(e.at)}"),
+  'Created-by, Last updated, parent-list and recent-activity metadata all use the same adequately spaced separator helper.');
+assert.ok(html.includes("const typeLabel='<span class=\"type-pill account-assigned-type-label\">'") &&
+  html.includes("#accountPage .account-assigned-item-row .account-item-copy .account-assigned-type-label") &&
+  html.includes("border: 1px solid var(--border) !important;") &&
+  html.includes("justify-content: flex-start !important;"),
+  'Profile Search and Assigned item types remain inside a bounded pill aligned with the start of the card copy.');
+assert.ok(html.includes('html[dir="rtl"] #accountPage .account-search-controls > .account-search-clear-button') &&
+  html.includes('html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-button') &&
+  html.includes('justify-self: stretch !important;') &&
+  html.includes('justify-content: flex-start !important;') &&
+  html.includes('direction: rtl !important;'),
+  'Profile Search and Assigned Clear controls use a full-row RTL flex alignment rather than direction-sensitive grid placement.');
 const mobileChildFixStart = html.indexOf('<style id="mobile-child-card-dynamic-flow-and-unified-metadata-separators">');
 const mobileChildFixEnd = html.indexOf('</style>', mobileChildFixStart);
 const mobileChildFix = html.slice(mobileChildFixStart, mobileChildFixEnd);
@@ -654,7 +674,9 @@ assert.ok(mobileChildFixStart >= 0 && mobileChildFixEnd > mobileChildFixStart &&
   mobileChildFix.includes('.child-title-row .type-pill {') &&
   mobileChildFix.includes('vertical-align: baseline !important;') &&
   mobileChildFix.includes('.child-top .child-description {') &&
-  mobileChildFix.includes('grid-column: 1 / -1 !important;') &&
+  mobileChildFix.includes('grid-column: 2 / -1 !important;') &&
+  mobileChildFix.includes('.child-top .child-meta {') &&
+  mobileChildFix.includes('grid-column: 2 / -1 !important;') &&
   mobileChildFix.includes('grid-row: 2 !important;'),
   'On mobile, the type chip follows the item-name text and the description spans the full card width.');
 assert.ok(mobileAssigneeStart >= 0 && mobileAssigneeEnd > mobileAssigneeStart &&

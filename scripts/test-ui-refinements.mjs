@@ -388,18 +388,18 @@ assert.ok(html.includes('function jobOverviewChildOrder(parentId){') &&
   html.includes('newJobPosition!==oldJobPosition') &&
   html.includes('alignWorkspaceItemInViewport(movedCard)'),
   'Job overview editing must compare pre/post filtered order and jump only when the card moves.');
-assert.ok(html.includes("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false}={}){") &&
+assert.ok(html.includes("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlight=true}={}){") &&
   html.includes('viewportCenter=usableTop+(usableBottom-usableTop)/2') &&
   html.includes('window.scrollY+targetCenter-viewportCenter'),
   'Item jumps must center the target in the usable desktop viewport.');
 assert.ok(html.includes('const delta=alignToTop||!desktop?rect.top-(usableTop+12):targetCenter-viewportCenter;') &&
   html.includes('if(desktop&&!alignToTop){') &&
-  html.includes("alignToTop:isRootItem&&item.type==='job'"),
+  html.includes("alignToTop:isRootItem,highlight:item.type!=='project'"),
   'Job root redirects align the actual detail-card start below the header; ordinary item jumps retain desktop centering.');
 assert.ok(html.includes('window.scrollY+rect.top-headerBottom-12'),
   'Mobile item jumps must preserve top alignment below the fixed header.');
-assert.ok(html.includes("alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId,{alignToTop:isRootItem&&item.type==='job'})") &&
-  html.includes("const rootTarget=document.querySelector('#mainContent .detail-card')||document.querySelector('#mainContent .detail-banner');alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'})"),
+assert.ok(html.includes("alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId,{alignToTop:isRootItem,highlight:item.type!=='project'})") &&
+  html.includes("const rootTarget=document.querySelector('#mainContent .detail-card')||document.querySelector('#mainContent .detail-banner');alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'})"),
   'Parent, assigned, and pinned destinations must use the same item-aware navigation.');
 assert.ok(html.includes('workspace-jump-highlight') &&
   html.includes('consistent-card-hover-and-jump-highlight') &&
@@ -606,6 +606,30 @@ assert.ok(html.includes('class="view-full-history-arrow ${ui.lang===\'ar\'?\'is-
   html.includes('.view-full-history-arrow.is-rtl svg{transform:scaleX(-1)!important'),
   'The Recent activity View full history arrow is mirrored in Arabic only.');
 
+
+const unifiedMetadataFixStart=html.indexOf('<style id="rtl-clear-root-navigation-and-unified-metadata">');
+const unifiedMetadataFixEnd=html.indexOf('</style>',unifiedMetadataFixStart);
+const unifiedMetadataFix=html.slice(unifiedMetadataFixStart,unifiedMetadataFixEnd);
+assert.ok(unifiedMetadataFixStart>=0 && unifiedMetadataFixEnd>unifiedMetadataFixStart &&
+  unifiedMetadataFix.includes('font-size: 1em !important;') &&
+  unifiedMetadataFix.includes('font-weight: 800 !important;') &&
+  unifiedMetadataFix.includes('-webkit-text-stroke: 0 !important;') &&
+  unifiedMetadataFix.includes('white-space: pre !important;') &&
+  unifiedMetadataFix.includes('.creator-copy,') &&
+  unifiedMetadataFix.includes('column-gap: 0 !important;') &&
+  unifiedMetadataFix.includes('.timeline-meta > .timeline-user') &&
+  unifiedMetadataFix.includes('.account-assigned-followup-row') &&
+  unifiedMetadataFix.includes('.parent-card-meta'),
+  'Created by, Last updated, Recent activity and hierarchy metadata use one fixed separator weight and spacing without duplicated flex gaps.');
+assert.ok(html.includes('<span class="timeline-user">') &&
+  html.includes('${userAvatar(e.userId)}<span>${esc(u.name)}</span></span>${metaSeparatorMarkup()}${fmtDateTimeMarkup(e.at)}'),
+  'Recent activity groups the avatar and username so the shared separator spacing remains precise.');
+assert.ok(html.includes("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlight=true}={}){") &&
+  html.includes('if(highlight)highlightWorkspaceCard(activeTarget);') &&
+  html.includes("alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'") &&
+  html.includes("alignToTop:isRootItem,highlight:item.type!=='project'"),
+  'Project and Job roots align at the top from workspace and Profile redirects, while a Project root itself is not highlighted.');
+
 const finalLayoutFixStart=html.indexOf('<style id="final-header-metadata-and-hierarchy-layout-fix">');
 const finalLayoutFixEnd=html.indexOf('</style>',finalLayoutFixStart);
 const finalLayoutFix=html.slice(finalLayoutFixStart,finalLayoutFixEnd);
@@ -656,12 +680,17 @@ assert.ok(html.includes("const typeLabel='<span class=\"type-pill account-assign
   html.includes("border: 1px solid var(--border) !important;") &&
   html.includes("justify-content: flex-start !important;"),
   'Profile Search and Assigned item types remain inside a bounded pill aligned with the start of the card copy.');
-assert.ok(html.includes('html[dir="rtl"] #accountPage .account-search-controls > .account-search-clear-button') &&
-  html.includes('html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-button') &&
-  html.includes('justify-self: stretch !important;') &&
-  html.includes('justify-content: flex-start !important;') &&
-  html.includes('direction: rtl !important;'),
-  'Profile Search and Assigned Clear controls use a full-row RTL flex alignment rather than direction-sensitive grid placement.');
+const rtlClearFixStart=html.indexOf('<style id="rtl-clear-root-navigation-and-unified-metadata">');
+const rtlClearFixEnd=html.indexOf('</style>',rtlClearFixStart);
+const rtlClearFix=html.slice(rtlClearFixStart,rtlClearFixEnd);
+assert.ok(rtlClearFixStart>=0 && rtlClearFixEnd>rtlClearFixStart &&
+  rtlClearFix.includes('justify-self: end !important;') &&
+  rtlClearFix.includes('width: max-content !important;') &&
+  rtlClearFix.includes('". . . clear" !important;') &&
+  rtlClearFix.includes('grid-template-areas:') &&
+  html.includes('html[dir="rtl"] #accountPage .account-search-controls > .account-search-clear-button') &&
+  html.includes('html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-button'),
+  'Profile Search and Assigned Clear controls occupy the physical left edge in RTL and the physical right edge in LTR at desktop and mobile widths.');
 const mobileChildFixStart = html.indexOf('<style id="mobile-child-card-dynamic-flow-and-unified-metadata-separators">');
 const mobileChildFixEnd = html.indexOf('</style>', mobileChildFixStart);
 const mobileChildFix = html.slice(mobileChildFixStart, mobileChildFixEnd);

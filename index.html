@@ -2130,7 +2130,8 @@ $('signInForm').addEventListener('submit',handleSubmit);
 </script>
 <div class="app" id="app" inert aria-hidden="true">
   <header class="topbar">
-    <div class="brand" id="brandHome" role="button" tabindex="0" aria-label="Open workspace"><div class="brand-mark" aria-hidden="true" id="brandMark"></div><div class="brand-copy"><strong>Follow-Up</strong><span id="brandContextLabel" class="brand-context-label"></span><span id="brandSubtitle">Work, connected.</span></div></div>
+    <div class="brand" id="brandHome" role="button" tabindex="0" aria-label="Open workspace"><div class="brand-mark" aria-hidden="true" id="brandMark"></div><div class="brand-copy"><strong>Follow-Up</strong><span id="brandSubtitle">Work, connected.</span></div></div>
+    <span id="brandContextLabel" class="brand-context-label" aria-hidden="true"></span>
     <div class="top-title"><span class="eyebrow" id="workspaceEyebrow">WORKSPACE</span><strong id="workspaceTitle">Projects &amp; follow-ups</strong></div>
     <div class="top-actions">
       <button class="lang-btn" id="langToggle" type="button" aria-label="Change language"><span id="langToggleText">عربي</span></button>
@@ -8412,6 +8413,59 @@ input[type="date"]::-webkit-datetime-edit-fields-wrapper,.date-input::-webkit-da
 .audit-link .meta-date-time,.mini-updated .meta-date-time{vertical-align:baseline}
 .view-full-history-arrow{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle}
 .view-full-history-arrow.is-rtl svg{transform:scaleX(-1)!important;transform-origin:center}
+</style>
+
+
+<style id="final-header-metadata-and-hierarchy-layout-fix">
+.brand-context-label{display:none;pointer-events:none!important;user-select:none!important}
+@media(max-width:820px){
+ .topbar{display:grid!important;grid-template-columns:max-content minmax(0,1fr) max-content!important;grid-template-rows:auto!important;align-items:center!important}
+ .topbar>.brand{grid-column:1!important;grid-row:1!important;width:max-content!important;min-width:0!important;max-width:100%!important;justify-self:start!important}
+ .topbar>.brand .brand-copy{display:flex!important;flex-direction:column!important;min-width:0!important}
+ .topbar>#brandContextLabel{display:block!important;grid-column:2!important;grid-row:1!important;justify-self:center!important;align-self:center!important;max-width:100%!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;text-align:center!important;white-space:nowrap!important;pointer-events:none!important;color:var(--muted)!important;font-family:var(--font-ui)!important;font-size:10px!important;font-weight:800!important;letter-spacing:1.15px!important;line-height:1.1!important;text-transform:uppercase!important;unicode-bidi:plaintext!important}
+ .topbar>.top-actions{grid-column:3!important;grid-row:1!important;min-width:0!important;justify-self:end!important}
+}
+@media(max-width:700px){
+ .topbar{grid-template-columns:max-content minmax(0,1fr)!important;grid-template-rows:auto auto!important}
+ .topbar>.brand{grid-column:1!important;grid-row:1!important;width:max-content!important;justify-self:start!important}
+ .topbar>#brandContextLabel{grid-column:2!important;grid-row:1!important;justify-self:center!important}
+ .topbar>.top-actions{grid-column:1/-1!important;grid-row:2!important;width:100%!important;justify-self:stretch!important}
+}
+:root{--activity-meta-font:var(--font-ui);--activity-meta-size:10px;--activity-meta-weight:600;--activity-meta-line-height:1.4}
+#mainContent .timeline-meta,#mainContent .timeline-meta>span,#mainContent .timeline-meta>span:last-child,#mainContent .timeline-meta .meta-date-time,#mainContent .tree-created-meta .creator-copy,#mainContent .tree-created-meta .creator-copy>span,#mainContent .created-label .creator-copy,#mainContent .parent-detail-created .creator-copy,#mainContent .audit-link>span,#parentList .mini-updated>span{font-family:var(--activity-meta-font)!important;font-size:var(--activity-meta-size)!important;font-weight:var(--activity-meta-weight)!important;line-height:var(--activity-meta-line-height)!important;font-variant-numeric:normal!important}
+#mainContent .timeline-meta .meta-separator,#mainContent .tree-created-meta .meta-separator,#mainContent .creator-copy .meta-separator,#mainContent .audit-link .meta-separator,#parentList .mini-updated .meta-separator{font-family:var(--font-ui)!important;font-weight:950!important;font-size:1.08em!important}
+.meta-date-time{display:inline!important;vertical-align:baseline!important;font-family:inherit!important;text-decoration:inherit!important}
+.meta-date-time>*{display:inline!important;vertical-align:baseline!important;text-decoration:inherit!important}
+.meta-separator{display:inline!important;margin-inline:.48em!important;padding:0!important;font-family:var(--font-ui)!important;font-weight:950!important;font-size:1.08em!important;line-height:inherit!important;text-decoration:inherit!important;unicode-bidi:isolate!important}
+.creator-copy{display:inline-flex!important;align-items:baseline!important;flex-wrap:wrap!important;gap:2px .38em!important}
+#mainContent .audit-link:hover,#mainContent .audit-link:focus-visible,#parentList .mini-updated:hover,#parentList .mini-updated:focus-visible{text-decoration:underline!important;text-decoration-thickness:1px!important;text-underline-offset:3px!important}
+#mainContent .audit-link .meta-date-time,#mainContent .audit-link .meta-date-time>*,
+#mainContent .audit-link .meta-separator,#parentList .mini-updated .meta-date-time,
+#parentList .mini-updated .meta-date-time>*,
+#parentList .mini-updated .meta-separator{text-decoration:inherit!important}
+#mainContent .detail-description{font-size:12px!important;line-height:1.6!important;font-family:var(--font-body)!important}
+@media(max-width:820px){
+ .tree-task-wrap{overflow:visible!important}
+ .tree-task-row{position:relative!important;display:grid!important;grid-template-columns:20px minmax(0,1fr) max-content!important;grid-template-rows:auto auto!important;align-items:start!important;column-gap:8px!important;row-gap:7px!important;width:100%!important;min-width:0!important;max-width:100%!important;padding:0!important;box-sizing:border-box!important}
+ .tree-task-row.is-ltr{direction:ltr!important}.tree-task-row.is-rtl{direction:rtl!important}
+ .tree-task-row>svg:first-child{grid-column:1!important;grid-row:1!important;align-self:start!important;width:18px!important;height:18px!important;min-width:18px!important;margin-top:2px!important}
+ .tree-task-row>.tree-name-type{grid-column:2!important;grid-row:1!important;display:flex!important;align-items:center!important;flex-wrap:wrap!important;gap:4px 7px!important;width:100%!important;min-width:0!important;max-width:100%!important}
+ .tree-task-row>.tree-name-type>.tree-title{flex:1 1 145px!important;width:auto!important;min-width:0!important;max-width:100%!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;line-height:1.4!important}
+ .tree-task-row>.tree-name-type>.tree-direct-type{flex:0 0 auto!important;align-self:center!important;max-width:100%!important;margin:0!important}
+ .tree-task-row>.status-pill{grid-column:2!important;grid-row:2!important;justify-self:start!important;align-self:center!important;max-width:100%!important;margin:0!important}
+ .tree-task-row>.tree-task-edit{position:static!important;grid-column:3!important;grid-row:1!important;justify-self:end!important;align-self:start!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;min-width:max-content!important;max-width:100%!important;min-height:30px!important;margin:0!important;padding-inline:7px!important;white-space:nowrap!important}
+ .tree-task-wrap .tree-child-main,.tree-direct-main{position:relative!important;display:grid!important;grid-template-columns:20px minmax(0,1fr) max-content!important;grid-template-rows:auto auto!important;align-items:start!important;column-gap:7px!important;row-gap:7px!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
+ .tree-task-wrap .tree-child-main>svg:first-child,.tree-direct-main>svg:first-child{grid-column:1!important;grid-row:1!important;align-self:start!important;width:18px!important;height:18px!important;min-width:18px!important;margin-top:2px!important}
+ .tree-task-wrap .tree-child-main>.tree-child-name{grid-column:2!important;grid-row:1!important;display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;line-height:1.4!important}
+ .tree-direct-main>.tree-name-type{grid-column:2!important;grid-row:1!important;display:flex!important;align-items:center!important;flex-wrap:wrap!important;gap:4px 7px!important;width:100%!important;min-width:0!important;max-width:100%!important}
+ .tree-direct-main>.tree-name-type>.tree-child-name{flex:1 1 145px!important;width:auto!important;min-width:0!important;max-width:100%!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;line-height:1.4!important}
+ .tree-task-wrap .tree-child-main>.status-pill,.tree-direct-main>.status-pill{grid-column:2!important;grid-row:2!important;justify-self:start!important;align-self:center!important;max-width:100%!important;margin:0!important}
+ .tree-task-wrap .tree-child-main>button,.tree-direct-main>button{position:static!important;grid-column:3!important;grid-row:1!important;justify-self:end!important;align-self:start!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;width:32px!important;min-width:32px!important;max-width:32px!important;min-height:30px!important;margin:0!important;padding:0!important}
+}
+.history-user,.application-history-table .history-user,.history-event-card .history-user{display:flex!important;align-items:center!important;align-self:center!important}
+.history-user>.avatar{align-self:center!important;flex:0 0 22px!important}
+.history-user-copy{align-self:center!important;justify-content:center!important;min-width:0!important}
+.history-user-name{display:block!important;align-self:center!important;line-height:1.4!important}
 </style>
 
 </body>

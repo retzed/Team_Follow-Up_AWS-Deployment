@@ -443,6 +443,9 @@ assert.ok(accountSearchMatcherStart>=0&&accountSearchMatcherEnd>accountSearchMat
 assert.ok(html.includes("accountSearchUserLabel:'Assignee'")&&html.includes("accountSearchNoneAssignee:'None'")&&html.includes("assignableUsers().slice().sort("),'Profile Search labels the filter Assignee, offers None, and excludes root/system users.');
 assert.ok(html.includes("ui.accountAssignedType==='project'||ui.accountAssignedType==='job'?'disabled':''")&&html.includes("if(ui.accountAssignedType==='project'||ui.accountAssignedType==='job')ui.accountAssignedPriority='all';"),'Assigned Items disables and resets Priority for Project and Job type selections.');
 assert.ok(html.includes("workspaceTitle:'WORKSPACE'")&&html.includes("accountHubTitle:'USERSPACE'")&&html.includes("$('#workspaceTitle').hidden=ui.page!=='account';"),'Workspace and account headers use WORKSPACE and USERSPACE.');
+assert.ok(html.includes("page:'account',accountTab:'assigned'"), 'A fresh account session must open on Assigned Items by default.');
+assert.ok(html.includes("$('#actingUserDisplay').addEventListener('click',()=>{void openAccountTab(ui.accountTab||'assigned');});"), 'Reopening the account page must preserve the last selected account tab instead of resetting to Assigned Items.');
+assert.ok(html.includes("'accountTab','accountAssignedQuery'") && html.includes("for(const eventName of ['click','change','input'])window.addEventListener(eventName,scheduleWorkspaceViewStateSave,true);"), 'The selected account tab must continue to persist in the current browser tab session.');
 assert.ok(html.includes("pendingTasks:'Pending Tasks'")&&html.includes("tr('pendingTasks')"),'Project overview labels its incomplete task metric Pending Tasks.');
 const overviewRegressionStart=html.indexOf('function renderOverview(parent,summary=null){');
 const overviewRegressionEnd=html.indexOf('\nfunction childTreeFiltered(parent){',overviewRegressionStart);

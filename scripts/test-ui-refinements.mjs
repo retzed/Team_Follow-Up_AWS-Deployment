@@ -396,6 +396,7 @@ assert.ok(html.includes('const delta=alignToTop?rect.top-(usableTop+12):targetCe
   html.includes('if(desktop&&!alignToTop){') &&
   html.includes("alignToTop:isRootItem,highlight:item.type!=='project'"),
   'Job root redirects align the actual detail-card start below the header; ordinary item jumps retain desktop centering.');
+const alignHelperStart=html.indexOf("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlight=true}={}){");
 const mobileJumpStart=html.indexOf("if(!desktop){",alignHelperStart);
 const mobileJumpEnd=html.indexOf("let scrollContainer=null;",mobileJumpStart);
 const mobileJumpLogic=html.slice(mobileJumpStart,mobileJumpEnd);
@@ -615,7 +616,6 @@ assert.ok(html.includes('class="view-full-history-arrow ${ui.lang===\'ar\'?\'is-
   'The Recent activity View full history arrow is mirrored in Arabic only.');
 
 
-const alignHelperStart=html.indexOf("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlight=true}={}){");
 const unifiedMetadataFixStart=html.indexOf('<style id="rtl-clear-root-navigation-and-unified-metadata">');
 const unifiedMetadataFixEnd=html.indexOf('</style>',unifiedMetadataFixStart);
 const unifiedMetadataFix=html.slice(unifiedMetadataFixStart,unifiedMetadataFixEnd);

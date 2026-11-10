@@ -396,8 +396,16 @@ assert.ok(html.includes('const delta=alignToTop||!desktop?rect.top-(usableTop+12
   html.includes('if(desktop&&!alignToTop){') &&
   html.includes("alignToTop:isRootItem,highlight:item.type!=='project'"),
   'Job root redirects align the actual detail-card start below the header; ordinary item jumps retain desktop centering.');
-assert.ok(html.includes('window.scrollY+rect.top-headerBottom-12'),
-  'Mobile item jumps must preserve top alignment below the fixed header.');
+const mobileJumpStart=html.indexOf("if(!desktop){",alignHelperStart);
+const mobileJumpEnd=html.indexOf("let scrollContainer=null;",mobileJumpStart);
+const mobileJumpLogic=html.slice(mobileJumpStart,mobileJumpEnd);
+assert.ok(mobileJumpStart>alignHelperStart && mobileJumpEnd>mobileJumpStart &&
+  mobileJumpLogic.includes("activeTarget.style.scrollMarginTop=\u0060\u0024{headerInset}px\u0060;") &&
+  mobileJumpLogic.includes("activeTarget.scrollIntoView({") &&
+  mobileJumpLogic.includes("block:'start'") &&
+  mobileJumpLogic.includes("inline:'nearest'") &&
+  mobileJumpLogic.includes("behavior:alignToTop||reduceMotion?'instant':'smooth'"),
+  'Mobile redirects use native scroll positioning with a measured offset for the fixed header.');
 assert.ok(html.includes("alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId,{alignToTop:isRootItem,highlight:item.type!=='project'})") &&
   html.includes("const rootTarget=document.querySelector('#mainContent .detail-card')||document.querySelector('#mainContent .detail-banner');alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'})"),
   'Parent, assigned, and pinned destinations must use the same item-aware navigation.');
@@ -607,6 +615,7 @@ assert.ok(html.includes('class="view-full-history-arrow ${ui.lang===\'ar\'?\'is-
   'The Recent activity View full history arrow is mirrored in Arabic only.');
 
 
+const alignHelperStart=html.indexOf("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlight=true}={}){");
 const unifiedMetadataFixStart=html.indexOf('<style id="rtl-clear-root-navigation-and-unified-metadata">');
 const unifiedMetadataFixEnd=html.indexOf('</style>',unifiedMetadataFixStart);
 const unifiedMetadataFix=html.slice(unifiedMetadataFixStart,unifiedMetadataFixEnd);

@@ -642,15 +642,41 @@ assert.ok(historyUserRendererStart>=0 &&
   historyUserRenderer.includes('class="history-user-copy"'),
   'History popup user name stays inside the flex-aligned avatar/name group.');
 
-assert.ok(finalLayoutFix.includes('@media(max-width:700px)') &&
-  finalLayoutFix.includes('#mainContent .child-card .child-top>.child-main{display:contents!important}') &&
-  finalLayoutFix.includes('grid-template-columns:34px minmax(0,1fr) auto!important') &&
-  finalLayoutFix.includes('.child-top .child-meta{') &&
-  finalLayoutFix.includes('grid-column:1 / -1!important;grid-row:3!important') &&
-  finalLayoutFix.includes('flex-wrap:nowrap!important') &&
-  finalLayoutFix.includes('.assigned-label{') &&
-  finalLayoutFix.includes('white-space:nowrap!important;'),
-  'On mobile, the Assignees icon and label stay on one line and the complete assignee row spans the card from the item-icon edge.');
+const mobileChildFixStart = html.indexOf('<style id="mobile-child-card-dynamic-flow-and-unified-metadata-separators">');
+const mobileChildFixEnd = html.indexOf('</style>', mobileChildFixStart);
+const mobileChildFix = html.slice(mobileChildFixStart, mobileChildFixEnd);
+const mobileAssigneeStart = mobileChildFix.indexOf('#mainContent .child-card .child-meta > .child-assignee {');
+const mobileAssigneeEnd = mobileChildFix.indexOf('}', mobileAssigneeStart) + 1;
+const mobileAssigneeRule = mobileChildFix.slice(mobileAssigneeStart, mobileAssigneeEnd);
+assert.ok(mobileChildFixStart >= 0 && mobileChildFixEnd > mobileChildFixStart &&
+  mobileChildFix.includes('.child-title-row .child-title {') &&
+  mobileChildFix.includes('display: inline !important;') &&
+  mobileChildFix.includes('.child-title-row .type-pill {') &&
+  mobileChildFix.includes('vertical-align: baseline !important;') &&
+  mobileChildFix.includes('.child-top .child-description {') &&
+  mobileChildFix.includes('grid-column: 1 / -1 !important;') &&
+  mobileChildFix.includes('grid-row: 2 !important;'),
+  'On mobile, the type chip follows the item-name text and the description spans the full card width.');
+assert.ok(mobileAssigneeStart >= 0 && mobileAssigneeEnd > mobileAssigneeStart &&
+  mobileAssigneeRule.includes('flex: 0 1 auto !important;') &&
+  mobileAssigneeRule.includes('width: fit-content !important;') &&
+  mobileAssigneeRule.includes('align-self: flex-start !important;') &&
+  mobileAssigneeRule.includes('direction: inherit !important;') &&
+  !mobileAssigneeRule.includes('flex: 0 0 100%') &&
+  !mobileAssigneeRule.includes('    width: 100% !important;'),
+  'The mobile assignee pill uses content-sized width, expands only as required, wraps safely, and follows the page’s natural direction.');
+assert.ok(mobileChildFix.includes('.meta-separator,') &&
+  mobileChildFix.includes('.meta-dot,') &&
+  mobileChildFix.includes('.account-assigned-meta-separator {') &&
+  mobileChildFix.includes('font-weight: 1000 !important;') &&
+  mobileChildFix.includes('-webkit-text-stroke: .22px currentColor !important;') &&
+  mobileChildFix.includes('.parent-card-meta { column-gap: 0 !important; }') &&
+  mobileChildFix.includes('.account-assigned-meta-row.account-assigned-context-row { gap: 0 !important; }'),
+  'All visual metadata separators share the same weight, glyph treatment, and internal spacing without additional flex gaps.');
+assert.ok(html.includes("return parts.join(metaSeparatorMarkup());") &&
+  html.includes("class=\"parent-card-meta\"><span>${esc(typeName(p.type))}</span>${metaSeparatorMarkup()}") &&
+  html.includes("metaSeparatorMarkup()+priorityPill(item.priority||'medium')"),
+  'Parent, sidebar and profile metadata use the shared metadata separator helper.');
 assert.ok(finalLayoutFix.includes('@media(max-width:820px)') &&
   finalLayoutFix.includes('#mainContent .tree-created-meta{') &&
   finalLayoutFix.includes('margin-inline:0!important') &&

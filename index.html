@@ -8805,66 +8805,40 @@ html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-
   }
 }
 
-/* Every visual metadata separator uses the same glyph, font, weight and
-   two non-collapsing spaces from metaSeparatorMarkup(). */
+/* One authoritative separator rule for every requested metadata surface.
+   The direct-child selectors intentionally outrank metadata text rules that
+   otherwise reduce only the outer dot inside Created by / Recent activity. */
 .meta-separator,
 .meta-dot,
 .account-assigned-meta-separator,
+#accountPage .account-assigned-meta-row > .account-assigned-meta-separator,
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-meta-row > .account-assigned-meta-separator,
 #mainContent .timeline-meta .meta-separator,
-#mainContent .tree-created-meta .meta-separator,
+#mainContent .timeline-meta > span.meta-separator,
 #mainContent .creator-copy .meta-separator,
+#mainContent .creator-copy > span.meta-separator,
+#mainContent .tree-created-meta .creator-copy > span.meta-separator,
 #mainContent .audit-link .meta-separator,
-#parentList .mini-updated .meta-separator {
+#parentList .mini-updated .meta-separator,
+#parentList .parent-card-meta .meta-dot {
   display: inline !important;
   flex: 0 0 auto !important;
   margin: 0 !important;
   padding: 0 !important;
   color: currentColor !important;
   font-family: var(--font-ui) !important;
-  font-size: 1em !important;
+  font-size: 1.1em !important;
   font-weight: 1000 !important;
+  font-synthesis: weight !important;
   line-height: inherit !important;
   letter-spacing: 0 !important;
   opacity: 1 !important;
   text-decoration: inherit !important;
   text-decoration-skip-ink: none !important;
-  -webkit-text-stroke: .30px currentColor !important;
+  -webkit-text-stroke: .55px currentColor !important;
+  text-shadow: 0 0 .2px currentColor !important;
   unicode-bidi: isolate !important;
   white-space: pre !important;
 }
-/* The helper supplies all horizontal spacing; flex gaps must not add another
-   inconsistent margin before or after the separator. */
-.creator-copy,
-.meta-date-time {
-  gap: 0 !important;
-  column-gap: 0 !important;
-}
-#mainContent .timeline-meta {
-  gap: 0 !important;
-  column-gap: 0 !important;
-}
-#mainContent .timeline-meta > .timeline-user {
-  display: inline-flex !important;
-  flex: 0 0 auto !important;
-  align-items: center !important;
-  gap: 6px !important;
-  min-width: 0 !important;
-}
-.parent-card-meta,
-#parentList .parent-card-meta {
-  column-gap: 0 !important;
-  row-gap: 2px !important;
-}
-#accountPage .account-assigned-meta-row.account-assigned-context-row,
-#accountPage .account-assigned-item-row .account-item-copy .account-assigned-followup-row {
-  gap: 0 !important;
-  column-gap: 0 !important;
-}
-#mainContent .audit-link > span,
-#parentList .mini-updated > span {
-  gap: 0 !important;
-  column-gap: 0 !important;
-}
-</style>
 </body>
 </html>

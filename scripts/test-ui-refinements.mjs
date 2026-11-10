@@ -567,11 +567,13 @@ assert.ok(jumpHighlightFunction.includes("target.classList.add('workspace-jump-h
   jumpHighlightFunction.includes('workspaceJumpHighlightTimer=setTimeout(') &&
   jumpHighlightFunction.includes('},1850);'),
   'The hover correction does not shorten or otherwise interrupt the established temporary jump-highlight duration.');
-assert.ok(html.includes('<span id="brandContextLabel" class="brand-context-label"></span>') &&
+assert.ok(html.includes('</div></div>\n    <span id="brandContextLabel" class="brand-context-label" aria-hidden="true"></span>\n    <div class="top-title">') &&
   html.includes("$('#brandContextLabel').textContent=ui.page==='account'?tr('accountHubTitle'):tr('workspaceEyebrow');") &&
-  html.includes('.topbar .brand-copy .brand-context-label') &&
-  html.includes('flex-direction:row!important'),
-  'Mobile header displays the active WORKSPACE/USERSPACE context beside the Follow-Up brand name.');
+  html.includes('.topbar>#brandContextLabel') &&
+  html.includes('grid-template-columns:max-content minmax(0,1fr)!important') &&
+  html.includes('justify-self:center!important') &&
+  html.includes('pointer-events:none!important'),
+  'Mobile WORKSPACE/USERSPACE is a non-interactive sibling of the brand, centered in the remaining header track.');
 assert.ok(html.includes('input[type="date"],.date-input{text-align:center!important;text-align-last:center!important}') &&
   html.includes('::-webkit-datetime-edit-fields-wrapper') &&
   html.includes('justify-content:center!important'),
@@ -598,3 +600,38 @@ assert.ok(html.includes('#mainContent .child-description{font-size:12px!importan
 assert.ok(html.includes('class="view-full-history-arrow ${ui.lang===\'ar\'?\'is-rtl\':\'is-ltr\'}"') &&
   html.includes('.view-full-history-arrow.is-rtl svg{transform:scaleX(-1)!important'),
   'The Recent activity View full history arrow is mirrored in Arabic only.');
+
+const finalLayoutFixStart=html.indexOf('<style id="final-header-metadata-and-hierarchy-layout-fix">');
+const finalLayoutFixEnd=html.indexOf('</style>',finalLayoutFixStart);
+const finalLayoutFix=html.slice(finalLayoutFixStart,finalLayoutFixEnd);
+assert.ok(finalLayoutFixStart>=0 && finalLayoutFixEnd>finalLayoutFixStart &&
+  finalLayoutFix.includes('.meta-date-time{display:inline!important') &&
+  finalLayoutFix.includes('text-decoration:inherit!important') &&
+  finalLayoutFix.includes('margin-inline:.48em!important'),
+  'Last-updated date/time remains inline and underlined as one complete label with clear spacing around each separator.');
+assert.ok(finalLayoutFix.includes('--activity-meta-font:var(--font-ui)') &&
+  finalLayoutFix.includes('--activity-meta-size:10px') &&
+  finalLayoutFix.includes('--activity-meta-weight:600') &&
+  finalLayoutFix.includes('#mainContent .timeline-meta>span:last-child') &&
+  finalLayoutFix.includes('#mainContent .tree-created-meta .creator-copy'),
+  'Recent activity and hierarchy metadata share the same default UI font, size and weight.');
+assert.ok(finalLayoutFix.includes('#mainContent .detail-description{font-size:12px!important'),
+  'Project/Job descriptions use the same increased font size as child item descriptions.');
+assert.ok(finalLayoutFix.includes('.tree-task-row>.tree-task-edit{') &&
+  finalLayoutFix.includes('grid-column:3!important;grid-row:1!important') &&
+  finalLayoutFix.includes('.tree-task-wrap .tree-child-main>button,.tree-direct-main>button{') &&
+  finalLayoutFix.includes('grid-column:3!important;grid-row:1!important') &&
+  finalLayoutFix.includes('.tree-child-main>.tree-child-name') &&
+  finalLayoutFix.includes('.tree-direct-main>.tree-name-type'),
+  'Every hierarchy Edit button (task, nested and direct items) has a dedicated first-row action column.');
+assert.ok(finalLayoutFix.includes('.history-user,') &&
+  finalLayoutFix.includes('.application-history-table .history-user,') &&
+  finalLayoutFix.includes('align-items:center!important') &&
+  finalLayoutFix.includes('.history-user-copy{align-self:center!important;justify-content:center!important'),
+  'Activity-history user names are vertically centered against their avatars in desktop tables and mobile cards.');
+const historyUserRendererStart=html.indexOf('function historyUserMarkup(event){');
+const historyUserRenderer=html.slice(historyUserRendererStart,historyUserRendererStart+420);
+assert.ok(historyUserRendererStart>=0 &&
+  historyUserRenderer.includes('class="history-user"') &&
+  historyUserRenderer.includes('class="history-user-copy"'),
+  'History popup user name stays inside the flex-aligned avatar/name group.');

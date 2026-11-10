@@ -3117,6 +3117,59 @@ function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlig
  };
  requestAnimationFrame(()=>requestAnimationFrame(align));
 }
+function findWorkspaceParentCard(parentId){
+ const wanted=String(parentId??'');
+ if(!wanted)return null;
+ return [...document.querySelectorAll('#mainContent .detail-card[data-parent-id]')].find(card=>
+  String(card.dataset.parentId||'')===wanted
+ )||null;
+}
+function alignWorkspaceParentInViewport(parentId,{highlight=false}={}){
+ const wanted=String(parentId??'');
+ if(!wanted)return;
+ let missingAttempts=0,alignmentPasses=0;
+ const align=()=>{
+  if(ui.page!=='workspace'||String(ui.selectedParentId||'')!==wanted)return;
+  const target=findWorkspaceParentCard(wanted);
+  if(!target?.isConnected){
+   if(missingAttempts++<20)requestAnimationFrame(align);
+   return;
+  }
+  if(highlight&&alignmentPasses===0)highlightWorkspaceCard(target);
+  const topbar=document.querySelector('.topbar');
+  const topbarRect=topbar?topbar.getBoundingClientRect():null;
+  const headerBottom=topbarRect&&topbarRect.bottom>0?topbarRect.bottom:0;
+  const headerInset=Math.max(0,Math.ceil(headerBottom+12));
+  target.style.scrollMarginTop=`${headerInset}px`;
+  const rect=target.getBoundingClientRect();
+  let scrollContainer=null;
+  for(let node=target.parentElement;node&&node!==document.body&&node!==document.documentElement;node=node.parentElement){
+   const overflowY=window.getComputedStyle(node).overflowY;
+   if((overflowY==='auto'||overflowY==='scroll'||overflowY==='overlay')&&node.scrollHeight>node.clientHeight+1){
+    scrollContainer=node;
+    break;
+   }
+  }
+  if(scrollContainer){
+   const bounds=scrollContainer.getBoundingClientRect();
+   const visibleTop=bounds.top+scrollContainer.clientTop+12;
+   const maxScroll=Math.max(0,scrollContainer.scrollHeight-scrollContainer.clientHeight);
+   const nextTop=Math.max(0,Math.min(maxScroll,scrollContainer.scrollTop+rect.top-visibleTop));
+   scrollContainer.scrollTop=nextTop;
+  }else{
+   const scrollRoot=document.scrollingElement||document.documentElement;
+   const currentTop=Number(window.scrollY||scrollRoot.scrollTop||0);
+   const maxScroll=Math.max(0,scrollRoot.scrollHeight-(window.innerHeight||document.documentElement.clientHeight||0));
+   const nextTop=Math.max(0,Math.min(maxScroll,currentTop+rect.top-headerInset));
+   if(Math.abs(nextTop-currentTop)>1)window.scrollTo(0,nextTop);
+  }
+  // Repeat across several paint frames to outlast browser scroll restoration
+  // and final layout after switching from Profile or the workspace list.
+  alignmentPasses++;
+  if(alignmentPasses<4)requestAnimationFrame(align);
+ };
+ requestAnimationFrame(()=>requestAnimationFrame(align));
+}
 function typeIcon(type){return icon(type==='project'?'folder':type==='job'?'briefcase':type==='task'?'clipboard':'message',19);}
 function creatorLabel(item){const user=person(item.createdBy);return `<span class="creator-line">${userAvatar(item.createdBy)}<span class="creator-copy"><span>${esc(tr('createdBy'))} ${esc(user.name)}</span>${metaSeparatorMarkup()}${fmtDateTimeMarkup(item.createdAt)}</span></span>`;}
 function auditLabel(item,extraClass=''){const updatedAt=item?.updatedAt||item?.createdAt||'';const updatedById=item?.updatedBy||item?.updatedByUserId||item?.updatedById||item?.createdBy||item?.createdByUserId||'';const user=person(updatedById);const textDir=ui.lang==='ar'?'rtl':'ltr';return `<button class="audit-link ${extraClass}" dir="${textDir}" type="button" data-action="history" data-item-id="${esc(item.id)}" title="${esc(tr('activityHistory'))}">${icon('clock',12)}<span dir="${textDir}"><bdi dir="auto">${esc(tr('lastUpdatedLabel'))}</bdi>: ${fmtDateTimeMarkup(updatedAt)}${metaSeparatorMarkup()}<bdi dir="auto">${esc(user.name)}</bdi></span></button>`;}
@@ -3438,7 +3491,7 @@ function isLegacyFirstCreatedSelection(selectedId,items){
  return String(firstCreated.id||'')===id&&Boolean(latestUpdated)&&String(latestUpdated.id||'')!==id;
 }
 function renderDetail(){const selectedParentId=String(ui.selectedParentId||'');const parent=data.parents.find(p=>String(p.id)===selectedParentId);if(!parent){if(!dataLoadState.parentsReady&&!dataLoadState.initialError){$('#mainContent').innerHTML=spinnerMarkup(tr('loadingData'));return;}if(dataLoadState.initialError&&!data.parents.length){$('#mainContent').innerHTML=loadErrorMarkup(dataLoadState.initialError);return;}if(data.parents.length&&!selectedParentId){ui.selectedParentId=defaultWorkspaceParentId(data.parents);return renderDetail();}if(data.parents.length&&selectedParentId){$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('loadFailed'))}</strong></div>`;return;}$('#mainContent').innerHTML=`<div class="empty-children"><div class="empty-icon">${icon('folder',22)}</div><strong>${esc(tr('noFilterResults'))}</strong><button class="btn btn-primary" data-action="new-parent" type="button">${icon('plus',14)} ${esc(tr('newParent'))}</button></div>`;return;}
- const s=getItemSummary(parent);$('#mainContent').innerHTML=`<div class="main-head"><div class="breadcrumb">${icon('grid',12)} <span>${esc(tr('workspaceTitle'))}</span>${icon('chevron',11)}<strong>${esc(typeName(parent.type))}</strong></div><div class="head-actions"><button class="btn" data-action="history" data-item-id="${esc(parent.id)}" type="button">${icon('activity',14)} ${esc(tr('activityHistory'))}</button><button class="btn btn-primary" data-action="edit-item" data-id="${esc(parent.id)}" type="button">${icon('edit',14)} ${esc(tr('edit'))}</button>${pinActionMarkup(parent.id)}</div></div><section class="detail-card"><div class="detail-banner"><div class="detail-top"><div class="detail-nameblock"><div class="detail-type-icon">${typeIcon(parent.type)}</div><div class="detail-title-wrap"><div class="parent-detail-title-row"><div class="detail-title" dir="auto">${esc(parent.name)}</div><span class="type-pill">${esc(typeName(parent.type))}</span><span class="type-pill">${esc(s.all.length+' '+tr('items'))}</span></div><div class="detail-description" dir="auto">${esc(parent.description||tr('noDescription'))}</div></div></div><div class="detail-controls">${statusPill(parent.status)}</div></div><div class="detail-meta"><div class="metadata-group">${assigneeMarkup(parent)}<span class="meta-piece due-date-piece">${icon('calendar',14)} <span>${esc(tr('dueDate'))}:</span><strong>${esc(parent.dueDate?fmtDate(parent.dueDate,{month:'short',day:'numeric',year:'numeric'}):tr('noDueDate'))}</strong></span></div><div class="audit-line">${auditLabel(parent)}</div></div></div><div class="tabs" role="tablist"><button class="tab ${ui.tab==='overview'?'active':''}" role="tab" aria-selected="${ui.tab==='overview'}" data-action="detail-tab" data-tab="overview" type="button">${icon('grid',15)} ${esc(tr(parent.type==='job'?'jobOverview':'projectOverview'))}</button><button class="tab ${ui.tab==='activity'?'active':''}" role="tab" aria-selected="${ui.tab==='activity'}" data-action="detail-tab" data-tab="activity" type="button">${icon('timeline',15)} ${esc(tr(parent.type==='job'?'jobTimeline':'projectTimeline'))}<span class="tab-count">${rootActivityReady(parent.id)?activitiesFor(parent.id).length:(dataLoadState.parentsReady?0:'—')}</span></button></div>${ui.tab==='overview'?renderOverview(parent,s):renderActivity(parent)}</section>`;}
+ const s=getItemSummary(parent);$('#mainContent').innerHTML=`<div class="main-head"><div class="breadcrumb">${icon('grid',12)} <span>${esc(tr('workspaceTitle'))}</span>${icon('chevron',11)}<strong>${esc(typeName(parent.type))}</strong></div><div class="head-actions"><button class="btn" data-action="history" data-item-id="${esc(parent.id)}" type="button">${icon('activity',14)} ${esc(tr('activityHistory'))}</button><button class="btn btn-primary" data-action="edit-item" data-id="${esc(parent.id)}" type="button">${icon('edit',14)} ${esc(tr('edit'))}</button>${pinActionMarkup(parent.id)}</div></div><section class="detail-card" data-parent-id="${esc(parent.id)}"><div class="detail-banner"><div class="detail-top"><div class="detail-nameblock"><div class="detail-type-icon">${typeIcon(parent.type)}</div><div class="detail-title-wrap"><div class="parent-detail-title-row"><div class="detail-title" dir="auto">${esc(parent.name)}</div><span class="type-pill">${esc(typeName(parent.type))}</span><span class="type-pill">${esc(s.all.length+' '+tr('items'))}</span></div><div class="detail-description" dir="auto">${esc(parent.description||tr('noDescription'))}</div></div></div><div class="detail-controls">${statusPill(parent.status)}</div></div><div class="detail-meta"><div class="metadata-group">${assigneeMarkup(parent)}<span class="meta-piece due-date-piece">${icon('calendar',14)} <span>${esc(tr('dueDate'))}:</span><strong>${esc(parent.dueDate?fmtDate(parent.dueDate,{month:'short',day:'numeric',year:'numeric'}):tr('noDueDate'))}</strong></span></div><div class="audit-line">${auditLabel(parent)}</div></div></div><div class="tabs" role="tablist"><button class="tab ${ui.tab==='overview'?'active':''}" role="tab" aria-selected="${ui.tab==='overview'}" data-action="detail-tab" data-tab="overview" type="button">${icon('grid',15)} ${esc(tr(parent.type==='job'?'jobOverview':'projectOverview'))}</button><button class="tab ${ui.tab==='activity'?'active':''}" role="tab" aria-selected="${ui.tab==='activity'}" data-action="detail-tab" data-tab="activity" type="button">${icon('timeline',15)} ${esc(tr(parent.type==='job'?'jobTimeline':'projectTimeline'))}<span class="tab-count">${rootActivityReady(parent.id)?activitiesFor(parent.id).length:(dataLoadState.parentsReady?0:'—')}</span></button></div>${ui.tab==='overview'?renderOverview(parent,s):renderActivity(parent)}</section>`;}
 
 const ACCOUNT_ICONS=[
  {value:'compass'},{value:'terminal'},{value:'wrench'},{value:'shield'},
@@ -4677,8 +4730,8 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
  case 'sidebar-toggle':{const shouldExpand=ui.sidebarCollapsed;setWorkspaceSidebarCollapsed(!ui.sidebarCollapsed);if(shouldExpand){renderParentList({skipRemote:true});const selectedId=String(ui.selectedParentId||'');if(ui.page==='workspace'&&selectedId){renderDetail();void ensureRootChildrenLoaded(selectedId).then(()=>{if(!ui.sidebarCollapsed&&ui.page==='workspace'&&String(ui.selectedParentId)===selectedId){renderDetail();if(ui.selectedAssignedItemId){const selectedCard=document.getElementById('card-'+String(ui.selectedAssignedItemId));alignWorkspaceItemInViewport(selectedCard);}}}).catch(error=>console.warn('Could not restore the selected workspace item after expanding Search.',error));}}break;}
  case 'toggle-pin':void togglePinnedItem(id);break;
  case 'save-user-privilege':void saveUserPrivilege(actionEl.dataset.userId);break;
- case 'select-parent':{const enteringWorkspace=ui.page==='account';const parent=data.parents.find(row=>String(row.id)===String(id));if(!parent)break;const selectedId=String(parent.id);ui.page='workspace';if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedParentId=parent.id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();persistWorkspaceViewState();applyTranslations();renderParentList({skipRemote:true});renderDetail();void ensureRootChildrenLoaded(id).then(()=>{if(ui.page==='workspace'&&String(ui.selectedParentId)===selectedId){renderDetail();const rootTarget=document.querySelector('#mainContent .detail-card')||document.querySelector('#mainContent .detail-banner');alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'});}}).catch(error=>console.warn('Could not finish loading the selected workspace item.',error));void refreshActivityFor(id,'all');break;}  
- case 'select-assigned':{const enteringWorkspace=ui.page==='account';const item=allItem(id)||assignedItemCache.get(String(id))||ui.accountAssignedRows.find(row=>String(row.id||row.itemId)===String(id))||ui.accountPinnedRows.find(row=>String(row.id||row.itemId)===String(id));const rootId=String(item?.rootParentId||((item?.type==='project'||item?.type==='job')?item.id:(item?rootParent(item)?.id:''))||'');const root=data.parents.find(parent=>String(parent.id)===rootId)||(item?rootParent(item):null);if(!item||!root)break;const isRootItem=item.type==='project'||item.type==='job';const selectedItemId=String(item.id||id),selectedRootId=String(root.id);ui.page='workspace';if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedAssignedItemId=isRootItem?null:item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}persistWorkspaceViewState();applyTranslations();renderParentList({skipRemote:true});renderDetail();void refreshActivityFor(root.id,'all');void Promise.resolve(ensureRootChildrenLoaded(selectedRootId)).then(()=>{if(ui.page!=='workspace'||String(ui.selectedParentId)!==selectedRootId||(!isRootItem&&String(ui.selectedAssignedItemId||'')!==selectedItemId))return;if(!isRootItem){let ancestor=allItem(selectedItemId)||item;const seenAfterLoad=new Set();while(ancestor&&String(ancestor.id)!==selectedRootId&&!seenAfterLoad.has(String(ancestor.id))){seenAfterLoad.add(String(ancestor.id));if(ancestor.type==='task')ui.expanded.add(String(ancestor.id));ancestor=ancestor.parentId?allItem(ancestor.parentId):null;}}renderDetail();const selectedTarget=isRootItem?(document.querySelector('#mainContent .detail-card')||document.querySelector('#mainContent .detail-banner')):findWorkspaceItemCard(selectedItemId);alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId,{alignToTop:isRootItem,highlight:item.type!=='project'});}).catch(error=>console.warn('Could not finish loading the selected assigned or pinned item.',error));break;}  case 'open-archive':openArchive();break;
+ case 'select-parent':{const enteringWorkspace=ui.page==='account';const parent=data.parents.find(row=>String(row.id)===String(id));if(!parent)break;const selectedId=String(parent.id);ui.page='workspace';if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedParentId=parent.id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();persistWorkspaceViewState();applyTranslations();renderParentList({skipRemote:true});renderDetail();void ensureRootChildrenLoaded(id).then(()=>{if(ui.page==='workspace'&&String(ui.selectedParentId)===selectedId){renderDetail();alignWorkspaceParentInViewport(selectedId,{highlight:parent.type!=='project'});}}).catch(error=>console.warn('Could not finish loading the selected workspace item.',error));void refreshActivityFor(id,'all');break;}  
+ case 'select-assigned':{const enteringWorkspace=ui.page==='account';const item=allItem(id)||assignedItemCache.get(String(id))||ui.accountAssignedRows.find(row=>String(row.id||row.itemId)===String(id))||ui.accountPinnedRows.find(row=>String(row.id||row.itemId)===String(id));const rootId=String(item?.rootParentId||((item?.type==='project'||item?.type==='job')?item.id:(item?rootParent(item)?.id:''))||'');const root=data.parents.find(parent=>String(parent.id)===rootId)||(item?rootParent(item):null);if(!item||!root)break;const isRootItem=item.type==='project'||item.type==='job';const selectedItemId=String(item.id||id),selectedRootId=String(root.id);ui.page='workspace';if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedAssignedItemId=isRootItem?null:item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}persistWorkspaceViewState();applyTranslations();renderParentList({skipRemote:true});renderDetail();void refreshActivityFor(root.id,'all');void Promise.resolve(ensureRootChildrenLoaded(selectedRootId)).then(()=>{if(ui.page!=='workspace'||String(ui.selectedParentId)!==selectedRootId||(!isRootItem&&String(ui.selectedAssignedItemId||'')!==selectedItemId))return;if(!isRootItem){let ancestor=allItem(selectedItemId)||item;const seenAfterLoad=new Set();while(ancestor&&String(ancestor.id)!==selectedRootId&&!seenAfterLoad.has(String(ancestor.id))){seenAfterLoad.add(String(ancestor.id));if(ancestor.type==='task')ui.expanded.add(String(ancestor.id));ancestor=ancestor.parentId?allItem(ancestor.parentId):null;}}renderDetail();if(isRootItem)alignWorkspaceParentInViewport(selectedRootId,{highlight:item.type!=='project'});else{const selectedTarget=findWorkspaceItemCard(selectedItemId);alignWorkspaceItemInViewport(selectedTarget,selectedItemId,{highlight:item.type!=='project'});}}).catch(error=>console.warn('Could not finish loading the selected assigned or pinned item.',error));break;}  case 'open-archive':openArchive();break;
  case 'global-history':openApplicationHistory();break;
  case 'retry-data-load':if(ui.modal?.kind==='history')void refreshActivityFor(ui.modal.itemId,allItem(ui.modal.itemId)?.type==='followup'?'item':(ui.modal.historyScope||'all'));else if(ui.modal?.kind==='global-history')void refreshApplicationHistory();else if(!dataLoadState.parentsReady||dataLoadState.initialError)void startWorkspaceHydration();else if(ui.selectedParentId)void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});break;
  case 'archive-toggle-group':toggleArchiveGroup(actionEl.dataset.rootId);break;
@@ -8904,14 +8957,71 @@ html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-
  #newParentMobile:not([hidden]){
   display:flex!important;align-items:center;justify-content:center;gap:7px;
   width:calc(100% - 24px)!important;max-width:100%!important;min-width:0!important;
-  min-height:42px!important;height:auto!important;margin:10px 12px 0!important;
+  min-height:42px!important;height:auto!important;margin:10px 12px 10px!important;
   padding:10px 14px!important;box-sizing:border-box!important;white-space:normal!important;
   overflow-wrap:anywhere!important;
  }
  #newParentMobile[hidden]{display:none!important}
- .mobile-search-toggle:not([hidden]){margin-top:8px!important}
+ .mobile-search-toggle:not([hidden]){margin-top:0!important}
 }
 @media(min-width:821px){#newParentMobile{display:none!important}}
 </style>
+
+<style id="mobile-workspace-parent-scroll-and-history-header-fix">
+@media(max-width:560px){
+ .modal:has(.history-table-wrap) .history-event-head{
+  display:grid!important;
+  grid-template-columns:minmax(0,1.2fr) minmax(88px,.8fr)!important;
+  align-items:start!important;
+  justify-content:stretch!important;
+  column-gap:9px!important;
+  row-gap:4px!important;
+ }
+ .modal:has(.history-table-wrap) .history-event-datetime{
+  grid-column:1!important;
+  grid-row:1!important;
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  flex:none!important;
+  min-width:0!important;
+  width:100%!important;
+  gap:5px 7px!important;
+ }
+ .modal:has(.history-table-wrap) .history-event-head>.history-user{
+  grid-column:2!important;
+  grid-row:1!important;
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-self:stretch!important;
+  align-self:start!important;
+  flex:none!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  margin:0!important;
+  gap:6px!important;
+  white-space:normal!important;
+ }
+ .modal:has(.history-table-wrap) .history-event-head>.history-user>.avatar{
+  flex:0 0 auto!important;
+  align-self:flex-start!important;
+ }
+ .modal:has(.history-table-wrap) .history-event-head>.history-user .history-user-copy{
+  display:block!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+  max-width:100%!important;
+ }
+ .modal:has(.history-table-wrap) .history-event-head>.history-user .history-user-name{
+  display:block!important;
+  min-width:0!important;
+  max-width:100%!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  word-break:normal!important;
+ }
+}
+</style>
+
 </body>
 </html>

@@ -674,7 +674,7 @@ assert.ok(mobileChildFix.includes('.meta-separator,') &&
   mobileChildFix.includes('.account-assigned-meta-row.account-assigned-context-row { gap: 0 !important; }'),
   'All visual metadata separators share the same weight, glyph treatment, and internal spacing without additional flex gaps.');
 assert.ok(html.includes("return parts.join(metaSeparatorMarkup());") &&
-  html.includes("class=\"parent-card-meta\"><span>${esc(typeName(p.type))}</span>${metaSeparatorMarkup()}") &&
+  html.includes("class=\"parent-card-type parent-card-meta\"><span>${esc(typeName(p.type))}</span>${metaSeparatorMarkup()}") &&
   html.includes("metaSeparatorMarkup()+priorityPill(item.priority||'medium')") &&
   !html.includes('<span class="account-assigned-meta-separator">·</span>'),
   'Parent, sidebar and profile metadata use the shared metadata separator helper.');

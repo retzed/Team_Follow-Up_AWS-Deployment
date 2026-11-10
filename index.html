@@ -2376,6 +2376,7 @@ const PAGE_SCROLL_POSITION_KEYS=['workspace','account'];
 const pageScrollPositions={workspace:0,account:0};
 let pageScrollInitialized=false;
 let pageScrollCaptureSuppressed=false;
+let pendingPageScrollRestore=null;
 let pageScrollRestoreGeneration=0;
 function normalizePageScrollPosition(value){
  const number=Number(value);
@@ -2389,7 +2390,7 @@ function readDocumentScrollPosition(){
  ].map(value=>Number.isFinite(Number(value))?Number(value):0));
 }
 function capturePageScrollPosition(page=ui.page){
- if(!pageScrollInitialized||pageScrollCaptureSuppressed||!PAGE_SCROLL_POSITION_KEYS.includes(page))return false;
+ if(!pageScrollInitialized||pageScrollCaptureSuppressed||!PAGE_SCROLL_POSITION_KEYS.includes(page)||(pendingPageScrollRestore&&pendingPageScrollRestore.page===page))return false;
  pageScrollPositions[page]=readDocumentScrollPosition();
  return true;
 }
@@ -2398,6 +2399,7 @@ function resetPageScrollPositions(){
  pageScrollPositions.account=0;
  pageScrollRestoreGeneration++;
  pageScrollCaptureSuppressed=false;
+ pendingPageScrollRestore=null;
  pageScrollInitialized=false;
  if(workspaceViewStateSaveTimer){clearTimeout(workspaceViewStateSaveTimer);workspaceViewStateSaveTimer=0;}
  try{window.scrollTo({top:0,left:0,behavior:'instant'});}catch(error){window.scrollTo(0,0);}
@@ -2473,6 +2475,36 @@ function applyDocumentScrollPosition(value){
  const top=normalizePageScrollPosition(value);
  try{window.scrollTo({top,left:0,behavior:'instant'});}catch(error){window.scrollTo(0,top);}
 }
+function maxDocumentScrollPosition(){
+ const root=document.scrollingElement;
+ const height=Math.max(Number(root?.scrollHeight)||0,Number(document.documentElement?.scrollHeight)||0,Number(document.body?.scrollHeight)||0);
+ return Math.max(0,height-Math.max(0,Number(window.innerHeight)||0));
+}
+function pageScrollContentReady(page,tab,parentId){
+ if(page==='account'){
+  if(tab==='assigned')return !!ui.accountAssignedLoaded||(!ui.accountAssignedLoading&&!!ui.accountAssignedError);
+  if(tab==='pinned')return !!ui.accountPinnedLoaded||(!ui.accountPinnedLoading&&!!ui.accountPinnedError);
+  return true;
+ }
+ if(page==='workspace'&&parentId){
+  const rootId=String(parentId);
+  return dataLoadState.childrenLoaded.has(rootId)||dataLoadState.rootErrors.has(`children:${rootId}`);
+ }
+ return true;
+}
+function tryCompletePendingPageScrollRestore(){
+ const pending=pendingPageScrollRestore;
+ if(!pending)return false;
+ if(pending.generation!==pageScrollRestoreGeneration||ui.page!==pending.page){pendingPageScrollRestore=null;return false;}
+ if(pending.page==='account'&&ui.accountTab!==pending.tab){pendingPageScrollRestore=null;return false;}
+ if(pending.page==='workspace'&&String(ui.selectedParentId||'')!==String(pending.parentId||'')){pendingPageScrollRestore=null;return false;}
+ const maximum=maxDocumentScrollPosition();
+ if(pending.targetY>maximum+1&&!pageScrollContentReady(pending.page,pending.tab,pending.parentId))return false;
+ pendingPageScrollRestore=null;
+ applyDocumentScrollPosition(Math.min(pending.targetY,maximum));
+ schedulePageScrollFrame(()=>finalizePageScrollRestore(pending.page,pending.generation));
+ return true;
+}
 function finalizePageScrollRestore(page,generation){
  if(generation!==pageScrollRestoreGeneration||ui.page!==page)return;
  pageScrollCaptureSuppressed=false;
@@ -2484,6 +2516,7 @@ function beginPageTransition(nextPage,{restoreScroll=true}={}){
  if(!PAGE_SCROLL_POSITION_KEYS.includes(nextPage)||nextPage===ui.page)return null;
  if(workspaceViewStateSaveTimer){clearTimeout(workspaceViewStateSaveTimer);workspaceViewStateSaveTimer=0;}
  capturePageScrollPosition(ui.page);
+ pendingPageScrollRestore=null;
  const generation=++pageScrollRestoreGeneration;
  pageScrollCaptureSuppressed=true;
  ui.page=nextPage;
@@ -2503,13 +2536,21 @@ function finishPageTransition(transition){
  }
 }
 function restoreInitialPageScrollPosition(restoredScrollY=0){
- const page=ui.page;
+ const page=ui.page,tab=ui.accountTab,parentId=String(ui.selectedParentId||'');
  const generation=++pageScrollRestoreGeneration;
  pageScrollCaptureSuppressed=true;
  const targetY=normalizePageScrollPosition(pageScrollPositions[page]??restoredScrollY);
+ pendingPageScrollRestore=null;
  schedulePageScrollFrame(()=>schedulePageScrollFrame(()=>{
   if(generation!==pageScrollRestoreGeneration||ui.page!==page)return;
-  applyDocumentScrollPosition(targetY);
+  const maximum=maxDocumentScrollPosition();
+  if(targetY>maximum+1&&!pageScrollContentReady(page,tab,parentId)){
+   pendingPageScrollRestore={page,tab,parentId,targetY,generation};
+   pageScrollCaptureSuppressed=false;
+   pageScrollInitialized=true;
+   return;
+  }
+  applyDocumentScrollPosition(Math.min(targetY,maximum));
   schedulePageScrollFrame(()=>finalizePageScrollRestore(page,generation));
  }));
 }
@@ -2521,24 +2562,10 @@ function scheduleWorkspaceViewStateSave(){
  workspaceViewStateSaveTimer=setTimeout(()=>{workspaceViewStateSaveTimer=0;persistWorkspaceViewState();},125);
 }
 for(const eventName of ['click','change','input'])window.addEventListener(eventName,scheduleWorkspaceViewStateSave,true);
-window.addEventListener('scroll',scheduleWorkspaceViewStateSave,{passive:true});
-window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE=()=>{
- const userId=String(ui.actingUserId||'');
- if(userId){
-  try{sessionStorage.removeItem(WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(userId));}catch(error){}
-  try{sessionStorage.removeItem(LEGACY_WORKSPACE_VIEW_STATE_PREFIX+userId);}catch(error){}
- }
- ui.actingUserId='';
-};
-window.addEventListener('pagehide',persistWorkspaceViewState);
-window.addEventListener('beforeunload',persistWorkspaceViewState);
-let workspaceViewStateSaveTimer=0;
-function scheduleWorkspaceViewStateSave(){
- if(workspaceViewStateSaveTimer)clearTimeout(workspaceViewStateSaveTimer);
- workspaceViewStateSaveTimer=setTimeout(()=>{workspaceViewStateSaveTimer=0;persistWorkspaceViewState();},125);
-}
-for(const eventName of ['click','change','input'])window.addEventListener(eventName,scheduleWorkspaceViewStateSave,true);
-window.addEventListener('scroll',scheduleWorkspaceViewStateSave,{passive:true});
+window.addEventListener('scroll',()=>{
+ if(pendingPageScrollRestore&&!pageScrollCaptureSuppressed)pendingPageScrollRestore=null;
+ scheduleWorkspaceViewStateSave();
+},{passive:true});
 window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE=()=>{
  const userId=String(ui.actingUserId||'');
  if(userId){
@@ -3802,7 +3829,7 @@ async function refreshAccountProfileForForm(){
  }catch(error){console.warn('Could not refresh the signed-in Profile form.',error);}
  finally{if(requestId===ui.accountProfileRefreshToken&&ui.page==='account'&&ui.accountTab==='profile'&&userId===String(ui.actingUserId||''))renderAccountPage();}
 }
-async function openAccountTab(tab){const next=['profile','assigned','pinned','search'].includes(tab)?tab:'profile';const pageTransition=beginPageTransition('account');ui.accountTab=next;render();finishPageTransition(pageTransition);if(next==='profile')void refreshAccountProfileForForm();if(next==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();if(next==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();}
+async function openAccountTab(tab){const next=['profile','assigned','pinned','search'].includes(tab)?tab:'profile';const pageTransition=beginPageTransition('account');ui.accountTab=next;render();finishPageTransition(pageTransition);if((next==='assigned'&&ui.accountAssignedLoaded)||(next==='pinned'&&ui.accountPinnedLoaded))tryCompletePendingPageScrollRestore();if(next==='profile')void refreshAccountProfileForForm();if(next==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();if(next==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();}
 const recentlyArchivedItemIds=new Set();let accountItemsRequestGeneration=0;
 function isActiveItem(item){
  const id=String(item?.id||item?.itemId||'');
@@ -3856,7 +3883,7 @@ async function loadAccountAssignedItems(){
  }finally{
   if(hydration===workspaceHydrationGeneration&&requestGeneration===accountItemsRequestGeneration){
    ui.accountAssignedLoading=false;
-   if(ui.page==='account'&&ui.accountTab==='assigned')renderAccountPage();
+   if(ui.page==='account'&&ui.accountTab==='assigned'){renderAccountPage();tryCompletePendingPageScrollRestore();}
    if(realtimeAssignedRefreshPending&&ui.page==='account'&&ui.accountTab==='assigned'){
     realtimeAssignedRefreshPending=false;queueMicrotask(()=>void loadAccountAssignedItems());
    }
@@ -3895,7 +3922,7 @@ async function loadAccountPinnedItems(){
  }finally{
   if(hydration===workspaceHydrationGeneration&&requestGeneration===accountItemsRequestGeneration){
    ui.accountPinnedLoading=false;
-   if(ui.page==='account'&&ui.accountTab==='pinned')renderAccountPage();
+   if(ui.page==='account'&&ui.accountTab==='pinned'){renderAccountPage();tryCompletePendingPageScrollRestore();}
   }
  }
 }
@@ -5462,7 +5489,7 @@ async function startWorkspaceHydration(){
    if(ui.accountTab==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();
    else if(ui.accountTab==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();
   }
-  if(ui.selectedParentId){void ensureRootChildrenLoaded(ui.selectedParentId);void refreshActivityFor(ui.selectedParentId,'all');}
+  if(ui.selectedParentId){void ensureRootChildrenLoaded(ui.selectedParentId).then(()=>tryCompletePendingPageScrollRestore(),()=>tryCompletePendingPageScrollRestore());void refreshActivityFor(ui.selectedParentId,'all');}
  }catch(error){
   if(hydrationRun!==workspaceHydrationGeneration)return;
   ui.accountLoading=false;ui.accountError=String(error?.message||tr('loadFailed'));

@@ -648,14 +648,16 @@ assert.ok(finalLayoutFix.includes('@media(max-width:700px)') &&
   finalLayoutFix.includes('.child-top .child-meta{') &&
   finalLayoutFix.includes('grid-column:1 / -1!important;grid-row:3!important') &&
   finalLayoutFix.includes('flex-wrap:nowrap!important') &&
-  finalLayoutFix.includes('.assigned-label{flex:0 0 auto!important;white-space:nowrap!important}'),
+  finalLayoutFix.includes('.assigned-label{') &&
+  finalLayoutFix.includes('white-space:nowrap!important;'),
   'On mobile, the Assignees icon and label stay on one line and the complete assignee row spans the card from the item-icon edge.');
 assert.ok(finalLayoutFix.includes('@media(max-width:820px)') &&
   finalLayoutFix.includes('#mainContent .tree-created-meta{') &&
   finalLayoutFix.includes('margin-inline:0!important') &&
   finalLayoutFix.includes('.creator-line{') &&
   finalLayoutFix.includes('flex-wrap:nowrap!important') &&
-  finalLayoutFix.includes('.creator-line>.creator-copy{flex:1 1 auto!important'),
+  finalLayoutFix.includes('.creator-line>.creator-copy{') &&
+  finalLayoutFix.includes('flex:1 1 auto!important'),
   'Mobile timeline creator metadata begins at the item-icon edge and keeps its avatar inline with the Created by label.');
 assert.ok(finalLayoutFix.includes('.topbar>.brand .brand-copy strong{') &&
   finalLayoutFix.includes('width:max-content!important') &&

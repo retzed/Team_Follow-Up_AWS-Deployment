@@ -8741,5 +8741,118 @@ html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-
 }
 </style>
 
-${css}</body>
+
+<style id="rtl-clear-root-navigation-and-unified-metadata">
+/* Clear stays at the physical trailing edge of the page: right in LTR, left in RTL.
+   Keep it content-sized so the button itself, not just its text, changes sides. */
+#accountPage .account-search-controls > .account-search-clear-button,
+#accountPage .account-assigned-controls > .account-search-clear-button,
+html[dir="rtl"] #accountPage .account-search-controls > .account-search-clear-button,
+html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-button {
+  grid-area: clear !important;
+  justify-self: end !important;
+  align-self: end !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  flex-direction: row !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  direction: inherit !important;
+  text-align: start !important;
+  white-space: nowrap !important;
+}
+@media (min-width: 821px) {
+  /* Grid columns run from inline-start to inline-end. In RTL, the final
+     column is the physical left edge, which is the opposite of LTR. */
+  html[dir="rtl"] #accountPage .account-search-controls {
+    grid-template-areas:
+      "query query type status"
+      "user dateMode dateRange dateRange"
+      ". . . clear" !important;
+  }
+  html[dir="rtl"] #accountPage .account-assigned-controls {
+    grid-template-areas:
+      "query query type status"
+      "priority dateMode dateRange dateRange"
+      ". . . clear" !important;
+  }
+  html[dir="rtl"] #accountPage .account-assigned-controls.followup-filter-mode {
+    grid-template-areas:
+      "query query type type"
+      "priority dateMode dateRange dateRange"
+      ". . . clear" !important;
+  }
+}
+@media (max-width: 820px) {
+  html[dir="rtl"] #accountPage .account-search-controls > .account-search-clear-button,
+  html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-button {
+    justify-self: end !important;
+    width: max-content !important;
+  }
+}
+
+/* Every visual metadata separator uses the same glyph, font, weight and
+   two non-collapsing spaces from metaSeparatorMarkup(). */
+.meta-separator,
+.meta-dot,
+.account-assigned-meta-separator,
+#mainContent .timeline-meta .meta-separator,
+#mainContent .tree-created-meta .meta-separator,
+#mainContent .creator-copy .meta-separator,
+#mainContent .audit-link .meta-separator,
+#parentList .mini-updated .meta-separator {
+  display: inline !important;
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: currentColor !important;
+  font-family: var(--font-ui) !important;
+  font-size: 1em !important;
+  font-weight: 800 !important;
+  line-height: inherit !important;
+  letter-spacing: 0 !important;
+  opacity: 1 !important;
+  text-decoration: inherit !important;
+  text-decoration-skip-ink: none !important;
+  -webkit-text-stroke: 0 !important;
+  unicode-bidi: isolate !important;
+  white-space: pre !important;
+}
+/* The helper supplies all horizontal spacing; flex gaps must not add another
+   inconsistent margin before or after the separator. */
+.creator-copy,
+.meta-date-time {
+  gap: 0 !important;
+  column-gap: 0 !important;
+}
+#mainContent .timeline-meta {
+  gap: 0 !important;
+  column-gap: 0 !important;
+}
+#mainContent .timeline-meta > .timeline-user {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+.parent-card-meta,
+#parentList .parent-card-meta {
+  column-gap: 0 !important;
+  row-gap: 2px !important;
+}
+#accountPage .account-assigned-meta-row.account-assigned-context-row,
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-followup-row {
+  gap: 0 !important;
+  column-gap: 0 !important;
+}
+#mainContent .audit-link > span,
+#parentList .mini-updated > span {
+  gap: 0 !important;
+  column-gap: 0 !important;
+}
+</style>
+</body>
 </html>

@@ -2526,7 +2526,14 @@ function finishPageTransition(transition){
  if(!transition)return;
  const apply=()=>{
   if(transition.generation!==pageScrollRestoreGeneration||ui.page!==transition.page)return;
-  applyDocumentScrollPosition(transition.targetY);
+  const tab=ui.accountTab,parentId=String(ui.selectedParentId||''),maximum=maxDocumentScrollPosition();
+  if(transition.targetY>maximum+1&&!pageScrollContentReady(transition.page,tab,parentId)){
+   pendingPageScrollRestore={page:transition.page,tab,parentId,targetY:transition.targetY,generation:transition.generation};
+   pageScrollCaptureSuppressed=false;
+   pageScrollInitialized=true;
+   return;
+  }
+  applyDocumentScrollPosition(Math.min(transition.targetY,maximum));
   schedulePageScrollFrame(()=>finalizePageScrollRestore(transition.page,transition.generation));
  };
  if(transition.restoreScroll){
@@ -3829,7 +3836,7 @@ async function refreshAccountProfileForForm(){
  }catch(error){console.warn('Could not refresh the signed-in Profile form.',error);}
  finally{if(requestId===ui.accountProfileRefreshToken&&ui.page==='account'&&ui.accountTab==='profile'&&userId===String(ui.actingUserId||''))renderAccountPage();}
 }
-async function openAccountTab(tab){const next=['profile','assigned','pinned','search'].includes(tab)?tab:'profile';const pageTransition=beginPageTransition('account');ui.accountTab=next;render();finishPageTransition(pageTransition);if((next==='assigned'&&ui.accountAssignedLoaded)||(next==='pinned'&&ui.accountPinnedLoaded))tryCompletePendingPageScrollRestore();if(next==='profile')void refreshAccountProfileForForm();if(next==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();if(next==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();}
+async function openAccountTab(tab){const next=['profile','assigned','pinned','search'].includes(tab)?tab:'profile';const pageTransition=beginPageTransition('account');if(pendingPageScrollRestore&&pendingPageScrollRestore.page==='account'&&pendingPageScrollRestore.tab!==next)pendingPageScrollRestore=null;ui.accountTab=next;render();finishPageTransition(pageTransition);if((next==='assigned'&&ui.accountAssignedLoaded)||(next==='pinned'&&ui.accountPinnedLoaded))tryCompletePendingPageScrollRestore();if(next==='profile')void refreshAccountProfileForForm();if(next==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();if(next==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();}
 const recentlyArchivedItemIds=new Set();let accountItemsRequestGeneration=0;
 function isActiveItem(item){
  const id=String(item?.id||item?.itemId||'');

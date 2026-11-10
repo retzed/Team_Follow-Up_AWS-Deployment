@@ -392,7 +392,7 @@ assert.ok(html.includes("function alignWorkspaceItemInViewport(target,itemId='',
   html.includes('viewportCenter=usableTop+(usableBottom-usableTop)/2') &&
   html.includes('window.scrollY+targetCenter-viewportCenter'),
   'Item jumps must center the target in the usable desktop viewport.');
-assert.ok(html.includes('const delta=alignToTop||!desktop?rect.top-(usableTop+12):targetCenter-viewportCenter;') &&
+assert.ok(html.includes('const delta=alignToTop?rect.top-(usableTop+12):targetCenter-viewportCenter;') &&
   html.includes('if(desktop&&!alignToTop){') &&
   html.includes("alignToTop:isRootItem,highlight:item.type!=='project'"),
   'Job root redirects align the actual detail-card start below the header; ordinary item jumps retain desktop centering.');

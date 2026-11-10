@@ -591,7 +591,7 @@ assert.ok(html.includes('function metaSeparatorMarkup(){') &&
   html.includes('function fmtDateTimeMarkup(date){') &&
   html.includes('class="meta-separator" aria-hidden="true">&nbsp;·&nbsp;</span>') &&
   html.includes('font-weight:1000!important') &&
-  html.includes('-webkit-text-stroke:.18px currentColor') &&
+  html.includes('-webkit-text-stroke:.30px currentColor') &&
   html.includes('gap:0!important'),
   'All metadata middots use the same bold inline spacing, including spacing within the underlined text run.');
 assert.ok(html.includes('class="creator-copy"') &&

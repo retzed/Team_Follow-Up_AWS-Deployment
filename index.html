@@ -8712,6 +8712,13 @@ input[type="date"]::-webkit-datetime-edit-fields-wrapper,.date-input::-webkit-da
   white-space: nowrap !important;
 }
 
+/* In RTL, grid start is the physical right edge. Override the inherited
+   logical-end alignment at desktop sizes as well as phone widths. */
+html[dir="rtl"] #accountPage .account-search-controls > .account-search-clear-button,
+html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-button {
+  justify-self: start !important;
+  direction: rtl !important;
+}
 /* Make Clear follow the RTL content start in both Profile > Search and
    Assigned Items. A full-row flex surface avoids the grid's reversed
    inline-track alignment differences between browser engines. */

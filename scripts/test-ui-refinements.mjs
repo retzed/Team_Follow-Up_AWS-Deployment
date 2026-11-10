@@ -401,15 +401,26 @@ const mobileJumpStart=html.indexOf("if(!desktop){",alignHelperStart);
 const mobileJumpEnd=html.indexOf("let scrollContainer=null;",mobileJumpStart);
 const mobileJumpLogic=html.slice(mobileJumpStart,mobileJumpEnd);
 assert.ok(mobileJumpStart>alignHelperStart && mobileJumpEnd>mobileJumpStart &&
-  mobileJumpLogic.includes("activeTarget.style.scrollMarginTop=\u0060\u0024{headerInset}px\u0060;") &&
-  mobileJumpLogic.includes("activeTarget.scrollIntoView({") &&
-  mobileJumpLogic.includes("block:'start'") &&
-  mobileJumpLogic.includes("inline:'nearest'") &&
-  mobileJumpLogic.includes("behavior:alignToTop||reduceMotion?'instant':'smooth'"),
-  'Mobile redirects use native scroll positioning with a measured offset for the fixed header.');
+  mobileJumpLogic.includes("activeTarget.style.scrollMarginTop=\\u0060\\u0024{headerInset}px\\u0060;") &&
+  mobileJumpLogic.includes('if(scrollContainer){') &&
+  mobileJumpLogic.includes('scrollContainer.scrollTop=top;') &&
+  mobileJumpLogic.includes('window.scrollTo(0,top);') &&
+  mobileJumpLogic.includes("scrollContainer.scrollTo({top,behavior:'smooth'})") &&
+  mobileJumpLogic.includes("window.scrollTo({top,left:0,behavior:'smooth'})") &&
+  !mobileJumpLogic.includes('scrollIntoView('),
+  'Mobile redirects explicitly position the target in the real scroll container or document viewport below the sticky header.');
 assert.ok(html.includes("alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId,{alignToTop:isRootItem,highlight:item.type!=='project'})") &&
   html.includes("const rootTarget=document.querySelector('#mainContent .detail-card')||document.querySelector('#mainContent .detail-banner');alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'})"),
   'Parent, assigned, and pinned destinations must use the same item-aware navigation.');
+assert.ok(html.includes('id="newParentMobile" class="btn btn-primary mobile-new-parent-button"') &&
+  html.indexOf('id="newParentMobile"')<html.indexOf('id="mobileSearchToggle"') &&
+  html.includes("$('#newParentMobile').addEventListener('click',openNewParent);") &&
+  html.includes("mobileNewParent.hidden=ui.page==='account'||!mobileSidebar;") &&
+  html.includes("if(mobileNewParent)mobileNewParent.hidden=ui.page==='account'||!mobileViewport;") &&
+  html.includes('mobile-workspace-new-parent-and-root-job-redirection') &&
+  html.includes('grid-template-areas:"lang theme user logout"!important;') &&
+  html.includes('#newParentMobile:not([hidden])'),
+  'Mobile workspace shows its own New Project/Job button directly above the parent-search disclosure and removes the create action from the header.');
 assert.ok(html.includes('workspace-jump-highlight') &&
   html.includes('consistent-card-hover-and-jump-highlight') &&
   html.includes(':hover{') ,

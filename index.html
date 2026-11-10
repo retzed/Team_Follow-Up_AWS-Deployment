@@ -2384,10 +2384,11 @@ function normalizePageScrollPosition(value){
 }
 function readDocumentScrollPosition(){
  const root=document.scrollingElement;
- return Math.max(0,...[
-  window.scrollY,window.pageYOffset,root?.scrollTop,
-  document.documentElement?.scrollTop,document.body?.scrollTop
- ].map(value=>Number.isFinite(Number(value))?Number(value):0));
+ const rootPosition=Number(root?.scrollTop);
+ if(Number.isFinite(rootPosition))return normalizePageScrollPosition(rootPosition);
+ const fallback=[window.scrollY,window.pageYOffset,document.documentElement?.scrollTop,document.body?.scrollTop];
+ for(const value of fallback){const position=Number(value);if(Number.isFinite(position))return normalizePageScrollPosition(position);}
+ return 0;
 }
 function capturePageScrollPosition(page=ui.page){
  if(!pageScrollInitialized||pageScrollCaptureSuppressed||!PAGE_SCROLL_POSITION_KEYS.includes(page)||(pendingPageScrollRestore&&pendingPageScrollRestore.page===page))return false;

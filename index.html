@@ -3058,25 +3058,37 @@ function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlig
   const viewportHeight=Math.max(0,window.innerHeight||document.documentElement.clientHeight||0);
   const desktop=window.matchMedia?.('(min-width:821px)')?.matches??((window.innerWidth||0)>820);
   const reduceMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  if(highlight)highlightWorkspaceCard(activeTarget);
+  if(!desktop){
+   // Native scrollIntoView chooses the actual scrolling ancestor in mobile
+   // browsers. scroll-margin-top reserves the fixed header plus a small gap.
+   const headerInset=Math.max(0,Math.ceil(headerBottom+12));
+   activeTarget.style.scrollMarginTop=`${headerInset}px`;
+   activeTarget.scrollIntoView({
+    block:'start',
+    inline:'nearest',
+    behavior:alignToTop||reduceMotion?'instant':'smooth'
+   });
+   return;
+  }
   let scrollContainer=null;
   for(let node=activeTarget.parentElement;node&&node!==document.body&&node!==document.documentElement;node=node.parentElement){
    const overflowY=window.getComputedStyle(node).overflowY;
    if((overflowY==='auto'||overflowY==='scroll'||overflowY==='overlay')&&node.scrollHeight>node.clientHeight+1){scrollContainer=node;break;}
   }
-  if(highlight)highlightWorkspaceCard(activeTarget);
   if(scrollContainer){
    const bounds=scrollContainer.getBoundingClientRect();
    const usableTop=bounds.top+scrollContainer.clientTop+8;
    const usableBottom=Math.max(usableTop,bounds.top+scrollContainer.clientTop+scrollContainer.clientHeight-12);
    const targetCenter=rect.top+rect.height/2;
    const viewportCenter=usableTop+(usableBottom-usableTop)/2;
-   const delta=alignToTop||!desktop?rect.top-(usableTop+12):targetCenter-viewportCenter;
+   const delta=alignToTop?rect.top-(usableTop+12):targetCenter-viewportCenter;
    const maxScroll=Math.max(0,scrollContainer.scrollHeight-scrollContainer.clientHeight);
    const top=Math.max(0,Math.min(maxScroll,scrollContainer.scrollTop+delta));
    scrollContainer.scrollTo({top,behavior:reduceMotion?'instant':'smooth'});
   }else{
    let top=0;
-   if(desktop&&!alignToTop){
+   if(!alignToTop){
     const usableTop=Math.max(0,headerBottom+8);
     const usableBottom=Math.max(usableTop,viewportHeight-12);
     const targetCenter=rect.top+rect.height/2;

@@ -585,10 +585,11 @@ assert.ok(html.includes('#mainContent .tree-task-row .tree-title') &&
   'Related hierarchy item names match Recent activity title weight, and Recent activity metadata matches the compact metadata scale.');
 assert.ok(html.includes('function metaSeparatorMarkup(){') &&
   html.includes('function fmtDateTimeMarkup(date){') &&
-  html.includes('class="meta-separator" aria-hidden="true">·</span>') &&
-  html.includes('font-weight:950!important') &&
-  html.includes('gap:2px .38em'),
-  'Creator and timestamp labels use spaced, bold semantic separators instead of ambiguous plain-text middots.');
+  html.includes('class="meta-separator" aria-hidden="true">&thinsp;·&thinsp;</span>') &&
+  html.includes('font-weight:1000!important') &&
+  html.includes('-webkit-text-stroke:.18px currentColor') &&
+  html.includes('gap:0!important'),
+  'All metadata middots use the same bold inline spacing, including spacing within the underlined text run.');
 assert.ok(html.includes('class="creator-copy"') &&
   html.includes('${fmtDateTimeMarkup(item.createdAt)}') &&
   html.includes('function timelineEvents(parent,limit=8)') &&
@@ -607,8 +608,10 @@ const finalLayoutFix=html.slice(finalLayoutFixStart,finalLayoutFixEnd);
 assert.ok(finalLayoutFixStart>=0 && finalLayoutFixEnd>finalLayoutFixStart &&
   finalLayoutFix.includes('.meta-date-time{display:inline!important') &&
   finalLayoutFix.includes('text-decoration:inherit!important') &&
-  finalLayoutFix.includes('margin-inline:.48em!important'),
-  'Last-updated date/time remains inline and underlined as one complete label with clear spacing around each separator.');
+  finalLayoutFix.includes('.meta-separator{display:inline!important;margin-inline:0!important') &&
+  finalLayoutFix.includes('gap:0!important') &&
+  html.includes('&thinsp;·&thinsp;'),
+  'Last-updated date/time remains inline and underlined, with separator whitespace inside the decorated text rather than outside margins.');
 assert.ok(finalLayoutFix.includes('--activity-meta-font:var(--font-ui)') &&
   finalLayoutFix.includes('--activity-meta-size:10px') &&
   finalLayoutFix.includes('--activity-meta-weight:600') &&
@@ -627,11 +630,33 @@ assert.ok(finalLayoutFix.includes('.tree-task-row>.tree-task-edit{') &&
 assert.ok(finalLayoutFix.includes('.history-user,') &&
   finalLayoutFix.includes('.application-history-table .history-user,') &&
   finalLayoutFix.includes('align-items:center!important') &&
-  finalLayoutFix.includes('.history-user-copy{align-self:center!important;justify-content:center!important'),
-  'Activity-history user names are vertically centered against their avatars in desktop tables and mobile cards.');
+  finalLayoutFix.includes('.history-user-copy{align-self:center!important;justify-content:center!important') &&
+  finalLayoutFix.includes('.history-user-name{display:block!important;align-self:stretch!important;line-height:1.4!important;text-align:start!important}'),
+  'Activity-history names remain vertically aligned with avatars but their text stays start-aligned, not horizontally centered.');
 const historyUserRendererStart=html.indexOf('function historyUserMarkup(event){');
 const historyUserRenderer=html.slice(historyUserRendererStart,historyUserRendererStart+420);
 assert.ok(historyUserRendererStart>=0 &&
   historyUserRenderer.includes('class="history-user"') &&
   historyUserRenderer.includes('class="history-user-copy"'),
   'History popup user name stays inside the flex-aligned avatar/name group.');
+
+assert.ok(finalLayoutFix.includes('@media(max-width:700px)') &&
+  finalLayoutFix.includes('#mainContent .child-card .child-top>.child-main{display:contents!important}') &&
+  finalLayoutFix.includes('grid-template-columns:34px minmax(0,1fr) auto!important') &&
+  finalLayoutFix.includes('.child-top .child-meta{') &&
+  finalLayoutFix.includes('grid-column:1 / -1!important;grid-row:3!important') &&
+  finalLayoutFix.includes('flex-wrap:nowrap!important') &&
+  finalLayoutFix.includes('.assigned-label{flex:0 0 auto!important;white-space:nowrap!important}'),
+  'On mobile, the Assignees icon and label stay on one line and the complete assignee row spans the card from the item-icon edge.');
+assert.ok(finalLayoutFix.includes('@media(max-width:820px)') &&
+  finalLayoutFix.includes('#mainContent .tree-created-meta{') &&
+  finalLayoutFix.includes('margin-inline:0!important') &&
+  finalLayoutFix.includes('.creator-line{') &&
+  finalLayoutFix.includes('flex-wrap:nowrap!important') &&
+  finalLayoutFix.includes('.creator-line>.creator-copy{flex:1 1 auto!important'),
+  'Mobile timeline creator metadata begins at the item-icon edge and keeps its avatar inline with the Created by label.');
+assert.ok(finalLayoutFix.includes('.topbar>.brand .brand-copy strong{') &&
+  finalLayoutFix.includes('width:max-content!important') &&
+  finalLayoutFix.includes('overflow:visible!important;text-overflow:clip!important'),
+  'The mobile app wordmark keeps its full width and is not clipped by the centered WORKSPACE/USERSPACE label.');
+

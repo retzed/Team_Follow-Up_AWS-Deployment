@@ -620,15 +620,20 @@ const unifiedMetadataFixStart=html.indexOf('<style id="rtl-clear-root-navigation
 const unifiedMetadataFixEnd=html.indexOf('</style>',unifiedMetadataFixStart);
 const unifiedMetadataFix=html.slice(unifiedMetadataFixStart,unifiedMetadataFixEnd);
 assert.ok(unifiedMetadataFixStart>=0 && unifiedMetadataFixEnd>unifiedMetadataFixStart &&
-  unifiedMetadataFix.includes('font-size: 1em !important;') &&
+  unifiedMetadataFix.includes('font-size: 1.1em !important;') &&
   unifiedMetadataFix.includes('font-weight: 1000 !important;') &&
-  unifiedMetadataFix.includes('-webkit-text-stroke: .30px currentColor !important;') &&
+  unifiedMetadataFix.includes('-webkit-text-stroke: .55px currentColor !important;') &&
   unifiedMetadataFix.includes('white-space: pre !important;') &&
   unifiedMetadataFix.includes('.creator-copy,') &&
   unifiedMetadataFix.includes('#mainContent .timeline-meta .meta-separator') &&
   unifiedMetadataFix.includes('#mainContent .tree-created-meta .meta-separator') &&
   unifiedMetadataFix.includes('#mainContent .audit-link .meta-separator') &&
   unifiedMetadataFix.includes('#parentList .mini-updated .meta-separator') &&
+  unifiedMetadataFix.includes('#mainContent .timeline-meta > span.meta-separator') &&
+  unifiedMetadataFix.includes('#mainContent .creator-copy > span.meta-separator') &&
+  unifiedMetadataFix.includes('#mainContent .tree-created-meta .creator-copy > span.meta-separator') &&
+  unifiedMetadataFix.includes('font-synthesis: weight !important;') &&
+  unifiedMetadataFix.includes('text-shadow: 0 0 .2px currentColor !important;') &&
   unifiedMetadataFix.includes('column-gap: 0 !important;') &&
   unifiedMetadataFix.includes('.timeline-meta > .timeline-user') &&
   unifiedMetadataFix.includes('.account-assigned-followup-row') &&

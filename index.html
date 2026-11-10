@@ -2988,11 +2988,11 @@ function logActivity(item,action,kind='update',opts={}){const at=nowISO();data.a
 function fmtDate(date,opts={dateStyle:'medium'}){if(!date)return tr('noDueDate');const d=new Date(date);if(Number.isNaN(d.getTime()))return String(date);const locale=ui.lang==='ar'?'ar-EG':'en-GB';try{return new Intl.DateTimeFormat(locale,opts).format(d);}catch{return d.toLocaleDateString();}}
 function fmtTime(date){if(!date)return '';const d=new Date(date);const locale=ui.lang==='ar'?'ar-EG':'en-GB';try{return new Intl.DateTimeFormat(locale,{hour:'2-digit',minute:'2-digit',hour12:ui.lang!=='ar'}).format(d);}catch{return d.toLocaleTimeString();}}
 function fmtDateTime(date){return `${fmtDate(date)} · ${fmtTime(date)}`;}
-function metaSeparatorMarkup(){return '<span class="meta-separator" aria-hidden="true">·</span>';}
+function metaSeparatorMarkup(){return '<span class="meta-separator" aria-hidden="true">&thinsp;·&thinsp;</span>';}
 function fmtDateTimeMarkup(date){return `<span class="meta-date-time"><bdi dir="auto">${esc(fmtDate(date))}</bdi>${metaSeparatorMarkup()}<bdi dir="auto">${esc(fmtTime(date))}</bdi></span>`;}
 function relativeTime(date){if(!date)return '';const delta=Math.max(0,Date.now()-new Date(date).getTime());if(!Number.isFinite(delta))return fmtDate(date);const m=Math.floor(delta/60000);if(m<1)return ui.lang==='ar'?'الآن':'Just now';if(m<60)return ui.lang==='ar'?`منذ ${m} د`:`${m}m ago`;const h=Math.floor(m/60);if(h<24)return ui.lang==='ar'?`منذ ${h} س`:`${h}h ago`;const d=Math.floor(h/24);if(d<7)return ui.lang==='ar'?`منذ ${d} ي`:`${d}d ago`;return fmtDate(date,{month:'short',day:'numeric'});}
 function userAvatar(userId,size='small'){const u=person(userId);const raw=data.users.find(x=>x.id===userId)||u;return `<span class="avatar ${size==='large'?'large':''}" title="${esc(u.name)} · ${esc(u.role)}">${icon(profileIconName(raw.icon||roleIcons[raw.role]||'profile-user'),size==='large'?16:13)}</span>`;}
-function roleLabel(userId){if(!userId)return esc(tr('noAssignee'));const u=person(userId);return `${esc(u.name)} <span class="role-label">· ${esc(u.role)}</span>`;}
+function roleLabel(userId){if(!userId)return esc(tr('noAssignee'));const u=person(userId);return `${esc(u.name)}<span class="role-label">${metaSeparatorMarkup()}${esc(u.role)}</span>`;}
 function typeName(type){return tr(type==='project'?'project':type==='job'?'job':type==='task'?'task':'followup');}
 function statusName(status,lang=ui.lang){const key=({'not-started':'notStarted','in-progress':'inProgress','on-hold':'onHold','completed':'completed'})[status]||status;return (t[lang]&&t[lang][key])||t.en[key]||status;}
 function priorityName(priority){return tr(priority||'medium');}
@@ -8433,11 +8433,11 @@ input[type="date"]::-webkit-datetime-edit-fields-wrapper,.date-input::-webkit-da
 }
 :root{--activity-meta-font:var(--font-ui);--activity-meta-size:10px;--activity-meta-weight:600;--activity-meta-line-height:1.4}
 #mainContent .timeline-meta,#mainContent .timeline-meta>span,#mainContent .timeline-meta>span:last-child,#mainContent .timeline-meta .meta-date-time,#mainContent .tree-created-meta .creator-copy,#mainContent .tree-created-meta .creator-copy>span,#mainContent .created-label .creator-copy,#mainContent .parent-detail-created .creator-copy,#mainContent .audit-link>span,#parentList .mini-updated>span{font-family:var(--activity-meta-font)!important;font-size:var(--activity-meta-size)!important;font-weight:var(--activity-meta-weight)!important;line-height:var(--activity-meta-line-height)!important;font-variant-numeric:normal!important}
-#mainContent .timeline-meta .meta-separator,#mainContent .tree-created-meta .meta-separator,#mainContent .creator-copy .meta-separator,#mainContent .audit-link .meta-separator,#parentList .mini-updated .meta-separator{font-family:var(--font-ui)!important;font-weight:950!important;font-size:1.08em!important}
-.meta-date-time{display:inline!important;vertical-align:baseline!important;font-family:inherit!important;text-decoration:inherit!important}
+#mainContent .timeline-meta .meta-separator,#mainContent .tree-created-meta .meta-separator,#mainContent .creator-copy .meta-separator,#mainContent .audit-link .meta-separator,#parentList .mini-updated .meta-separator{font-family:var(--font-ui)!important;font-weight:1000!important;font-size:1.1em!important;-webkit-text-stroke:.18px currentColor!important}
+.meta-date-time{display:inline!important;vertical-align:baseline!important;font-family:inherit!important;text-decoration:inherit!important;gap:0!important}
 .meta-date-time>*{display:inline!important;vertical-align:baseline!important;text-decoration:inherit!important}
-.meta-separator{display:inline!important;margin-inline:.48em!important;padding:0!important;font-family:var(--font-ui)!important;font-weight:950!important;font-size:1.08em!important;line-height:inherit!important;text-decoration:inherit!important;unicode-bidi:isolate!important}
-.creator-copy{display:inline-flex!important;align-items:baseline!important;flex-wrap:wrap!important;gap:2px .38em!important}
+.meta-separator{display:inline!important;margin-inline:0!important;padding:0!important;font-family:var(--font-ui)!important;font-weight:1000!important;font-size:1.1em!important;line-height:inherit!important;text-decoration:inherit!important;text-decoration-skip-ink:none!important;-webkit-text-stroke:.18px currentColor!important;unicode-bidi:isolate!important;white-space:pre!important}
+.creator-copy{display:inline-flex!important;align-items:baseline!important;flex-wrap:wrap!important;gap:0!important}
 #mainContent .audit-link:hover,#mainContent .audit-link:focus-visible,#parentList .mini-updated:hover,#parentList .mini-updated:focus-visible{text-decoration:underline!important;text-decoration-thickness:1px!important;text-underline-offset:3px!important}
 #mainContent .audit-link .meta-date-time,#mainContent .audit-link .meta-date-time>*,
 #mainContent .audit-link .meta-separator,#parentList .mini-updated .meta-date-time,
@@ -8466,6 +8466,94 @@ input[type="date"]::-webkit-datetime-edit-fields-wrapper,.date-input::-webkit-da
 .history-user>.avatar{align-self:center!important;flex:0 0 22px!important}
 .history-user-copy{align-self:center!important;justify-content:center!important;min-width:0!important}
 .history-user-name{display:block!important;align-self:center!important;line-height:1.4!important}
+
+/* Mobile metadata rows follow the card's full content width. Keep the avatar
+   beside its creator label and use the same start edge as the item icon. */
+@media(max-width:820px){
+ #mainContent .tree-created-meta{
+  display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+  margin-inline:0!important;margin-inline-start:0!important;margin-inline-end:0!important;
+  padding-inline:0!important;box-sizing:border-box!important;
+ }
+ #mainContent .tree-created-meta .creator-line{
+  display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
+  align-items:center!important;gap:6px!important;width:100%!important;max-width:100%!important;min-width:0!important;
+ }
+ #mainContent .tree-created-meta .creator-line>.avatar{
+  display:inline-grid!important;flex:0 0 22px!important;width:22px!important;height:22px!important;
+  min-width:22px!important;align-self:center!important;margin:0!important;
+ }
+ #mainContent .tree-created-meta .creator-line>.creator-copy{
+  display:inline-flex!important;flex:1 1 auto!important;min-width:0!important;max-width:100%!important;
+  align-items:baseline!important;flex-wrap:wrap!important;gap:0!important;
+ }
+}
+/* Mobile child cards use a three-column grid. Flattening only the content
+   wrapper lets the Assignees row span from the item-icon edge to the card end. */
+@media(max-width:700px){
+ #mainContent .child-card .child-top{
+  display:grid!important;grid-template-columns:34px minmax(0,1fr) auto!important;
+  grid-template-rows:auto auto auto!important;align-items:start!important;
+  column-gap:10px!important;row-gap:6px!important;width:100%!important;min-width:0!important;
+ }
+ #mainContent .child-card .child-top>.child-icon{
+  grid-column:1!important;grid-row:1 / span 2!important;align-self:start!important;
+ }
+ #mainContent .child-card .child-top>.child-main{display:contents!important}
+ #mainContent .child-card .child-top .child-title-row{
+  grid-column:2!important;grid-row:1!important;min-width:0!important;max-width:100%!important;
+ }
+ #mainContent .child-card .child-top .child-description{
+  grid-column:2!important;grid-row:2!important;min-width:0!important;max-width:100%!important;margin:0!important;
+ }
+ #mainContent .child-card .child-top .child-meta{
+  grid-column:1 / -1!important;grid-row:3!important;display:flex!important;
+  width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important;
+  align-items:center!important;flex-wrap:wrap!important;
+ }
+ #mainContent .child-card .child-top>.child-actions{
+  grid-column:3!important;grid-row:1!important;justify-self:end!important;align-self:start!important;
+ }
+ #mainContent .child-card .child-meta>.child-assignee{
+  display:flex!important;flex:0 0 100%!important;width:100%!important;max-width:100%!important;
+  min-width:0!important;box-sizing:border-box!important;align-self:stretch!important;
+  align-items:center!important;justify-content:flex-start!important;flex-wrap:nowrap!important;
+  white-space:normal!important;
+ }
+ #mainContent .child-card .child-meta>.child-assignee>svg{
+  display:block!important;flex:0 0 14px!important;width:14px!important;height:14px!important;
+ }
+ #mainContent .child-card .child-meta>.child-assignee>.assigned-label{
+  flex:0 0 auto!important;white-space:nowrap!important;
+ }
+ #mainContent .child-card .child-meta>.child-assignee>.assigned-person-list,
+ #mainContent .child-card .child-meta>.child-assignee>.assigned-person{
+  flex:1 1 auto!important;min-width:0!important;max-width:100%!important;white-space:normal!important;
+ }
+ #mainContent .child-card .child-meta>.child-assignee .assigned-person-chip{
+  min-width:0!important;max-width:100%!important;white-space:normal!important;
+ }
+ #mainContent .child-card .child-meta>.child-assignee .assigned-person{
+  min-width:0!important;white-space:normal!important;overflow-wrap:anywhere!important;
+ }
+ /* Do not clip the Follow-Up wordmark after reserving the centered context label. */
+ .topbar>.brand{
+  width:max-content!important;min-width:max-content!important;max-width:none!important;flex:0 0 auto!important;
+ }
+ .topbar>.brand .brand-mark{flex:0 0 36px!important;width:36px!important;height:36px!important}
+ .topbar>.brand .brand-copy{
+  display:flex!important;flex:0 0 auto!important;flex-direction:column!important;
+  width:max-content!important;min-width:max-content!important;max-width:none!important;overflow:visible!important;
+ }
+ .topbar>.brand .brand-copy strong{
+  display:block!important;width:max-content!important;max-width:none!important;
+  white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;
+ }
+}
+/* Keep history names at the start edge while retaining vertical avatar alignment. */
+.history-user-name{
+ display:block!important;align-self:stretch!important;line-height:1.4!important;text-align:start!important;
+}
 </style>
 
 </body>

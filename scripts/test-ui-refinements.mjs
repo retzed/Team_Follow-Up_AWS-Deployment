@@ -616,6 +616,10 @@ assert.ok(unifiedMetadataFixStart>=0 && unifiedMetadataFixEnd>unifiedMetadataFix
   unifiedMetadataFix.includes('-webkit-text-stroke: 0 !important;') &&
   unifiedMetadataFix.includes('white-space: pre !important;') &&
   unifiedMetadataFix.includes('.creator-copy,') &&
+  unifiedMetadataFix.includes('#mainContent .timeline-meta .meta-separator') &&
+  unifiedMetadataFix.includes('#mainContent .tree-created-meta .meta-separator') &&
+  unifiedMetadataFix.includes('#mainContent .audit-link .meta-separator') &&
+  unifiedMetadataFix.includes('#parentList .mini-updated .meta-separator') &&
   unifiedMetadataFix.includes('column-gap: 0 !important;') &&
   unifiedMetadataFix.includes('.timeline-meta > .timeline-user') &&
   unifiedMetadataFix.includes('.account-assigned-followup-row') &&

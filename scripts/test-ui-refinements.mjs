@@ -398,10 +398,10 @@ assert.ok(html.includes('const delta=alignToTop?rect.top-(usableTop+12):targetCe
   'Job root redirects align the actual detail-card start below the header; ordinary item jumps retain desktop centering.');
 const alignHelperStart=html.indexOf("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlight=true}={}){");
 const mobileJumpStart=html.indexOf("if(!desktop){",alignHelperStart);
-const mobileJumpEnd=html.indexOf("let scrollContainer=null;",mobileJumpStart);
+const mobileJumpEnd=html.indexOf("\n  }\n  let scrollContainer=null;",mobileJumpStart);
 const mobileJumpLogic=html.slice(mobileJumpStart,mobileJumpEnd);
 assert.ok(mobileJumpStart>alignHelperStart && mobileJumpEnd>mobileJumpStart &&
-  mobileJumpLogic.includes("activeTarget.style.scrollMarginTop=\\u0060\\u0024{headerInset}px\\u0060;") &&
+  mobileJumpLogic.includes("const headerInset=Math.max(0,Math.ceil(headerBottom+12));") &&
   mobileJumpLogic.includes('if(scrollContainer){') &&
   mobileJumpLogic.includes('scrollContainer.scrollTop=top;') &&
   mobileJumpLogic.includes('window.scrollTo(0,top);') &&

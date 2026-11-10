@@ -8840,5 +8840,38 @@ html[dir="rtl"] #accountPage .account-assigned-controls > .account-search-clear-
   unicode-bidi: isolate !important;
   white-space: pre !important;
 }
+/* Keep helper-owned whitespace continuous for hover underlines. */
+.creator-copy,
+.meta-date-time {
+  gap: 0 !important;
+  column-gap: 0 !important;
+}
+#mainContent .timeline-meta {
+  gap: 0 !important;
+  column-gap: 0 !important;
+}
+#mainContent .timeline-meta > .timeline-user {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+.parent-card-meta,
+#parentList .parent-card-meta {
+  column-gap: 0 !important;
+  row-gap: 2px !important;
+}
+#accountPage .account-assigned-meta-row.account-assigned-context-row,
+#accountPage .account-assigned-item-row .account-item-copy .account-assigned-followup-row {
+  gap: 0 !important;
+  column-gap: 0 !important;
+}
+#mainContent .audit-link > span,
+#parentList .mini-updated > span {
+  gap: 0 !important;
+  column-gap: 0 !important;
+}
+</style>
 </body>
 </html>

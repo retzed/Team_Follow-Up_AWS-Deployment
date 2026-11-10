@@ -412,7 +412,7 @@ assert.ok(finalPositionCss.includes('justify-content:center!important') &&
 
 const parentJumpStart=html.indexOf("case 'select-parent':");
 const parentJumpEnd=html.indexOf("case 'select-assigned':",parentJumpStart);
-assert.ok(parentJumpStart>=0&&parentJumpEnd>parentJumpStart&&html.slice(parentJumpStart,parentJumpEnd).includes("alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'})"),'Selecting a parent aligns Job items to the beginning and preserves the existing Project behavior.');
+assert.ok(parentJumpStart>=0&&parentJumpEnd>parentJumpStart&&html.slice(parentJumpStart,parentJumpEnd).includes("alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'})"),'Selecting a parent aligns Job items to the beginning and preserves the existing Project behavior.');
 
 
 const accountSearchMatcherStart=html.indexOf('function accountSearchUserMatches(item,userId){');

@@ -8324,5 +8324,59 @@ html[dir="rtl"] #mainContent .child-card .child-last-updated-row .mini-updated{a
  .tree-task-row>.tree-task-edit{grid-column:3!important;grid-row:1!important;justify-self:end!important;align-self:start!important;flex:0 0 auto!important;margin:0!important;min-height:30px!important;max-width:100%!important;white-space:nowrap!important}
 }
 </style>
+
+<style id="timeline-mobile-edit-placement-and-jump-highlight-override">
+/* Mobile hierarchy: reserve a stable action slot and position Edit at inline-end.
+   This covers the app's full mobile/tablet breakpoint, not only phone widths. */
+@media(max-width:820px){
+ .tree-task-wrap{overflow:visible!important}
+ .tree-task-row{
+  position:relative!important;display:grid!important;
+  grid-template-columns:20px minmax(0,1fr)!important;grid-template-rows:auto auto!important;
+  align-items:start!important;column-gap:8px!important;row-gap:7px!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  padding-inline-end:74px!important;box-sizing:border-box!important;
+ }
+ .tree-task-row.is-ltr{direction:ltr!important}
+ .tree-task-row.is-rtl{direction:rtl!important}
+ .tree-task-row>svg:first-child{
+  grid-column:1!important;grid-row:1!important;align-self:start!important;
+  width:18px!important;height:18px!important;min-width:18px!important;margin-top:2px!important;
+ }
+ .tree-task-row>.tree-name-type{
+  grid-column:2!important;grid-row:1!important;display:flex!important;
+  align-items:center!important;flex-wrap:wrap!important;gap:4px 7px!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+ }
+ .tree-task-row>.tree-name-type>.tree-title{
+  flex:1 1 145px!important;width:auto!important;min-width:0!important;max-width:100%!important;
+  white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;line-height:1.4!important;
+ }
+ .tree-task-row>.tree-name-type>.tree-direct-type{
+  flex:0 0 auto!important;align-self:center!important;max-width:100%!important;margin:0!important;
+ }
+ .tree-task-row>.status-pill{
+  grid-column:2!important;grid-row:2!important;justify-self:start!important;align-self:center!important;
+  max-width:100%!important;margin:0!important;
+ }
+ .tree-task-row>.tree-task-edit{
+  position:absolute!important;inset-block-start:0!important;inset-inline-end:0!important;z-index:2!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  grid-column:auto!important;grid-row:auto!important;justify-self:auto!important;align-self:start!important;
+  flex:0 0 auto!important;min-width:52px!important;max-width:68px!important;min-height:30px!important;
+  margin:0!important;padding-inline:6px!important;white-space:nowrap!important;direction:inherit!important;
+ }
+}
+
+/* A jump highlight must win over the generic desktop :hover treatment.
+   The extra pseudo-class specificity preserves it while the pointer is over
+   the redirected card; hovering a different card does not clear its class. */
+.workspace-jump-highlight:is(.parent-card,.child-card,.nested-followup,.account-item-row,.tree-task-wrap,.tree-item,.tree-direct,.archive-row,.archive-child-card,.history-event-card):is(:hover,:focus-within){
+ border-color:var(--accent)!important;
+ background-color:color-mix(in srgb,var(--accent-soft) 58%,var(--panel))!important;
+ box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 28%,transparent)!important;
+}
+</style>
+
 </body>
 </html>

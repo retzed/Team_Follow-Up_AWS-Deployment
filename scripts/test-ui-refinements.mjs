@@ -612,8 +612,8 @@ const unifiedMetadataFixEnd=html.indexOf('</style>',unifiedMetadataFixStart);
 const unifiedMetadataFix=html.slice(unifiedMetadataFixStart,unifiedMetadataFixEnd);
 assert.ok(unifiedMetadataFixStart>=0 && unifiedMetadataFixEnd>unifiedMetadataFixStart &&
   unifiedMetadataFix.includes('font-size: 1em !important;') &&
-  unifiedMetadataFix.includes('font-weight: 800 !important;') &&
-  unifiedMetadataFix.includes('-webkit-text-stroke: 0 !important;') &&
+  unifiedMetadataFix.includes('font-weight: 1000 !important;') &&
+  unifiedMetadataFix.includes('-webkit-text-stroke: .30px currentColor !important;') &&
   unifiedMetadataFix.includes('white-space: pre !important;') &&
   unifiedMetadataFix.includes('.creator-copy,') &&
   unifiedMetadataFix.includes('#mainContent .timeline-meta .meta-separator') &&

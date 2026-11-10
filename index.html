@@ -2372,16 +2372,48 @@ const WORKSPACE_VIEW_FILTER_KEYS=[
 ];
 function workspaceViewStateKey(){return WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(String(ui.actingUserId||'anonymous'));}
 function legacyWorkspaceViewStateKey(){return LEGACY_WORKSPACE_VIEW_STATE_PREFIX+String(ui.actingUserId||'anonymous');}
+const PAGE_SCROLL_POSITION_KEYS=['workspace','account'];
+const pageScrollPositions={workspace:0,account:0};
+let pageScrollInitialized=false;
+let pageScrollCaptureSuppressed=false;
+let pageScrollRestoreGeneration=0;
+function normalizePageScrollPosition(value){
+ const number=Number(value);
+ return Number.isFinite(number)&&number>0?Math.round(number):0;
+}
+function readDocumentScrollPosition(){
+ const root=document.scrollingElement;
+ return Math.max(0,...[
+  window.scrollY,window.pageYOffset,root?.scrollTop,
+  document.documentElement?.scrollTop,document.body?.scrollTop
+ ].map(value=>Number.isFinite(Number(value))?Number(value):0));
+}
+function capturePageScrollPosition(page=ui.page){
+ if(!pageScrollInitialized||pageScrollCaptureSuppressed||!PAGE_SCROLL_POSITION_KEYS.includes(page))return false;
+ pageScrollPositions[page]=readDocumentScrollPosition();
+ return true;
+}
+function resetPageScrollPositions(){
+ pageScrollPositions.workspace=0;
+ pageScrollPositions.account=0;
+ pageScrollRestoreGeneration++;
+ pageScrollCaptureSuppressed=false;
+ pageScrollInitialized=false;
+ if(workspaceViewStateSaveTimer){clearTimeout(workspaceViewStateSaveTimer);workspaceViewStateSaveTimer=0;}
+ try{window.scrollTo({top:0,left:0,behavior:'instant'});}catch(error){window.scrollTo(0,0);}
+}
 function persistWorkspaceViewState(){
  try{
   const userId=String(ui.actingUserId||'');
   if(!userId)return false;
-  const state={version:3,userId,page:ui.page,values:{},expanded:[...(ui.expanded||[])].slice(0,1000),scrollY:Math.max(0,Math.round(window.scrollY||0))};
+  capturePageScrollPosition();
+  const state={version:4,userId,page:ui.page,values:{},expanded:[...(ui.expanded||[])].slice(0,1000),
+   scrollPositions:{workspace:pageScrollPositions.workspace,account:pageScrollPositions.account},
+   scrollY:pageScrollPositions[ui.page]||0};
   for(const key of WORKSPACE_VIEW_FILTER_KEYS)state.values[key]=ui[key];
-  // View state is deliberately tab-scoped. Never mirror it to localStorage:
-  // localStorage is shared by every same-origin tab and would couple their views.
+  // View state and both page scroll positions are deliberately tab-scoped.
+  // Never mirror them to localStorage: separate browser tabs must stay independent.
   sessionStorage.setItem(workspaceViewStateKey(),JSON.stringify(state));
-  // Remove the retired legacy key only after the current tab snapshot is saved.
   try{sessionStorage.removeItem(legacyWorkspaceViewStateKey());}catch(error){}
   return true;
  }catch(error){
@@ -2394,15 +2426,13 @@ function restoreWorkspaceViewState(){
  try{
   const userId=String(ui.actingUserId||'');
   if(!userId)return 0;
-  // Read only sessionStorage. A missing tab snapshot must start with defaults;
-  // falling back to localStorage would import another tab's last-opened view.
   let raw=sessionStorage.getItem(workspaceViewStateKey());
   if(!raw)raw=sessionStorage.getItem(legacyWorkspaceViewStateKey());
   const state=JSON.parse(raw||'null');
-  if(!state||![1,2,3].includes(state.version))return 0;
+  if(!state||![1,2,3,4].includes(state.version))return 0;
   if(state.version>=2&&String(state.userId||'')!==userId)return 0;
   restoredWorkspaceViewStateVersion=Number(state.version)||0;
-  if(['account','workspace'].includes(state.page))ui.page=state.page;
+  if(PAGE_SCROLL_POSITION_KEYS.includes(state.page))ui.page=state.page;
   const values=state.values&&typeof state.values==='object'?state.values:{};
   for(const key of WORKSPACE_VIEW_FILTER_KEYS){
    if(!(key in values))continue;
@@ -2414,15 +2444,92 @@ function restoreWorkspaceViewState(){
    if(typeof ui[key]==='string'&&typeof value!=='string')continue;
    ui[key]=value;
   }
+  const savedScrollPositions=state.scrollPositions&&typeof state.scrollPositions==='object'?state.scrollPositions:{};
+  for(const page of PAGE_SCROLL_POSITION_KEYS){
+   if(Object.prototype.hasOwnProperty.call(savedScrollPositions,page)){
+    pageScrollPositions[page]=normalizePageScrollPosition(savedScrollPositions[page]);
+   }
+  }
+  // Migrate the former single scrollY value to only the page that was active
+  // when the old snapshot was written; never copy it to both pages.
+  const legacyPage=PAGE_SCROLL_POSITION_KEYS.includes(state.page)?state.page:ui.page;
+  if(!Object.prototype.hasOwnProperty.call(savedScrollPositions,legacyPage)&&Number.isFinite(Number(state.scrollY))){
+   pageScrollPositions[legacyPage]=normalizePageScrollPosition(state.scrollY);
+  }
   if(Array.isArray(state.expanded))ui.expanded=new Set(state.expanded.slice(0,1000).map(String));
   ui.modal=null;
-  return Number.isFinite(Number(state.scrollY))?Math.max(0,Number(state.scrollY)):0;
+  return pageScrollPositions[ui.page]||0;
  }catch(error){
   console.warn('This tab could not restore its workspace view from sessionStorage.',error);
   return 0;
  }
 }
 const restoredWorkspaceScrollY=restoreWorkspaceViewState();
+function schedulePageScrollFrame(callback){
+ if(typeof window.requestAnimationFrame==='function')window.requestAnimationFrame(callback);
+ else window.setTimeout(callback,0);
+}
+function applyDocumentScrollPosition(value){
+ const top=normalizePageScrollPosition(value);
+ try{window.scrollTo({top,left:0,behavior:'instant'});}catch(error){window.scrollTo(0,top);}
+}
+function finalizePageScrollRestore(page,generation){
+ if(generation!==pageScrollRestoreGeneration||ui.page!==page)return;
+ pageScrollCaptureSuppressed=false;
+ pageScrollInitialized=true;
+ capturePageScrollPosition(page);
+ persistWorkspaceViewState();
+}
+function beginPageTransition(nextPage,{restoreScroll=true}={}){
+ if(!PAGE_SCROLL_POSITION_KEYS.includes(nextPage)||nextPage===ui.page)return null;
+ if(workspaceViewStateSaveTimer){clearTimeout(workspaceViewStateSaveTimer);workspaceViewStateSaveTimer=0;}
+ capturePageScrollPosition(ui.page);
+ const generation=++pageScrollRestoreGeneration;
+ pageScrollCaptureSuppressed=true;
+ ui.page=nextPage;
+ return {page:nextPage,targetY:restoreScroll?pageScrollPositions[nextPage]:0,restoreScroll,generation};
+}
+function finishPageTransition(transition){
+ if(!transition)return;
+ const apply=()=>{
+  if(transition.generation!==pageScrollRestoreGeneration||ui.page!==transition.page)return;
+  applyDocumentScrollPosition(transition.targetY);
+  schedulePageScrollFrame(()=>finalizePageScrollRestore(transition.page,transition.generation));
+ };
+ if(transition.restoreScroll){
+  schedulePageScrollFrame(()=>schedulePageScrollFrame(apply));
+ }else{
+  apply();
+ }
+}
+function restoreInitialPageScrollPosition(restoredScrollY=0){
+ const page=ui.page;
+ const generation=++pageScrollRestoreGeneration;
+ pageScrollCaptureSuppressed=true;
+ const targetY=normalizePageScrollPosition(pageScrollPositions[page]??restoredScrollY);
+ schedulePageScrollFrame(()=>schedulePageScrollFrame(()=>{
+  if(generation!==pageScrollRestoreGeneration||ui.page!==page)return;
+  applyDocumentScrollPosition(targetY);
+  schedulePageScrollFrame(()=>finalizePageScrollRestore(page,generation));
+ }));
+}
+window.addEventListener('pagehide',persistWorkspaceViewState);
+window.addEventListener('beforeunload',persistWorkspaceViewState);
+let workspaceViewStateSaveTimer=0;
+function scheduleWorkspaceViewStateSave(){
+ if(workspaceViewStateSaveTimer)clearTimeout(workspaceViewStateSaveTimer);
+ workspaceViewStateSaveTimer=setTimeout(()=>{workspaceViewStateSaveTimer=0;persistWorkspaceViewState();},125);
+}
+for(const eventName of ['click','change','input'])window.addEventListener(eventName,scheduleWorkspaceViewStateSave,true);
+window.addEventListener('scroll',scheduleWorkspaceViewStateSave,{passive:true});
+window.__TEAM_FOLLOW_UP_CLEAR_VIEW_STATE=()=>{
+ const userId=String(ui.actingUserId||'');
+ if(userId){
+  try{sessionStorage.removeItem(WORKSPACE_VIEW_STATE_PREFIX+encodeURIComponent(userId));}catch(error){}
+  try{sessionStorage.removeItem(LEGACY_WORKSPACE_VIEW_STATE_PREFIX+userId);}catch(error){}
+ }
+ ui.actingUserId='';
+};
 window.addEventListener('pagehide',persistWorkspaceViewState);
 window.addEventListener('beforeunload',persistWorkspaceViewState);
 let workspaceViewStateSaveTimer=0;
@@ -3695,7 +3802,7 @@ async function refreshAccountProfileForForm(){
  }catch(error){console.warn('Could not refresh the signed-in Profile form.',error);}
  finally{if(requestId===ui.accountProfileRefreshToken&&ui.page==='account'&&ui.accountTab==='profile'&&userId===String(ui.actingUserId||''))renderAccountPage();}
 }
-async function openAccountTab(tab){const next=['profile','assigned','pinned','search'].includes(tab)?tab:'profile';ui.page='account';ui.accountTab=next;render();if(next==='profile')void refreshAccountProfileForForm();if(next==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();if(next==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();}
+async function openAccountTab(tab){const next=['profile','assigned','pinned','search'].includes(tab)?tab:'profile';const pageTransition=beginPageTransition('account');ui.accountTab=next;render();finishPageTransition(pageTransition);if(next==='profile')void refreshAccountProfileForForm();if(next==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();if(next==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();}
 const recentlyArchivedItemIds=new Set();let accountItemsRequestGeneration=0;
 function isActiveItem(item){
  const id=String(item?.id||item?.itemId||'');
@@ -4730,8 +4837,8 @@ function handleAction(target){const actionEl=target.closest('[data-action]');if(
  case 'sidebar-toggle':{const shouldExpand=ui.sidebarCollapsed;setWorkspaceSidebarCollapsed(!ui.sidebarCollapsed);if(shouldExpand){renderParentList({skipRemote:true});const selectedId=String(ui.selectedParentId||'');if(ui.page==='workspace'&&selectedId){renderDetail();void ensureRootChildrenLoaded(selectedId).then(()=>{if(!ui.sidebarCollapsed&&ui.page==='workspace'&&String(ui.selectedParentId)===selectedId){renderDetail();if(ui.selectedAssignedItemId){const selectedCard=document.getElementById('card-'+String(ui.selectedAssignedItemId));alignWorkspaceItemInViewport(selectedCard);}}}).catch(error=>console.warn('Could not restore the selected workspace item after expanding Search.',error));}}break;}
  case 'toggle-pin':void togglePinnedItem(id);break;
  case 'save-user-privilege':void saveUserPrivilege(actionEl.dataset.userId);break;
- case 'select-parent':{const enteringWorkspace=ui.page==='account';const parent=data.parents.find(row=>String(row.id)===String(id));if(!parent)break;const selectedId=String(parent.id);ui.page='workspace';if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedParentId=parent.id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();persistWorkspaceViewState();applyTranslations();renderParentList({skipRemote:true});renderDetail();void ensureRootChildrenLoaded(id).then(()=>{if(ui.page==='workspace'&&String(ui.selectedParentId)===selectedId){renderDetail();alignWorkspaceParentInViewport(selectedId,{highlight:parent.type!=='project'});}}).catch(error=>console.warn('Could not finish loading the selected workspace item.',error));void refreshActivityFor(id,'all');break;}  
- case 'select-assigned':{const enteringWorkspace=ui.page==='account';const item=allItem(id)||assignedItemCache.get(String(id))||ui.accountAssignedRows.find(row=>String(row.id||row.itemId)===String(id))||ui.accountPinnedRows.find(row=>String(row.id||row.itemId)===String(id));const rootId=String(item?.rootParentId||((item?.type==='project'||item?.type==='job')?item.id:(item?rootParent(item)?.id:''))||'');const root=data.parents.find(parent=>String(parent.id)===rootId)||(item?rootParent(item):null);if(!item||!root)break;const isRootItem=item.type==='project'||item.type==='job';const selectedItemId=String(item.id||id),selectedRootId=String(root.id);ui.page='workspace';if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedAssignedItemId=isRootItem?null:item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}persistWorkspaceViewState();applyTranslations();renderParentList({skipRemote:true});renderDetail();void refreshActivityFor(root.id,'all');void Promise.resolve(ensureRootChildrenLoaded(selectedRootId)).then(()=>{if(ui.page!=='workspace'||String(ui.selectedParentId)!==selectedRootId||(!isRootItem&&String(ui.selectedAssignedItemId||'')!==selectedItemId))return;if(!isRootItem){let ancestor=allItem(selectedItemId)||item;const seenAfterLoad=new Set();while(ancestor&&String(ancestor.id)!==selectedRootId&&!seenAfterLoad.has(String(ancestor.id))){seenAfterLoad.add(String(ancestor.id));if(ancestor.type==='task')ui.expanded.add(String(ancestor.id));ancestor=ancestor.parentId?allItem(ancestor.parentId):null;}}renderDetail();if(isRootItem)alignWorkspaceParentInViewport(selectedRootId,{highlight:item.type!=='project'});else{const selectedTarget=findWorkspaceItemCard(selectedItemId);alignWorkspaceItemInViewport(selectedTarget,selectedItemId,{highlight:item.type!=='project'});}}).catch(error=>console.warn('Could not finish loading the selected assigned or pinned item.',error));break;}  case 'open-archive':openArchive();break;
+ case 'select-parent':{const enteringWorkspace=ui.page==='account';const parent=data.parents.find(row=>String(row.id)===String(id));if(!parent)break;const selectedId=String(parent.id);const pageTransition=beginPageTransition('workspace',{restoreScroll:false});if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedParentId=parent.id;ui.selectedAssignedItemId=null;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();persistWorkspaceViewState();applyTranslations();renderParentList({skipRemote:true});renderDetail();finishPageTransition(pageTransition);void ensureRootChildrenLoaded(id).then(()=>{if(ui.page==='workspace'&&String(ui.selectedParentId)===selectedId){renderDetail();alignWorkspaceParentInViewport(selectedId,{highlight:parent.type!=='project'});}}).catch(error=>console.warn('Could not finish loading the selected workspace item.',error));void refreshActivityFor(id,'all');break;}  
+ case 'select-assigned':{const enteringWorkspace=ui.page==='account';const item=allItem(id)||assignedItemCache.get(String(id))||ui.accountAssignedRows.find(row=>String(row.id||row.itemId)===String(id))||ui.accountPinnedRows.find(row=>String(row.id||row.itemId)===String(id));const rootId=String(item?.rootParentId||((item?.type==='project'||item?.type==='job')?item.id:(item?rootParent(item)?.id:''))||'');const root=data.parents.find(parent=>String(parent.id)===rootId)||(item?rootParent(item):null);if(!item||!root)break;const isRootItem=item.type==='project'||item.type==='job';const selectedItemId=String(item.id||id),selectedRootId=String(root.id);const pageTransition=beginPageTransition('workspace',{restoreScroll:false});if(enteringWorkspace)setWorkspaceSidebarCollapsed(true);ui.selectedAssignedItemId=isRootItem?null:item.id;ui.selectedParentId=root.id;ui.tab='overview';ui.childQuery='';ui.childType='all';ui.childStatus='all';ui.childPriority='all';ui.childDateMode='updated';ui.childDateFrom='';ui.childDateTo='';ui.childScope='all';ui.expanded.clear();let cursor=item;const seen=new Set();while(cursor&&cursor.id!==root.id&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.type==='task')ui.expanded.add(cursor.id);cursor=cursor.parentId?allItem(cursor.parentId):null;}persistWorkspaceViewState();applyTranslations();renderParentList({skipRemote:true});renderDetail();finishPageTransition(pageTransition);void refreshActivityFor(root.id,'all');void Promise.resolve(ensureRootChildrenLoaded(selectedRootId)).then(()=>{if(ui.page!=='workspace'||String(ui.selectedParentId)!==selectedRootId||(!isRootItem&&String(ui.selectedAssignedItemId||'')!==selectedItemId))return;if(!isRootItem){let ancestor=allItem(selectedItemId)||item;const seenAfterLoad=new Set();while(ancestor&&String(ancestor.id)!==selectedRootId&&!seenAfterLoad.has(String(ancestor.id))){seenAfterLoad.add(String(ancestor.id));if(ancestor.type==='task')ui.expanded.add(String(ancestor.id));ancestor=ancestor.parentId?allItem(ancestor.parentId):null;}}renderDetail();if(isRootItem)alignWorkspaceParentInViewport(selectedRootId,{highlight:item.type!=='project'});else{const selectedTarget=findWorkspaceItemCard(selectedItemId);alignWorkspaceItemInViewport(selectedTarget,selectedItemId,{highlight:item.type!=='project'});}}).catch(error=>console.warn('Could not finish loading the selected assigned or pinned item.',error));break;}  case 'open-archive':openArchive();break;
  case 'global-history':openApplicationHistory();break;
  case 'retry-data-load':if(ui.modal?.kind==='history')void refreshActivityFor(ui.modal.itemId,allItem(ui.modal.itemId)?.type==='followup'?'item':(ui.modal.historyScope||'all'));else if(ui.modal?.kind==='global-history')void refreshApplicationHistory();else if(!dataLoadState.parentsReady||dataLoadState.initialError)void startWorkspaceHydration();else if(ui.selectedParentId)void ensureRootChildrenLoaded(ui.selectedParentId,{force:true});break;
  case 'archive-toggle-group':toggleArchiveGroup(actionEl.dataset.rootId);break;
@@ -4808,7 +4915,7 @@ function animateWorkspaceSurfaceEntry(){
  };
  surface.addEventListener('animationend',finish);
 }
-function openWorkspaceFromBrand(){ui.page='workspace';render();}
+function openWorkspaceFromBrand(){const pageTransition=beginPageTransition('workspace');render();finishPageTransition(pageTransition);}
 $('#brandHome').addEventListener('click',openWorkspaceFromBrand);
 $('#brandHome').addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();openWorkspaceFromBrand();}});
 $('#accountPage').addEventListener('submit',ev=>{if(ev.target?.id==='accountProfileForm'){ev.preventDefault();void saveCurrentProfile(ev.target);}else if(ev.target?.id==='accountPasswordForm'){ev.preventDefault();void changeCurrentPassword(ev.target);}});$('#accountPage').addEventListener('focusout',ev=>{if(ev.target?.id==='passwordCurrent'){const submit=ev.relatedTarget?.closest?.('#accountPasswordForm button[type="submit"]');if(!submit)void verifyCurrentPasswordField(ev.target);}});$('#accountPage').addEventListener('input',ev=>{if(ev.target.id==='passwordCurrent'){currentPasswordVerificationSequence++;verifiedCurrentPasswordOwner='';verifiedCurrentPasswordValue='';currentPasswordVerificationInFlight=null;const check=$('#passwordCurrentCheck');setCurrentPasswordCheck(check,'hidden');const status=$('#passwordChangeStatus');if(status){status.textContent='';status.classList.remove('error');}}else if(ev.target.id==='passwordNew'||ev.target.id==='passwordConfirm'){const form=ev.target.closest?.('#accountPasswordForm');if(form){const status=$('#passwordChangeStatus');if(status&&status.classList.contains('error')&&status.textContent!==tr('currentPasswordIncorrect')){status.textContent='';status.classList.remove('error');}updatePasswordMatchStatus(form);}}if(ev.target.id==='accountAssignedQuery'){ui.accountAssignedQuery=ev.target.value;refreshAccountAssignedResults();return;}if(ev.target.id==='accountSearchQuery'){ui.accountSearchQuery=ev.target.value;refreshAccountSearchResults();return;}const profileForm=ev.target.closest?.('#accountProfileForm');if(profileForm)ui.accountProfileDraft=Object.fromEntries(new FormData(profileForm).entries());});$('#accountPage').addEventListener('change',ev=>{const profileForm=$('#accountProfileForm');if(profileForm)ui.accountProfileDraft=Object.fromEntries(new FormData(profileForm).entries());if(ev.target.id==='accountTheme')void changeUserPreference('theme',ev.target.value);else if(ev.target.id==='accountLanguage')void changeUserPreference('lang',ev.target.value);else if(ev.target.id==='accountIcon'){const preview=$('#accountIconPreview');if(preview)preview.innerHTML=icon(ev.target.value,24);}else if(ev.target.id==='accountSearchType'){ui.accountSearchType=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchStatus'){ui.accountSearchStatus=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchDateMode'){ui.accountSearchDateMode=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchDateFrom'){ui.accountSearchDateFrom=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchDateTo'){ui.accountSearchDateTo=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountSearchUser'){ui.accountSearchUser=ev.target.value;refreshAccountSearchResults();}else if(ev.target.id==='accountAssignedType'){ui.accountAssignedType=ev.target.value;if(ui.accountAssignedType==='project'||ui.accountAssignedType==='job')ui.accountAssignedPriority='all';renderAccountPage();}else if(ev.target.id==='accountAssignedStatus'){ui.accountAssignedStatus=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedPriority'){ui.accountAssignedPriority=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedDateMode'){ui.accountAssignedDateMode=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedDateFrom'){ui.accountAssignedDateFrom=ev.target.value;refreshAccountAssignedResults();}else if(ev.target.id==='accountAssignedDateTo'){ui.accountAssignedDateTo=ev.target.value;refreshAccountAssignedResults();}});
@@ -5350,7 +5457,7 @@ async function startWorkspaceHydration(){
   // The restored parent was already reconciled by exact ID; preserve it through final rendering.
   invalidateActivityIndexes();skipNextSidebarApiRefresh=true;render();
   if(hydratedUserTheme){ui.theme=hydratedUserTheme;applyTheme();}
-  if(restoredWorkspaceScrollY>0&&typeof requestAnimationFrame==='function')requestAnimationFrame(()=>window.scrollTo({top:restoredWorkspaceScrollY,left:0,behavior:'instant'}));
+  restoreInitialPageScrollPosition(restoredWorkspaceScrollY);
   if(ui.page==='account'){
    if(ui.accountTab==='assigned'&&!ui.accountAssignedLoaded)void loadAccountAssignedItems();
    else if(ui.accountTab==='pinned'&&!ui.accountPinnedLoaded)void loadAccountPinnedItems();
@@ -5368,7 +5475,7 @@ async function startWorkspaceHydration(){
 // startWorkspaceHydration validates it after the complete parent list loads.
 setSignInState(Boolean(sessionUserIdAtLoad));
 render();
-window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;stopRealtimeNotifications();ui.actingUserId=context.teamUserId;ui.page='account';ui.accountTab='assigned';ui.accountLoading=true;ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedRows=[];ui.accountPinnedRows=[];render();void startWorkspaceHydration();startRealtimeNotifications();};
+window.__TEAM_FOLLOW_UP_APP_AUTH_CHANGED=(context)=>{if(!context)return;stopRealtimeNotifications();ui.actingUserId=context.teamUserId;resetPageScrollPositions();ui.page='account';ui.accountTab='assigned';ui.accountLoading=true;ui.accountAssignedLoaded=false;ui.accountPinnedLoaded=false;ui.accountAssignedRows=[];ui.accountPinnedRows=[];render();void startWorkspaceHydration();startRealtimeNotifications();};
 window.__TEAM_FOLLOW_UP_APP_AUTH_SIGNED_OUT=()=>{stopRealtimeNotifications();};
 document.documentElement.classList.remove('auth-pending','app-booting');
 void startWorkspaceHydration();

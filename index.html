@@ -3088,7 +3088,7 @@ function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlig
    scrollContainer.scrollTo({top,behavior:reduceMotion?'instant':'smooth'});
   }else{
    let top=0;
-   if(!alignToTop){
+   if(desktop&&!alignToTop){
     const usableTop=Math.max(0,headerBottom+8);
     const usableBottom=Math.max(usableTop,viewportHeight-12);
     const targetCenter=rect.top+rect.height/2;

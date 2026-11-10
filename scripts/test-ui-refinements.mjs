@@ -394,8 +394,9 @@ assert.ok(html.includes("function alignWorkspaceItemInViewport(target,itemId='',
   'Item jumps must center the target in the usable desktop viewport.');
 assert.ok(html.includes('const delta=alignToTop?rect.top-(usableTop+12):targetCenter-viewportCenter;') &&
   html.includes('if(desktop&&!alignToTop){') &&
-  html.includes("alignToTop:isRootItem,highlight:item.type!=='project'"),
-  'Job root redirects align the actual detail-card start below the header; ordinary item jumps retain desktop centering.');
+  html.includes("function alignWorkspaceParentInViewport(parentId,{highlight=false}={})") &&
+  html.includes("if(isRootItem)alignWorkspaceParentInViewport(selectedRootId,{highlight:item.type!=='project'})"),
+  'Root Project/Job redirects use exact-parent top alignment; ordinary child-item jumps retain desktop centering.');
 const alignHelperStart=html.indexOf("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlight=true}={}){");
 const mobileJumpStart=html.indexOf("if(!desktop){",alignHelperStart);
 const mobileJumpEnd=html.indexOf("\n  }\n  let scrollContainer=null;",mobileJumpStart);
@@ -409,9 +410,10 @@ assert.ok(mobileJumpStart>alignHelperStart && mobileJumpEnd>mobileJumpStart &&
   mobileJumpLogic.includes("window.scrollTo({top,left:0,behavior:'smooth'})") &&
   !mobileJumpLogic.includes('activeTarget.scrollIntoView('),
   'Mobile redirects explicitly position the target in the real scroll container or document viewport below the sticky header.');
-assert.ok(html.includes("alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId,{alignToTop:isRootItem,highlight:item.type!=='project'})") &&
-  html.includes("const rootTarget=document.querySelector('#mainContent .detail-card')||document.querySelector('#mainContent .detail-banner');alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'})"),
-  'Parent, assigned, and pinned destinations must use the same item-aware navigation.');
+assert.ok(html.includes("if(isRootItem)alignWorkspaceParentInViewport(selectedRootId,{highlight:item.type!=='project'})") &&
+  html.includes("alignWorkspaceItemInViewport(selectedTarget,selectedItemId,{highlight:item.type!=='project'})") &&
+  html.includes("alignWorkspaceParentInViewport(selectedId,{highlight:parent.type!=='project'})"),
+  'Root Project/Job destinations use exact-parent top alignment while child-item destinations retain item-aware alignment.');
 assert.ok(html.includes('id="newParentMobile" class="btn btn-primary mobile-new-parent-button"') &&
   html.indexOf('id="newParentMobile"')<html.indexOf('id="mobileSearchToggle"') &&
   html.includes("$('#newParentMobile').addEventListener('click',openNewParent);") &&
@@ -432,7 +434,7 @@ assert.ok(finalPositionCss.includes('justify-content:center!important') &&
 
 const parentJumpStart=html.indexOf("case 'select-parent':");
 const parentJumpEnd=html.indexOf("case 'select-assigned':",parentJumpStart);
-assert.ok(parentJumpStart>=0&&parentJumpEnd>parentJumpStart&&html.slice(parentJumpStart,parentJumpEnd).includes("alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'})"),'Selecting a parent aligns Job items to the beginning and preserves the existing Project behavior.');
+assert.ok(parentJumpStart>=0&&parentJumpEnd>parentJumpStart&&html.slice(parentJumpStart,parentJumpEnd).includes("alignWorkspaceParentInViewport(selectedId,{highlight:parent.type!=='project'})"),'Selecting a Project or Job from the workspace list top-aligns its exact detail card after its hierarchy loads.');
 
 
 const accountSearchMatcherStart=html.indexOf('function accountSearchUserMatches(item,userId){');
@@ -655,9 +657,10 @@ assert.ok(html.includes('<span class="timeline-user">') &&
   'Recent activity groups the avatar and username so the shared separator spacing remains precise.');
 assert.ok(html.includes("function alignWorkspaceItemInViewport(target,itemId='',{alignToTop=false,highlight=true}={}){") &&
   html.includes('if(highlight)highlightWorkspaceCard(activeTarget);') &&
-  html.includes("alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'") &&
-  html.includes("alignToTop:isRootItem,highlight:item.type!=='project'"),
-  'Project and Job roots align at the top from workspace and Profile redirects, while a Project root itself is not highlighted.');
+  html.includes("function alignWorkspaceParentInViewport(parentId,{highlight=false}={})") &&
+  html.includes("alignWorkspaceParentInViewport(selectedId,{highlight:parent.type!=='project'})") &&
+  html.includes("if(isRootItem)alignWorkspaceParentInViewport(selectedRootId,{highlight:item.type!=='project'})"),
+  'Project and Job roots use exact-parent top alignment from workspace and Profile redirects, while a Project root itself is not highlighted.');
 
 const finalLayoutFixStart=html.indexOf('<style id="final-header-metadata-and-hierarchy-layout-fix">');
 const finalLayoutFixEnd=html.indexOf('</style>',finalLayoutFixStart);
@@ -771,3 +774,27 @@ assert.ok(finalLayoutFix.includes('.topbar>.brand .brand-copy strong{') &&
   finalLayoutFix.includes('overflow:visible!important;text-overflow:clip!important'),
   'The mobile app wordmark keeps its full width and is not clipped by the centered WORKSPACE/USERSPACE label.');
 
+const awsParentDetailStart=html.indexOf('function renderDetail(){');
+const awsParentDetailEnd=html.indexOf('\\n\\nconst ACCOUNT_ICONS',awsParentDetailStart);
+assert.ok(awsParentDetailStart>=0&&awsParentDetailEnd>awsParentDetailStart,'The AWS workspace parent detail renderer must exist.');
+assert.ok(html.slice(awsParentDetailStart,awsParentDetailEnd).includes('class="detail-card" data-parent-id="${esc(parent.id)}"'),'The rendered AWS Project/Job detail card must expose its exact parent ID.');
+
+const awsParentAlignStart=html.indexOf('function alignWorkspaceParentInViewport(parentId,');
+const awsParentAlignEnd=html.indexOf('function typeIcon(type)',awsParentAlignStart);
+assert.ok(awsParentAlignStart>=0&&awsParentAlignEnd>awsParentAlignStart,'The exact AWS parent aligner must exist.');
+const awsParentAlignSource=html.slice(awsParentAlignStart,awsParentAlignEnd);
+assert.ok(awsParentAlignSource.includes('findWorkspaceParentCard(wanted)')&&awsParentAlignSource.includes('ui.selectedParentId')&&awsParentAlignSource.includes('alignmentPasses<4'),'AWS parent redirection resolves the selected card and reapplies alignment over successive paint frames.');
+assert.ok(awsParentAlignSource.includes('scrollContainer.scrollTop=nextTop')&&awsParentAlignSource.includes('window.scrollTo(0,nextTop)'),'AWS parent redirection top-aligns both scrollable containers and the document viewport.');
+
+const awsParentCase=html.slice(html.indexOf("case 'select-parent':"),html.indexOf("case 'select-assigned':",html.indexOf("case 'select-parent':")));
+const awsAssignedCase=html.slice(html.indexOf("case 'select-assigned':"),html.indexOf("case 'open-archive':",html.indexOf("case 'select-assigned':")));
+assert.ok(awsParentCase.includes('alignWorkspaceParentInViewport(selectedId'),'AWS workspace parent selection uses exact-parent top alignment.');
+assert.ok(awsAssignedCase.includes('if(isRootItem)alignWorkspaceParentInViewport(selectedRootId'),'AWS profile redirects to root Projects/Jobs use the same exact-parent top alignment.');
+
+const awsMobileHistoryStart=html.indexOf('<style id="mobile-workspace-parent-scroll-and-history-header-fix">');
+const awsMobileHistoryEnd=html.indexOf('</style>',awsMobileHistoryStart);
+assert.ok(awsMobileHistoryStart>=0&&awsMobileHistoryEnd>awsMobileHistoryStart,'AWS mobile Activity History header layout override must exist.');
+const awsMobileHistoryCss=html.slice(awsMobileHistoryStart,awsMobileHistoryEnd);
+assert.ok(awsMobileHistoryCss.includes('grid-template-columns:minmax(0,1.2fr) minmax(88px,.8fr)')&&awsMobileHistoryCss.includes('grid-column:1!important')&&awsMobileHistoryCss.includes('grid-column:2!important'),'AWS mobile Activity History places time/date and user identity in the same first row.');
+assert.ok(awsMobileHistoryCss.includes('white-space:normal!important')&&awsMobileHistoryCss.includes('overflow-wrap:anywhere!important'),'Long usernames wrap within the first-row user column without moving the entire user block to a separate row.');
+assert.ok(html.includes('margin:10px 12px 10px!important')&&html.includes('.mobile-search-toggle:not([hidden]){margin-top:0!important}'),'AWS mobile New Project/Job button leaves a small defined gap before the Find a project or job disclosure.');

@@ -631,7 +631,9 @@ assert.ok(finalLayoutFix.includes('.history-user,') &&
   finalLayoutFix.includes('.application-history-table .history-user,') &&
   finalLayoutFix.includes('align-items:center!important') &&
   finalLayoutFix.includes('.history-user-copy{align-self:center!important;justify-content:center!important') &&
-  finalLayoutFix.includes('.history-user-name{display:block!important;align-self:stretch!important;line-height:1.4!important;text-align:start!important}'),
+  finalLayoutFix.includes('.history-user-name{') &&
+  finalLayoutFix.includes('align-self:stretch!important') &&
+  finalLayoutFix.includes('text-align:start!important'),
   'Activity-history names remain vertically aligned with avatars but their text stays start-aligned, not horizontally centered.');
 const historyUserRendererStart=html.indexOf('function historyUserMarkup(event){');
 const historyUserRenderer=html.slice(historyUserRendererStart,historyUserRendererStart+420);

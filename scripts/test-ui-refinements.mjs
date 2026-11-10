@@ -567,3 +567,34 @@ assert.ok(jumpHighlightFunction.includes("target.classList.add('workspace-jump-h
   jumpHighlightFunction.includes('workspaceJumpHighlightTimer=setTimeout(') &&
   jumpHighlightFunction.includes('},1850);'),
   'The hover correction does not shorten or otherwise interrupt the established temporary jump-highlight duration.');
+assert.ok(html.includes('<span id="brandContextLabel" class="brand-context-label"></span>') &&
+  html.includes("$('#brandContextLabel').textContent=ui.page==='account'?tr('accountHubTitle'):tr('workspaceEyebrow');") &&
+  html.includes('.topbar .brand-copy .brand-context-label') &&
+  html.includes('flex-direction:row!important'),
+  'Mobile header displays the active WORKSPACE/USERSPACE context beside the Follow-Up brand name.');
+assert.ok(html.includes('input[type="date"],.date-input{text-align:center!important;text-align-last:center!important}') &&
+  html.includes('::-webkit-datetime-edit-fields-wrapper') &&
+  html.includes('justify-content:center!important'),
+  'Sidebar and child-item From/To date values are centered, including native Chromium date segments.');
+assert.ok(html.includes('#mainContent .tree-task-row .tree-title') &&
+  html.includes('#mainContent .tree-child-row .tree-child-name') &&
+  html.includes('font-weight:700!important') &&
+  html.includes('#mainContent .timeline-meta{font-size:10px!important'),
+  'Related hierarchy item names match Recent activity title weight, and Recent activity metadata matches the compact metadata scale.');
+assert.ok(html.includes('function metaSeparatorMarkup(){') &&
+  html.includes('function fmtDateTimeMarkup(date){') &&
+  html.includes('class="meta-separator" aria-hidden="true">·</span>') &&
+  html.includes('font-weight:950!important') &&
+  html.includes('gap:2px .38em'),
+  'Creator and timestamp labels use spaced, bold semantic separators instead of ambiguous plain-text middots.');
+assert.ok(html.includes('class="creator-copy"') &&
+  html.includes('${fmtDateTimeMarkup(item.createdAt)}') &&
+  html.includes('function timelineEvents(parent,limit=8)') &&
+  html.includes('${metaSeparatorMarkup()}${fmtDateTimeMarkup(e.at)}'),
+  'Created-by labels and Recent activity metadata share the structured date/time separator treatment.');
+assert.ok(html.includes('#mainContent .child-description{font-size:12px!important}') &&
+  html.includes('.archive-modal .archive-child-card .child-description{font-size:11px!important}'),
+  'Item descriptions are slightly larger in the workspace and archive without changing other text.');
+assert.ok(html.includes('class="view-full-history-arrow ${ui.lang===\'ar\'?\'is-rtl\':\'is-ltr\'}"') &&
+  html.includes('.view-full-history-arrow.is-rtl svg{transform:scaleX(-1)!important'),
+  'The Recent activity View full history arrow is mirrored in Arabic only.');

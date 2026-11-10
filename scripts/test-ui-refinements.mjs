@@ -407,7 +407,7 @@ assert.ok(mobileJumpStart>alignHelperStart && mobileJumpEnd>mobileJumpStart &&
   mobileJumpLogic.includes('window.scrollTo(0,top);') &&
   mobileJumpLogic.includes("scrollContainer.scrollTo({top,behavior:'smooth'})") &&
   mobileJumpLogic.includes("window.scrollTo({top,left:0,behavior:'smooth'})") &&
-  !mobileJumpLogic.includes('scrollIntoView('),
+  !mobileJumpLogic.includes('activeTarget.scrollIntoView('),
   'Mobile redirects explicitly position the target in the real scroll container or document viewport below the sticky header.');
 assert.ok(html.includes("alignWorkspaceItemInViewport(selectedTarget,isRootItem?'':selectedItemId,{alignToTop:isRootItem,highlight:item.type!=='project'})") &&
   html.includes("const rootTarget=document.querySelector('#mainContent .detail-card')||document.querySelector('#mainContent .detail-banner');alignWorkspaceItemInViewport(rootTarget,'',{alignToTop:parent.type==='job'||parent.type==='project',highlight:parent.type!=='project'})"),

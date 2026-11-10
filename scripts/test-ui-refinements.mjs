@@ -775,7 +775,7 @@ assert.ok(finalLayoutFix.includes('.topbar>.brand .brand-copy strong{') &&
   'The mobile app wordmark keeps its full width and is not clipped by the centered WORKSPACE/USERSPACE label.');
 
 const awsParentDetailStart=html.indexOf('function renderDetail(){');
-const awsParentDetailEnd=html.indexOf('\\n\\nconst ACCOUNT_ICONS',awsParentDetailStart);
+const awsParentDetailEnd=html.indexOf('\n\nconst ACCOUNT_ICONS',awsParentDetailStart);
 assert.ok(awsParentDetailStart>=0&&awsParentDetailEnd>awsParentDetailStart,'The AWS workspace parent detail renderer must exist.');
 assert.ok(html.slice(awsParentDetailStart,awsParentDetailEnd).includes('class="detail-card" data-parent-id="${esc(parent.id)}"'),'The rendered AWS Project/Job detail card must expose its exact parent ID.');
 

@@ -492,12 +492,15 @@ assert.ok(html.includes('.account-parent-context-row>strong>bdi[dir="auto"]') &&
   html.includes('.account-assigned-item-row .account-item-copy .account-assigned-parent-name>bdi{') &&
   html.includes('<bdi dir="') && html.includes("ui.lang==='ar'?'rtl':'ltr'"),
   'Assigned/Pinned parent names must use the selected English/Arabic direction and block alignment in the card and popup.');
-assert.ok(html.includes('grid-template-columns:20px minmax(0,1fr) auto!important') &&
-  html.includes('.tree-task-row.is-ltr{direction:ltr!important}') &&
-  html.includes('.tree-task-row.is-rtl{direction:rtl!important}') &&
+assert.ok(html.includes('<style id="timeline-mobile-edit-placement-and-jump-highlight-override">') &&
+  html.includes('@media(max-width:820px)') &&
+  html.includes('.tree-task-row{') &&
+  html.includes('padding-inline-end:74px!important') &&
   html.includes('.tree-task-row>.tree-task-edit{') &&
+  html.includes('position:absolute!important') &&
+  html.includes('inset-inline-end:0!important') &&
   html.includes('.tree-task-row>.status-pill{'),
-  'Mobile timeline hierarchy assigns direct grid positions using explicit English and Arabic directions.');
+  'Mobile timeline reserves the action width and pins Edit at the top inline-end across the full mobile breakpoint.');
 assert.ok(html.includes('@media(min-width:701px)') &&
   html.includes('.tree-created-meta .creator-line>.avatar') &&
   html.includes('flex:0 0 16px!important') &&
@@ -536,9 +539,31 @@ assert.ok(html.includes('html[dir="rtl"] #mainContent .child-card .child-last-up
   html.includes('justify-content:flex-start!important'),
   'Arabic child-card Last updated labels must move to the physical left without changing their text formatting.');
 
-assert.ok(html.includes('.tree-task-row.is-ltr{direction:ltr!important}') &&
-  html.includes('.tree-task-row.is-rtl{direction:rtl!important}') &&
-  html.includes('.tree-task-row>.tree-task-edit{') &&
-  html.includes('grid-template-columns:20px minmax(0,1fr) auto!important') &&
-  html.includes('grid-column:3!important;') && html.includes('grid-row:1!important;'),
-  'Mobile hierarchy Edit buttons must occupy physical top-right in English and top-left in Arabic without nested display:contents.');
+const timelineOverrideStart=html.indexOf('<style id="timeline-mobile-edit-placement-and-jump-highlight-override">');
+const timelineOverrideEnd=html.indexOf('</style>',timelineOverrideStart);
+const timelineOverride=html.slice(timelineOverrideStart,timelineOverrideEnd);
+assert.ok(timelineOverrideStart>=0 && timelineOverrideEnd>timelineOverrideStart &&
+  timelineOverride.includes('@media(max-width:820px)') &&
+  timelineOverride.includes('.tree-task-row.is-ltr{direction:ltr!important}') &&
+  timelineOverride.includes('.tree-task-row.is-rtl{direction:rtl!important}') &&
+  timelineOverride.includes('padding-inline-end:74px!important') &&
+  timelineOverride.includes('position:absolute!important;inset-block-start:0!important;inset-inline-end:0!important'),
+  'Timeline Edit is pinned in its own top inline-end slot, physically right in English and left in Arabic.');
+const taskTreeRendererStart=html.indexOf('function treeActivity(parent){');
+const taskTreeRenderer=html.slice(taskTreeRendererStart,taskTreeRendererStart+5000);
+assert.ok(taskTreeRendererStart>=0 &&
+  taskTreeRenderer.includes("class=\"tree-task-row ${ui.lang==='ar'?'is-rtl':'is-ltr'}\"") &&
+  taskTreeRenderer.includes("</div>${statusPill(item.status)}<button class=\"subtle-btn tree-task-edit\""),
+  'Timeline task status and Edit remain direct children so the mobile positioning rules cannot depend on nested wrappers.');
+const hoverStylePosition=html.indexOf('<style id="consistent-card-hover-and-jump-highlight">');
+const jumpOverridePosition=html.indexOf('<style id="timeline-mobile-edit-placement-and-jump-highlight-override">');
+assert.ok(hoverStylePosition>=0 && jumpOverridePosition>hoverStylePosition &&
+  timelineOverride.includes('.workspace-jump-highlight:is(.parent-card,.child-card,.nested-followup,.account-item-row,.tree-task-wrap,.tree-item,.tree-direct,.archive-row,.archive-child-card,.history-event-card):is(:hover,:focus-within)') &&
+  timelineOverride.includes('box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 28%,transparent)!important'),
+  'The redirected card retains the jump highlight above hover styling when the pointer is over it or moves elsewhere.');
+const jumpHighlightFunctionStart=html.indexOf('function highlightWorkspaceCard(target){');
+const jumpHighlightFunction=html.slice(jumpHighlightFunctionStart,html.indexOf('function findWorkspaceItemCard',jumpHighlightFunctionStart));
+assert.ok(jumpHighlightFunction.includes("target.classList.add('workspace-jump-highlight')") &&
+  jumpHighlightFunction.includes('workspaceJumpHighlightTimer=setTimeout(') &&
+  jumpHighlightFunction.includes('},1850);'),
+  'The hover correction does not shorten or otherwise interrupt the established temporary jump-highlight duration.');

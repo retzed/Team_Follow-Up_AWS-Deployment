@@ -3220,7 +3220,7 @@ function applyTranslations(){const enteringWorkspace=lastAppliedPage==='account'
  if(enteringWorkspace)animateWorkspaceSurfaceEntry();
 }
 function filteredAssignedItems(baseItems=[...data.parents,...data.children]){const query=ui.parentQuery.trim().toLocaleLowerCase();const list=baseItems.filter(item=>{if(!itemAssigneeIds(item).includes(String(ui.actingUserId||'')))return false;const workflowSearch=item.type==='followup'?'':[statusName(item.status,'en'),statusName(item.status,'ar')].join(' ');if(query&&!`${item.name} ${typeName(item.type)} ${workflowSearch} ${person(item.createdBy).name} ${person(item.updatedBy).name}`.toLocaleLowerCase().includes(query))return false;if(ui.parentType!=='all'&&item.type!==ui.parentType)return false;if(!matchesItemStatusFilter(item,ui.parentStatus))return false;if(!matchesDate(item,ui.parentDateMode,ui.parentDateFrom,ui.parentDateTo))return false;return true;});list.sort((a,b)=>compareByDateMode(a,b,ui.parentDateMode));return list;}
-function assignmentContextMarkup(item){if(item.type==='project'||item.type==='job')return esc(typeName(item.type));const parent=allItem(item.parentId);const root=rootParent(item);const parts=[esc(typeName(item.type))];if(parent?.type==='task')parts.push(`<bdi dir="auto">${esc(parent.name)}</bdi>`);if(root?.name)parts.push(`<bdi dir="auto">${esc(root.name)}</bdi>`);return parts.join(' · ');}
+function assignmentContextMarkup(item){if(item.type==='project'||item.type==='job')return esc(typeName(item.type));const parent=allItem(item.parentId);const root=rootParent(item);const parts=[esc(typeName(item.type))];if(parent?.type==='task')parts.push(`<bdi dir="auto">${esc(parent.name)}</bdi>`);if(root?.name)parts.push(`<bdi dir="auto">${esc(root.name)}</bdi>`);return parts.join(metaSeparatorMarkup());}
 let sidebarQueryTimer=null,sidebarQuerySequence=0;
 function mobileSearchToggleMarkup(){return `${icon('search',14)}<span class="mobile-search-toggle-label">${esc(tr('parentSearchTitle'))}</span><span class="mobile-search-toggle-state" aria-hidden="true">${icon('chevron',14)}</span>`;}
 function syncWorkspaceSidebarVisibility(){
@@ -3282,7 +3282,7 @@ function renderParentSearchList(list){
  const rootCounts=loadedRootItemCounts();
  const isPending=!dataLoadState.parentsReady&&!dataLoadState.initialError;
  $('#parentCount').innerHTML=`${list.length} ${esc(tr('items'))}${isPending?` ${inlineSpinnerMarkup()}`:''}`;
- const cards=list.map(p=>{const selected=p.id===ui.selectedParentId;const childReady=rootChildrenReady(p.id);const itemCount=childReady?(rootCounts.get(String(p.id))||0):0;return `<article class="parent-card ${selected?'selected':''}" data-action="select-parent" data-id="${esc(p.id)}" tabindex="0" aria-current="${selected?'true':'false'}"><span class="card-topline"><span class="type-icon">${typeIcon(p.type)}</span><span class="parent-card-copy"><span class="parent-card-title" dir="auto">${esc(p.name)}</span><span class="parent-card-type parent-card-meta"><span>${esc(typeName(p.type))}</span><span class="meta-dot">·</span>${childReady?`<span>${esc(itemCount+' '+tr('items'))}</span>`:(dataLoadState.initialError||dataLoadState.rootErrors.has(`children:${p.id}`))?countValueMarkup(itemCount,false,p.id,'children'):(selected||rootChildrenRequests.has(String(p.id)))?inlineSpinnerMarkup():''}</span></span></span><span class="parent-card-bottom">${statusPill(p.status)}${pinActionMarkup(p.id)}</span><button class="mini-updated" dir="${ui.lang==='ar'?'rtl':'ltr'}" data-action="history" data-item-id="${esc(p.id)}" type="button" aria-label="${esc(tr('activityHistory'))}" title="${esc(`${tr('lastUpdatedLabel')}: ${fmtDateTime(p.updatedAt)} · ${person(p.updatedBy).name}`)}">${icon('clock',11)} <span>${esc(tr('lastUpdatedLabel'))}: ${esc(fmtDateTime(p.updatedAt))} · ${esc(person(p.updatedBy).name)}</span></button></article>`;}).join('');
+ const cards=list.map(p=>{const selected=p.id===ui.selectedParentId;const childReady=rootChildrenReady(p.id);const itemCount=childReady?(rootCounts.get(String(p.id))||0):0;return `<article class="parent-card ${selected?'selected':''}" data-action="select-parent" data-id="${esc(p.id)}" tabindex="0" aria-current="${selected?'true':'false'}"><span class="card-topline"><span class="type-icon">${typeIcon(p.type)}</span><span class="parent-card-copy"><span class="parent-card-title" dir="auto">${esc(p.name)}</span><span class="parent-card-type parent-card-meta"><span>${esc(typeName(p.type))}</span>${metaSeparatorMarkup()}${childReady?`<span>${esc(itemCount+' '+tr('items'))}</span>`:(dataLoadState.initialError||dataLoadState.rootErrors.has(`children:${p.id}`))?countValueMarkup(itemCount,false,p.id,'children'):(selected||rootChildrenRequests.has(String(p.id)))?inlineSpinnerMarkup():''}</span></span></span><span class="parent-card-bottom">${statusPill(p.status)}${pinActionMarkup(p.id)}</span><button class="mini-updated" dir="${ui.lang==='ar'?'rtl':'ltr'}" data-action="history" data-item-id="${esc(p.id)}" type="button" aria-label="${esc(tr('activityHistory'))}" title="${esc(`${tr('lastUpdatedLabel')}: ${fmtDateTime(p.updatedAt)} · ${person(p.updatedBy).name}`)}">${icon('clock',11)} <span>${esc(tr('lastUpdatedLabel'))}: ${fmtDateTimeMarkup(p.updatedAt)}${metaSeparatorMarkup()}<bdi dir="auto">${esc(person(p.updatedBy).name)}</bdi></span></button></article>`;}).join('');
  const pending=isPending?spinnerMarkup(tr('loadingItems'),true):'';
  const error=dataLoadState.initialError?loadErrorMarkup(dataLoadState.initialError):'';
  $('#parentList').innerHTML=cards+(pending||error||(!cards?`<div class="empty-state">${esc(tr('noFilterResults'))}</div>`:''));
@@ -3503,7 +3503,7 @@ function accountAssignedItemRow(item){
  const dueLabel=esc(item.dueDate?fmtDate(item.dueDate,{month:'short',day:'numeric',year:'numeric'}):'—');
  const dueMarkup=item.type==='followup'?'':'<span class="account-assigned-due">'+icon('calendar',12)+' '+dueLabel+'</span>';
  const details=item.type==='followup'
-  ?'<div class="account-assigned-meta-row account-assigned-context-row account-assigned-followup-row">'+typeLabel+'<span class="account-assigned-meta-separator">·</span>'+priorityPill(item.priority||'medium')+'<span class="account-assigned-meta-separator">·</span>'+parentNameMarkup+'</div>'
+  ?'<div class="account-assigned-meta-row account-assigned-context-row account-assigned-followup-row">'+typeLabel+metaSeparatorMarkup()+priorityPill(item.priority||'medium')+'<span class="account-assigned-meta-separator">·</span>'+parentNameMarkup+'</div>'
   :isParent
    ?'<div class="account-assigned-meta-row">'+typeLabel+(item.type==='followup'?'':statusPill(item.status))+dueMarkup+'</div>'
    :'<div class="account-assigned-meta-row account-assigned-context-row">'+typeLabel+'<span class="account-assigned-meta-separator">·</span>'+parentNameMarkup+'</div><div class="account-assigned-meta-row account-assigned-state-row">'+priorityPill(item.priority||'medium')+statusPill(item.status)+dueMarkup+'</div>';
@@ -8553,6 +8553,140 @@ input[type="date"]::-webkit-datetime-edit-fields-wrapper,.date-input::-webkit-da
 /* Keep history names at the start edge while retaining vertical avatar alignment. */
 .history-user-name{
  display:block!important;align-self:stretch!important;line-height:1.4!important;text-align:start!important;
+}
+</style>
+
+
+<style id="mobile-child-card-dynamic-flow-and-unified-metadata-separators">
+/* One separator glyph, weight and spacing treatment across metadata surfaces.
+   Thin spaces are part of the decorated span, preserving continuous underlines. */
+.meta-separator,
+.meta-dot,
+.account-assigned-meta-separator {
+  display: inline !important;
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: currentColor !important;
+  font-family: var(--font-ui) !important;
+  font-size: 1.1em !important;
+  font-weight: 1000 !important;
+  line-height: inherit !important;
+  opacity: 1 !important;
+  text-decoration: inherit !important;
+  text-decoration-skip-ink: none !important;
+  -webkit-text-stroke: .22px currentColor !important;
+  unicode-bidi: isolate !important;
+  white-space: pre !important;
+}
+.parent-card-meta { column-gap: 0 !important; }
+#accountPage .account-assigned-meta-row.account-assigned-context-row { gap: 0 !important; }
+
+@media (max-width: 700px) {
+  #mainContent .child-card .child-top {
+    grid-template-columns: 34px minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto auto !important;
+  }
+  #mainContent .child-card .child-top > .child-icon {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+  #mainContent .child-card .child-top .child-title-row {
+    display: block !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    line-height: 1.45 !important;
+  }
+  /* Inline text flow keeps the type chip immediately after the item name. */
+  #mainContent .child-card .child-title-row .child-title {
+    display: inline !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+  #mainContent .child-card .child-title-row .type-pill {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    vertical-align: baseline !important;
+    align-self: auto !important;
+    margin-block: 0 !important;
+    margin-inline-start: .4em !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+  }
+  #mainContent .child-card .child-top .child-description {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+  #mainContent .child-card .child-top .child-meta {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+  #mainContent .child-card .child-top > .child-actions {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+    align-self: start !important;
+  }
+  /* Size the assignee by its actual content, not by the full row. It can
+     wrap when needed but starts at the normal inline edge in either locale. */
+  #mainContent .child-card .child-meta > .child-assignee {
+    display: inline-flex !important;
+    flex: 0 1 auto !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    align-self: flex-start !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+    direction: inherit !important;
+    text-align: start !important;
+    white-space: normal !important;
+  }
+  #mainContent .child-card .child-meta > .child-assignee > svg {
+    display: block !important;
+    flex: 0 0 14px !important;
+    width: 14px !important;
+    height: 14px !important;
+  }
+  #mainContent .child-card .child-meta > .child-assignee > .assigned-label {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+  #mainContent .child-card .child-meta > .child-assignee > .assigned-person-list,
+  #mainContent .child-card .child-meta > .child-assignee > .assigned-person {
+    display: inline-flex !important;
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex-wrap: wrap !important;
+    white-space: normal !important;
+  }
+  #mainContent .child-card .child-meta > .child-assignee .assigned-person-chip,
+  #mainContent .child-card .child-meta > .child-assignee .assigned-person {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
 }
 </style>
 

@@ -3503,10 +3503,10 @@ function accountAssignedItemRow(item){
  const dueLabel=esc(item.dueDate?fmtDate(item.dueDate,{month:'short',day:'numeric',year:'numeric'}):'—');
  const dueMarkup=item.type==='followup'?'':'<span class="account-assigned-due">'+icon('calendar',12)+' '+dueLabel+'</span>';
  const details=item.type==='followup'
-  ?'<div class="account-assigned-meta-row account-assigned-context-row account-assigned-followup-row">'+typeLabel+metaSeparatorMarkup()+priorityPill(item.priority||'medium')+'<span class="account-assigned-meta-separator">·</span>'+parentNameMarkup+'</div>'
+  ?'<div class="account-assigned-meta-row account-assigned-context-row account-assigned-followup-row">'+typeLabel+metaSeparatorMarkup()+priorityPill(item.priority||'medium')+'${metaSeparatorMarkup()}'+parentNameMarkup+'</div>'
   :isParent
    ?'<div class="account-assigned-meta-row">'+typeLabel+(item.type==='followup'?'':statusPill(item.status))+dueMarkup+'</div>'
-   :'<div class="account-assigned-meta-row account-assigned-context-row">'+typeLabel+'<span class="account-assigned-meta-separator">·</span>'+parentNameMarkup+'</div><div class="account-assigned-meta-row account-assigned-state-row">'+priorityPill(item.priority||'medium')+statusPill(item.status)+dueMarkup+'</div>';
+   :'<div class="account-assigned-meta-row account-assigned-context-row">'+typeLabel+'${metaSeparatorMarkup()}'+parentNameMarkup+'</div><div class="account-assigned-meta-row account-assigned-state-row">'+priorityPill(item.priority||'medium')+statusPill(item.status)+dueMarkup+'</div>';
  const workArrowMarkup='<span class="account-assigned-work-arrow'+(ui.lang==='ar'?' is-rtl':'')+'" aria-hidden="true">'+icon('arrow',12)+'</span>';
  return '<div class="account-item-row account-assigned-item-row"><div class="account-item-icon">'+typeIcon(item.type)+'</div><div class="account-item-copy"><strong dir="'+(ui.lang==='ar'?'rtl':'ltr')+'" title="'+esc(item.name||id)+'">'+esc(item.name||id)+'</strong>'+details+'</div><div class="account-item-actions"><button class="btn btn-small" type="button" data-action="select-assigned" data-id="'+esc(id)+'">'+workArrowMarkup+' '+esc(tr('workLabel'))+'</button><button class="btn btn-small" type="button" data-action="history" data-item-id="'+esc(id)+'"'+(item.type==='task'?' data-history-scope="item"':'')+' aria-label="'+esc(tr('activityHistory'))+'" title="'+esc(tr('activityHistory'))+'">'+icon('clock',12)+' '+esc(tr('activityHistory'))+'</button>'+pinActionMarkup(id)+'</div></div>';
 }
